@@ -2,7 +2,7 @@ import random
 
 import pytest
 
-from src.loaded_dice.dice import DiceSet, TooManyRollsError
+from loaded_dice.dice import DiceSet, TooManyRollsError
 
 
 def test_diceset_has_five_dice_by_default():
@@ -41,10 +41,31 @@ def test_unlocked_dice_can_change_on_reroll():
     assert changed
 
 
-def test_cannot_roll_more_than_three_times_per_turn():
+def test_cannot_roll_more_than_default_max_per_turn():
     ds = DiceSet()
     ds.roll()
     ds.roll()
+    ds.roll()
+    with pytest.raises(TooManyRollsError):
+        ds.roll()
+
+
+def test_higher_max_rolls_allows_extra_rolls():
+    ds = DiceSet(max_rolls=4)
+    ds.roll()
+    ds.roll()
+    ds.roll()
+    ds.roll()
+    with pytest.raises(TooManyRollsError):
+        ds.roll()
+
+
+def test_grant_extra_rolls_mid_turn():
+    ds = DiceSet()
+    ds.roll()
+    ds.roll()
+    ds.roll()
+    ds.grant_extra_rolls(1)
     ds.roll()
     with pytest.raises(TooManyRollsError):
         ds.roll()

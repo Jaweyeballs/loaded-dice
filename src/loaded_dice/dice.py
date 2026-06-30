@@ -1,8 +1,11 @@
 """Core dice mechanics for the Yahtzee engine.
 
-A DiceSet holds 5 Die objects. Locked dice are skipped on reroll,
-matching standard Yahtzee keep/reroll behavior. This covers M0 Group A
-from the project roadmap.
+A DiceSet holds one or more Die objects (default 5). Locked dice are skipped on
+reroll, matching standard Yahtzee keep/reroll behavior. Default is 3 rolls per
+turn; card effects may grant more. Card effects may also add extra dice;
+scoring always uses 5 selected values (see GDD). Standard dice use faces 1–6;
+special dice (e.g. The Coin's blank faces) may use 0 or other face sets when
+card effects are implemented.
 """
 
 import random
@@ -30,21 +33,27 @@ class TooManyRollsError(Exception):
     """Raised when a DiceSet tries to roll more times than allowed in a turn."""
 
 
+DEFAULT_MAX_ROLLS_PER_TURN = 3
+
+
 class DiceSet:
-    """Five dice plus the roll-count enforcement for a single turn."""
+    """Dice for a single turn. Default size is 5; card effects may increase it."""
 
-    MAX_ROLLS_PER_TURN = 3
-
-    def __init__(self, size: int = 5):
+    def __init__(self, size: int = 5, max_rolls: int = DEFAULT_MAX_ROLLS_PER_TURN):
         self.dice = [Die() for _ in range(size)]
+        self.max_rolls = max_rolls
         self.rolls_this_turn = 0
+
+    def grant_extra_rolls(self, count: int = 1) -> None:
+        """Increase the per-turn roll limit (e.g. The Gambler, The Toddler)."""
+        self.max_rolls += count
 
     def roll(self) -> list[int]:
         """Roll all unlocked dice. Raises TooManyRollsError past the per-turn limit."""
-        if self.rolls_this_turn >= self.MAX_ROLLS_PER_TURN:
+        if self.rolls_this_turn >= self.max_rolls:
             raise TooManyRollsError(
                 f"Already rolled {self.rolls_this_turn} times this turn "
-                f"(max {self.MAX_ROLLS_PER_TURN})."
+                f"(max {self.max_rolls})."
             )
         for die in self.dice:
             die.roll()

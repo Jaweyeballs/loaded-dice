@@ -22,9 +22,9 @@ python -m venv .venv
 .venv\Scripts\Activate.ps1
 ```
 
-Then install dependencies:
+Then install the package and dev dependencies:
 ```bash
-pip install -r requirements.txt
+pip install -e ".[dev]"
 ```
 
 ## Running tests
