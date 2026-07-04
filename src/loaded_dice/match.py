@@ -6,6 +6,12 @@ from dataclasses import dataclass, field
 from enum import Enum
 
 from loaded_dice.dice import DEFAULT_MAX_ROLLS_PER_TURN, DiceSet, TooManyRollsError
+from loaded_dice.economy import (
+    CHIPS_PER_SCORED_HAND,
+    calculate_interest,
+    chips_for_unused_standard_rolls,
+    InsufficientChipsError,
+)
 from loaded_dice.scoring import Category, ScoreSheet
 
 
@@ -43,10 +49,11 @@ class MatchConfig:
 
 @dataclass
 class Player:
-    name: str 
-    current_sheet: ScoreSheet = field(default_factory=ScoreSheet) 
+    name: str
+    current_sheet: ScoreSheet = field(default_factory=ScoreSheet)
     game_total: int = 0
     sheets_completed: int = 0
+    chips: int = 0
 
     def total_score(self) -> int:
         return self.game_total + self.current_sheet.grand_total()
@@ -55,6 +62,20 @@ class Player:
         if config.refresh_sheet_on_complete:
             return False
         return self.current_sheet.is_complete()
+
+    def earn_chips(self, amount: int) -> None:
+        if amount < 0:
+            raise ValueError("Cannot earn a negative chip amount")
+        self.chips += amount
+
+    def spend_chips(self, amount: int) -> None:
+        if amount < 0:
+            raise ValueError("Cannot spend a negative chip amount")
+        if amount > self.chips:
+            raise InsufficientChipsError(
+                f"Need {amount} chips but only have {self.chips}"
+            )
+        self.chips -= amount
 
 
 class Match:
@@ -94,6 +115,9 @@ class Match:
             raise WrongPhaseError(f"Cannot start turn during {self.phase.value}")
         if self.active_player.is_out_of_match(self.config):
             raise WrongPhaseError(f"{self.active_player.name} has finished the match")
+
+        interest = calculate_interest(self.active_player.chips)
+        self.active_player.earn_chips(interest)
 
         self.phase = TurnPhase.TURN_START
         self._dice = DiceSet(
@@ -145,6 +169,7 @@ class Match:
 
         values = self._select_scoring_values(die_indices)
         points = self.active_player.current_sheet.record(values, category)
+        self._award_scoring_income(self.active_player)
         self._on_sheet_completed(self.active_player)
         self._end_turn()
         return points
@@ -196,6 +221,15 @@ class Match:
             return [all_values[i] for i in die_indices]
         except IndexError as exc:
             raise InvalidDieSelectionError(f"Invalid die index in {die_indices}") from exc
+
+    def _award_scoring_income(self, player: Player) -> None:
+        assert self._dice is not None
+        player.earn_chips(CHIPS_PER_SCORED_HAND)
+        roll_income = chips_for_unused_standard_rolls(
+            self._dice.rolls_this_turn,
+            self._dice.standard_max_rolls,
+        )
+        player.earn_chips(roll_income)
 
     def _on_sheet_completed(self, player: Player) -> None:
         if not player.current_sheet.is_complete():

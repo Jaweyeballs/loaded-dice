@@ -1,6 +1,6 @@
 # Loaded Dice — Design Document
 
-*Working title. Currency figures, point values, and slot counts throughout are placeholder/ballpark — not final balance. "Chips" are currency; "$" is shorthand for chip values for simplicity and to express relative value between cards.*
+*Working title. Chip amounts, point values, and slot counts throughout are placeholder/ballpark — not final balance.*
 
 ---
 
@@ -15,10 +15,10 @@
 
 - Currency: **chips**, given in multiple ways (open system — see below).
 - Shop: a slot-machine-style shop, available to a player during *other* players' turns (i.e. browsing/spending isn't limited to your own turn).
-- **Compensation** (passive income mechanic). The two components **stack** — a player who attacked no one and was attacked by N people gets $2 + $1×N on their turn.
-  - $1 per person who attacked you in the previous rotation
-  - $2 if you did not attack anyone in the previous rotation
-- **Base income**: scored hands and unspent rerolls both grant chips by default. Exact amounts TBD during balancing.
+- **Compensation** (passive income mechanic). The two components **stack** — a player who attacked no one and was attacked by N people gets **200 + 100×N** chips on their turn.
+  - **100** chips per person who attacked you in the previous rotation
+  - **200** chips if you did not attack anyone in the previous rotation
+- **Base income**: scoring a hand grants **300** chips; each unused standard reroll (of the default 3) grants **150** chips when you score — ability-granted extra rerolls do not. **Interest**: at turn start, earn **50** chips per **200** chips held (max **200** interest per turn).
 - Needs a full **rarity + economy system** for cards (drop rates, shop pricing tiers) — not yet designed.
 
 ---
@@ -29,7 +29,7 @@ Permanent boosts with drawbacks, picked at the start of a run/match.
 
 | Character | Boost | Drawback |
 |---|---|---|
-| **Vampire** | Gain $2 per person you attack | Gains no compensation |
+| **Vampire** | Gain **200** chips per person you attack | Gains no compensation |
 | **Hoarder** | Can hold an extra trading card | Cannot sell any trading cards |
 | **Quantum cat** | Once per turn, change a single die's value up or down by one | One less power card slot |
 | **Miscounter** | +2 to all scored hands | Can only hit Yahtzee once per game |
@@ -75,7 +75,7 @@ Permanent boosts with drawbacks, picked at the start of a run/match.
 | Positive reinforcement | If you attacked no one last rotation, gain 8 points on this scored hand |
 | Negative reinforcement | If you attacked no one last rotation, gain a *transparent* Parry |
 | Benchwarmer | Roll an extra die alongside normal dice this roll (limited to values 1–3); select 5 dice for scoring |
-| Helping hand | Choose: gain $4, or gain 10 points on this hand — whichever you don't pick goes to another player of your choice |
+| Helping hand | Choose: gain **400** chips, or gain 10 points on this hand — whichever you don't pick goes to another player of your choice |
 | The twins | Two of your dice on the next roll are guaranteed to match (can't be used on two dice that already differ in a way that conflicts) |
 | Space die | Choose a die and set it to any value it could show |
 | The coin | Roll an extra die alongside normal dice for the rest of the round (3 six-faces, 3 blank/0 faces); select 5 dice for scoring |
@@ -85,7 +85,7 @@ Permanent boosts with drawbacks, picked at the start of a run/match.
 | Name | Effect |
 |---|---|
 | Positive punishment | If the target attacked you last round, they lose 5 points on their next scored hand |
-| Negative punishment | If the target attacked you last round, they lose $2 |
+| Negative punishment | If the target attacked you last round, they lose **200** chips |
 | Blue shell | The player in 1st place loses 10 points |
 | Already in jail | The first die the target locks on their turn cannot be unlocked for the rest of their turn |
 | Glass half empty | Any lower-section hand picked this round scores 0 |
@@ -99,14 +99,14 @@ Permanent boosts with drawbacks, picked at the start of a run/match.
 
 | Name | Effect |
 |---|---|
-| The gecko | +$1 to all compensation payouts |
+| The gecko | +**100** chips to all compensation payouts |
 | The toddler | Choose 2 dice to use in an extra reroll |
 | The persuader | +3 points on every scored hand |
-| The gambler | Pay $2 for an extra reroll; cost increases by $1 each time used |
+| The gambler | Pay **200** chips for an extra reroll; cost increases by **100** chips each time used |
 | The psychic | Choose 2 dice to preview their next rolled value |
 | The guardian | Parries a hindrance card of your choice; goes on cooldown for one turn after triggering |
 | The forecaster | Reveals all hindrance cards held by all players, visible only to you, on your turn |
-| The merchant | Earn $2 on your turn |
+| The merchant | Earn **200** chips on your turn |
 | The lawyer | End your turn without scoring a hand (2-turn cooldown) |
 
 ---

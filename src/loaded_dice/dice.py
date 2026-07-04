@@ -41,12 +41,14 @@ class DiceSet:
 
     def __init__(self, size: int = 5, max_rolls: int = DEFAULT_MAX_ROLLS_PER_TURN):
         self.dice = [Die() for _ in range(size)]
+        self.standard_max_rolls = max_rolls
         self.max_rolls = max_rolls
         self.rolls_this_turn = 0
 
     def grant_extra_rolls(self, count: int = 1) -> None:
         """Increase the per-turn roll limit (e.g. The Gambler, The Toddler)."""
         self.max_rolls += count
+        # standard_max_rolls stays fixed — only ability-free rolls earn chip income.
 
     def roll(self) -> list[int]:
         """Roll all unlocked dice. Raises TooManyRollsError past the per-turn limit."""
