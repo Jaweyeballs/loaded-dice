@@ -12,7 +12,13 @@ from loaded_dice.economy import (
     chips_for_unused_standard_rolls,
     InsufficientChipsError,
 )
-from loaded_dice.cards import CardInventory
+from loaded_dice.cards import (
+    CardId,
+    CardInventory,
+    CardNotInInventoryError,
+    POSITIVE_POWERS_REQUIRING_TARGET,
+)
+from loaded_dice.card_effects.positive_power import POSITIVE_POWER_CAST, cast_positive_power
 from loaded_dice.effects import TurnEffects
 from loaded_dice.scoring import Category, ScoreSheet
 from loaded_dice.shop import Shop, ShopError
@@ -41,6 +47,14 @@ class InvalidDieSelectionError(Exception):
     """Raised when die indices for scoring are invalid."""
 
 
+@dataclass(frozen=True)
+class QueuedHindrance:
+    """Hindrance waiting to resolve on the target's next turn start."""
+
+    card_id: CardId
+    caster_name: str
+
+
 @dataclass
 class MatchConfig:
     """Rules for how a match starts and ends. Expand for modes (elimination, etc.)."""
@@ -60,6 +74,8 @@ class Player:
     chips: int = 0
     inventory: CardInventory = field(default_factory=CardInventory)
     turn_effects: TurnEffects = field(default_factory=TurnEffects)
+    queued_hindrances: list[QueuedHindrance] = field(default_factory=list)
+    parry_ready: bool = False
 
     def total_score(self) -> int:
         return self.game_total + self.current_sheet.grand_total()
@@ -161,6 +177,31 @@ class Match:
         """Pass-through for card effects (e.g. The Gambler) on the active turn."""
         self._require_active_dice()
         self._dice.grant_extra_rolls(count)
+
+    def cast_power_card(self, card_id: CardId, **kwargs) -> None:
+        """Play a positive power card from the active player's inventory during rolling."""
+        self._ensure_not_over()
+        if self.phase != TurnPhase.TURN_ACTIVE:
+            raise WrongPhaseError(f"Cannot cast power cards during {self.phase.value}")
+        if card_id not in POSITIVE_POWER_CAST:
+            raise WrongPhaseError(f"{card_id.value} is not a castable positive power card")
+
+        player = self.active_player
+        if card_id in POSITIVE_POWERS_REQUIRING_TARGET:
+            target = kwargs.get("target")
+            if target is None:
+                raise ValueError(f"{card_id.value} requires target")
+            if target not in self.players:
+                raise ValueError("target must be a player in this match")
+            if target is player:
+                raise ValueError(f"{card_id.value} must target another player")
+
+        try:
+            player.inventory.consume_power_by_id(card_id)
+        except CardNotInInventoryError as exc:
+            raise WrongPhaseError(str(exc)) from exc
+
+        cast_positive_power(card_id, player, self, **kwargs)
 
     def score(
         self,

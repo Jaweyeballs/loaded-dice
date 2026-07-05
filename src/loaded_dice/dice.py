@@ -29,6 +29,13 @@ class Die:
         return f"Die(value={self.value}, {state})"
 
 
+def bump_die_face(value: int) -> int:
+    """Increase a standard die face by 1, wrapping 6 → 1 (Icarus)."""
+    if value < 1 or value > 6:
+        raise ValueError(f"Standard die face must be 1–6, got {value}")
+    return (value % 6) + 1
+
+
 class TooManyRollsError(Exception):
     """Raised when a DiceSet tries to roll more times than allowed in a turn."""
 

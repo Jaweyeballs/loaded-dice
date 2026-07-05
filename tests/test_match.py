@@ -2,6 +2,7 @@ import random
 
 import pytest
 
+from loaded_dice.cards import Card, CardId, CardKind
 from loaded_dice.dice import TooManyRollsError
 from loaded_dice.match import (
     InvalidDieSelectionError,
@@ -158,3 +159,40 @@ def test_cannot_act_after_match_over():
     assert match.is_over()
     with pytest.raises(MatchOverError):
         match.start_turn()
+
+
+def test_cast_icarus_bumps_die_and_consumes_card():
+    match = Match(["Alice"])
+    match.active_player.inventory.add_power(Card(CardId.ICARUS, CardKind.POWER))
+    _begin_active_turn(match)
+    match.roll()
+    match.dice.dice[2].value = 5
+    match.cast_power_card(CardId.ICARUS, die_index=2)
+    assert match.dice.dice[2].value == 6
+    assert not match.active_player.inventory.has_power(CardId.ICARUS)
+
+
+def test_cast_icarus_wraps_six_to_one():
+    match = Match(["Alice"])
+    match.active_player.inventory.add_power(Card(CardId.ICARUS, CardKind.POWER))
+    _begin_active_turn(match)
+    match.roll()
+    match.dice.dice[0].value = 6
+    match.cast_power_card(CardId.ICARUS, die_index=0)
+    assert match.dice.dice[0].value == 1
+
+
+def test_cast_power_card_requires_turn_active():
+    match = Match(["Alice"])
+    match.active_player.inventory.add_power(Card(CardId.ICARUS, CardKind.POWER))
+    match.start_turn()
+    with pytest.raises(WrongPhaseError):
+        match.cast_power_card(CardId.ICARUS, die_index=0)
+
+
+def test_cast_power_card_requires_card_in_inventory():
+    match = Match(["Alice"])
+    _begin_active_turn(match)
+    match.roll()
+    with pytest.raises(WrongPhaseError):
+        match.cast_power_card(CardId.ICARUS, die_index=0)

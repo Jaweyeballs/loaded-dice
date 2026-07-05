@@ -2,7 +2,7 @@ import random
 
 import pytest
 
-from loaded_dice.dice import DiceSet, TooManyRollsError
+from loaded_dice.dice import DiceSet, TooManyRollsError, bump_die_face
 
 
 def test_diceset_has_five_dice_by_default():
@@ -78,3 +78,11 @@ def test_reset_for_new_turn_clears_locks_and_roll_count():
     ds.reset_for_new_turn()
     assert ds.rolls_this_turn == 0
     assert all(not die.locked for die in ds.dice)
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [(1, 2), (5, 6), (6, 1)],
+)
+def test_bump_die_face_wraps_six_to_one(value, expected):
+    assert bump_die_face(value) == expected

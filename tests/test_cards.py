@@ -8,6 +8,7 @@ from loaded_dice.cards import (
     DEFAULT_POWER_SLOTS,
     DEFAULT_TRADING_SLOTS,
     InventoryFullError,
+    CardNotInInventoryError,
 )
 from loaded_dice.effects import TurnEffects
 from loaded_dice.match import Match
@@ -38,6 +39,21 @@ def test_trading_inventory_respects_slot_limit():
         inventory.add_trading(Card(CardId.MERCHANT, CardKind.TRADING))
     with pytest.raises(InventoryFullError):
         inventory.add_trading(Card(CardId.MERCHANT, CardKind.TRADING))
+
+
+def test_consume_power_by_id_removes_one_card():
+    inventory = CardInventory()
+    inventory.add_power(Card(CardId.ICARUS, CardKind.POWER))
+    inventory.add_power(Card(CardId.ICARUS, CardKind.POWER))
+    consumed = inventory.consume_power_by_id(CardId.ICARUS)
+    assert consumed.id == CardId.ICARUS
+    assert len(inventory.power_cards) == 1
+
+
+def test_consume_power_by_id_raises_when_missing():
+    inventory = CardInventory()
+    with pytest.raises(CardNotInInventoryError):
+        inventory.consume_power_by_id(CardId.ICARUS)
 
 
 def test_glass_half_full_zeros_upper_section():

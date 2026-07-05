@@ -40,6 +40,14 @@ CARD_DEFS: dict[CardId, Card] = {
     CardId.GLASS_HALF_FULL: Card(CardId.GLASS_HALF_FULL, CardKind.POWER),
 }
 
+# Positive powers that benefit another player — require target= in kwargs when implemented.
+POSITIVE_POWERS_REQUIRING_TARGET: frozenset[CardId] = frozenset()
+
+# Negative powers — cast via Match.cast_hindrance() (M2), not cast_power_card().
+NEGATIVE_POWER_IDS: frozenset[CardId] = frozenset(
+    {CardId.GLASS_HALF_EMPTY, CardId.GLASS_HALF_FULL}
+)
+
 
 def card_for_id(card_id: CardId) -> Card:
     return CARD_DEFS[card_id]
@@ -47,6 +55,10 @@ def card_for_id(card_id: CardId) -> Card:
 
 class InventoryFullError(Exception):
     """Raised when a player cannot hold another card of that type."""
+
+
+class CardNotInInventoryError(Exception):
+    """Raised when a player does not have the requested card."""
 
 
 @dataclass
@@ -83,6 +95,16 @@ class CardInventory:
         if not self.can_add_trading(card):
             raise InventoryFullError("No open trading card slots")
         self.trading_cards.append(card)
+
+    def has_power(self, card_id: CardId) -> bool:
+        return any(card.id == card_id for card in self.power_cards)
+
+    def consume_power_by_id(self, card_id: CardId) -> Card:
+        """Remove and return one power card with *card_id* (consumable use)."""
+        for index, card in enumerate(self.power_cards):
+            if card.id == card_id:
+                return self.power_cards.pop(index)
+        raise CardNotInInventoryError(f"No {card_id.value} in power inventory")
 
     def remove_power(self, card: Card) -> None:
         self.power_cards.remove(card)
