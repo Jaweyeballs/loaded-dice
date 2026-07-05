@@ -4,6 +4,10 @@ import pytest
 
 from loaded_dice.cards import Card, CardId, CardKind
 from loaded_dice.dice import TooManyRollsError
+from loaded_dice.economy import (
+    COMPENSATION_CHIPS_PER_ATTACKER,
+    COMPENSATION_PACIFIST_CHIPS,
+)
 from loaded_dice.match import (
     InvalidDieSelectionError,
     Match,
@@ -20,6 +24,26 @@ from loaded_dice.scoring import Category
 def _begin_active_turn(match: Match) -> None:
     match.start_turn()
     match.begin_rolling()
+
+
+def _end_turn_quickly(match: Match) -> None:
+    if match.phase == TurnPhase.BETWEEN_TURNS:
+        _begin_active_turn(match)
+    if match.phase == TurnPhase.TURN_START:
+        match.begin_rolling()
+    if match.phase == TurnPhase.TURN_ACTIVE:
+        if match.dice is not None and match.dice.rolls_this_turn < 1:
+            match.roll()
+        match.end_turn_without_scoring()
+
+
+def _complete_rotation(match: Match) -> None:
+    """Advance until the active player wraps back to whoever started."""
+    starting = match.active_player.name
+    while True:
+        _end_turn_quickly(match)
+        if match.active_player.name == starting and match.phase == TurnPhase.BETWEEN_TURNS:
+            break
 
 
 def test_match_requires_at_least_one_player():
@@ -315,3 +339,78 @@ def test_cast_hindrance_requires_turn_active():
     match.start_turn()
     with pytest.raises(WrongPhaseError):
         match.cast_hindrance(CardId.GLASS_HALF_FULL, match.players[1])
+
+
+def test_no_compensation_on_first_rotation():
+    match = Match(["Alice", "Bob"])
+    match.start_turn()
+    assert match.players[0].chips == 0
+
+
+def test_compensation_pacifist_bonus_after_rotation():
+    match = Match(["Alice", "Bob"])
+    _complete_rotation(match)
+    match.start_turn()
+    assert match.active_player.chips == COMPENSATION_PACIFIST_CHIPS
+
+
+def test_compensation_pays_for_being_attacked_last_rotation():
+    match = Match(["Alice", "Bob", "Carol"])
+    _begin_active_turn(match)
+    alice = match.active_player
+    bob = match.players[1]
+    alice.inventory.add_power(Card(CardId.GLASS_HALF_FULL, CardKind.POWER))
+    match.roll()
+    match.cast_hindrance(CardId.GLASS_HALF_FULL, bob)
+    _complete_rotation(match)
+
+    while match.active_player.name != "Bob":
+        _end_turn_quickly(match)
+    match.start_turn()
+    assert bob.chips == COMPENSATION_PACIFIST_CHIPS + COMPENSATION_CHIPS_PER_ATTACKER
+
+
+def test_compensation_no_pacifist_bonus_if_player_attacked():
+    match = Match(["Alice", "Bob"])
+    _begin_active_turn(match)
+    match.active_player.inventory.add_power(Card(CardId.GLASS_HALF_FULL, CardKind.POWER))
+    match.roll()
+    match.cast_hindrance(CardId.GLASS_HALF_FULL, match.players[1])
+    _complete_rotation(match)
+
+    match.start_turn()
+    assert match.active_player.chips == 0
+
+
+def test_compensation_counts_unique_attackers_only_once():
+    match = Match(["Alice", "Bob", "Carol"])
+    bob = match.players[1]
+    _begin_active_turn(match)
+    match.active_player.inventory.add_power(Card(CardId.GLASS_HALF_FULL, CardKind.POWER))
+    match.roll()
+    match.cast_hindrance(CardId.GLASS_HALF_FULL, bob)
+    _end_turn_quickly(match)
+    _end_turn_quickly(match)
+    _begin_active_turn(match)
+    assert match.active_player.name == "Carol"
+    match.active_player.inventory.add_power(Card(CardId.GLASS_HALF_EMPTY, CardKind.POWER))
+    match.roll()
+    match.cast_hindrance(CardId.GLASS_HALF_EMPTY, bob)
+    _end_turn_quickly(match)
+    _end_turn_quickly(match)
+
+    match.start_turn()
+    assert bob.chips == COMPENSATION_PACIFIST_CHIPS + 2 * COMPENSATION_CHIPS_PER_ATTACKER
+
+
+def test_player_attacked_last_rotation_tracks_hindrance_casts():
+    match = Match(["Alice", "Bob"])
+    _begin_active_turn(match)
+    match.active_player.inventory.add_power(Card(CardId.GLASS_HALF_FULL, CardKind.POWER))
+    match.roll()
+    match.cast_hindrance(CardId.GLASS_HALF_FULL, match.players[1])
+    _complete_rotation(match)
+
+    assert match.player_attacked_last_rotation(match.players[0]) is True
+    assert match.player_attacked_last_rotation(match.players[1]) is False
+    assert match.attackers_on_player_last_rotation(match.players[1]) == frozenset({"Alice"})

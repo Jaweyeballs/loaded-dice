@@ -3,7 +3,10 @@ import pytest
 from loaded_dice.economy import (
     CHIPS_PER_SCORED_HAND,
     CHIPS_PER_UNUSED_STANDARD_ROLL,
+    COMPENSATION_CHIPS_PER_ATTACKER,
+    COMPENSATION_PACIFIST_CHIPS,
     InsufficientChipsError,
+    calculate_compensation,
     calculate_interest,
     chips_for_unused_standard_rolls,
 )
@@ -26,6 +29,23 @@ from loaded_dice.scoring import Category
 )
 def test_calculate_interest(balance, expected):
     assert calculate_interest(balance) == expected
+
+
+@pytest.mark.parametrize(
+    ("attackers_on_player", "player_attacked_anyone", "expected"),
+    [
+        (0, False, COMPENSATION_PACIFIST_CHIPS),
+        (0, True, 0),
+        (1, False, COMPENSATION_PACIFIST_CHIPS + COMPENSATION_CHIPS_PER_ATTACKER),
+        (2, False, COMPENSATION_PACIFIST_CHIPS + 2 * COMPENSATION_CHIPS_PER_ATTACKER),
+        (1, True, COMPENSATION_CHIPS_PER_ATTACKER),
+        (3, True, 3 * COMPENSATION_CHIPS_PER_ATTACKER),
+    ],
+)
+def test_calculate_compensation(attackers_on_player, player_attacked_anyone, expected):
+    assert (
+        calculate_compensation(attackers_on_player, player_attacked_anyone) == expected
+    )
 
 
 @pytest.mark.parametrize(

@@ -8,6 +8,7 @@ from enum import Enum
 from loaded_dice.dice import DEFAULT_MAX_ROLLS_PER_TURN, DiceSet, TooManyRollsError
 from loaded_dice.economy import (
     CHIPS_PER_SCORED_HAND,
+    calculate_compensation,
     calculate_interest,
     chips_for_unused_standard_rolls,
     InsufficientChipsError,
@@ -59,6 +60,24 @@ class QueuedHindrance:
 
     card_id: CardId
     caster_name: str
+
+
+@dataclass
+class RotationAttackRecord:
+    """Attack activity for one rotation — used for compensation and card checks."""
+
+    attackers: set[str] = field(default_factory=set)
+    attacks_on: dict[str, set[str]] = field(default_factory=dict)
+
+    def record(self, caster_name: str, target_name: str) -> None:
+        self.attackers.add(caster_name)
+        self.attacks_on.setdefault(target_name, set()).add(caster_name)
+
+    def attacker_count_on(self, player_name: str) -> int:
+        return len(self.attacks_on.get(player_name, set()))
+
+    def player_attacked(self, player_name: str) -> bool:
+        return player_name in self.attackers
 
 
 @dataclass
@@ -118,6 +137,8 @@ class Match:
         self._current_index = 0
         self._dice: DiceSet | None = None
         self._rotation_count = 0
+        self._current_rotation_attacks = RotationAttackRecord()
+        self._previous_rotation_attacks = RotationAttackRecord()
         self.shop = Shop()
 
     @property
@@ -147,6 +168,12 @@ class Match:
 
         interest = calculate_interest(self.active_player.chips)
         self.active_player.earn_chips(interest)
+        if self._rotation_count > 0:
+            compensation = calculate_compensation(
+                self._previous_rotation_attacks.attacker_count_on(self.active_player.name),
+                self._previous_rotation_attacks.player_attacked(self.active_player.name),
+            )
+            self.active_player.earn_chips(compensation)
         self.active_player.turn_effects = resolve_turn_effects(self.active_player)
         apply_turn_start_passives(self.active_player, self)
 
@@ -256,6 +283,7 @@ class Match:
         target.queued_hindrances.append(
             QueuedHindrance(card_id=card_id, caster_name=caster.name)
         )
+        self._current_rotation_attacks.record(caster.name, target.name)
 
     def score(
         self,
@@ -325,6 +353,14 @@ class Match:
         if not self.is_over():
             return None
         return self.get_standings()[0][0]
+
+    def player_attacked_last_rotation(self, player: Player) -> bool:
+        """Whether *player* cast a hindrance during the previous rotation."""
+        return self._previous_rotation_attacks.player_attacked(player.name)
+
+    def attackers_on_player_last_rotation(self, player: Player) -> frozenset[str]:
+        """Names of players who attacked *player* during the previous rotation."""
+        return frozenset(self._previous_rotation_attacks.attacks_on.get(player.name, set()))
 
     def _ensure_not_over(self) -> None:
         if self.is_over():
@@ -397,6 +433,8 @@ class Match:
         self._current_index = self._next_player_index()
         if self._current_index <= starting_index:
             self._rotation_count += 1
+            self._previous_rotation_attacks = self._current_rotation_attacks
+            self._current_rotation_attacks = RotationAttackRecord()
 
     def _next_player_index(self) -> int:
         count = len(self.players)
