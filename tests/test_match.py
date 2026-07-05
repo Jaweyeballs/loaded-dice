@@ -10,6 +10,7 @@ from loaded_dice.match import (
     MatchConfig,
     MatchOverError,
     MustRollBeforeScoreError,
+    QueuedHindrance,
     TurnPhase,
     WrongPhaseError,
 )
@@ -196,3 +197,121 @@ def test_cast_power_card_requires_card_in_inventory():
     match.roll()
     with pytest.raises(WrongPhaseError):
         match.cast_power_card(CardId.ICARUS, die_index=0)
+
+
+def test_cast_hindrance_queues_on_target_and_consumes_card():
+    match = Match(["Alice", "Bob"])
+    _begin_active_turn(match)
+    alice = match.active_player
+    bob = match.players[1]
+    alice.inventory.add_power(Card(CardId.GLASS_HALF_FULL, CardKind.POWER))
+
+    match.roll()
+    match.cast_hindrance(CardId.GLASS_HALF_FULL, bob)
+
+    assert not alice.inventory.has_power(CardId.GLASS_HALF_FULL)
+    assert len(bob.queued_hindrances) == 1
+    assert bob.queued_hindrances[0].card_id == CardId.GLASS_HALF_FULL
+    assert bob.queued_hindrances[0].caster_name == "Alice"
+
+
+def test_hindrance_resolves_when_turn_begins():
+    match = Match(["Alice", "Bob"])
+    _begin_active_turn(match)
+    bob = match.players[1]
+    match.active_player.inventory.add_power(Card(CardId.GLASS_HALF_FULL, CardKind.POWER))
+    match.roll()
+    match.cast_hindrance(CardId.GLASS_HALF_FULL, bob)
+    match.end_turn_without_scoring()
+
+    match.start_turn()
+    assert bob.turn_effects.zero_upper is False
+    match.begin_rolling()
+    assert bob.turn_effects.zero_upper is True
+    assert bob.queued_hindrances == []
+
+
+def test_hindrance_affects_scoring_after_begin_rolling():
+    match = Match(["Alice", "Bob"])
+    _begin_active_turn(match)
+    bob = match.players[1]
+    match.active_player.inventory.add_power(Card(CardId.GLASS_HALF_FULL, CardKind.POWER))
+    match.roll()
+    match.cast_hindrance(CardId.GLASS_HALF_FULL, bob)
+    match.end_turn_without_scoring()
+
+    match.start_turn()
+    match.begin_rolling()
+    match.roll()
+    for die, value in zip(match.dice.dice, [3, 3, 3, 1, 2]):
+        die.value = value
+    points = match.score(Category.THREES)
+    assert points == 0
+
+
+def test_block_hindrance_cancels_one_queued_effect():
+    match = Match(["Alice", "Bob"])
+    _begin_active_turn(match)
+    match.end_turn_without_scoring()
+    bob = match.active_player
+    assert bob.name == "Bob"
+    bob.queued_hindrances.extend(
+        [
+            QueuedHindrance(card_id=CardId.GLASS_HALF_FULL, caster_name="Alice"),
+            QueuedHindrance(card_id=CardId.GLASS_HALF_EMPTY, caster_name="Alice"),
+        ]
+    )
+    bob.inventory.add_power(Card(CardId.PARRY, CardKind.POWER))
+
+    match.start_turn()
+    match.block_hindrance(0)
+    match.begin_rolling()
+    assert bob.turn_effects.zero_upper is False
+    assert bob.turn_effects.zero_lower is True
+
+
+def test_block_hindrance_can_use_parry_ready():
+    match = Match(["Alice", "Bob"])
+    _begin_active_turn(match)
+    bob = match.players[1]
+    match.active_player.inventory.add_power(Card(CardId.GLASS_HALF_FULL, CardKind.POWER))
+    match.roll()
+    match.cast_hindrance(CardId.GLASS_HALF_FULL, bob)
+    match.end_turn_without_scoring()
+
+    assert match.active_player.name == "Bob"
+    bob.parry_ready = True
+    match.start_turn()
+    match.block_hindrance(0)
+    match.begin_rolling()
+    assert bob.turn_effects.zero_upper is False
+    assert bob.parry_ready is False
+
+
+def test_cannot_queue_conflicting_glass_half_hindrances():
+    match = Match(["Alice", "Bob"])
+    _begin_active_turn(match)
+    bob = match.players[1]
+    match.active_player.inventory.add_power(Card(CardId.GLASS_HALF_FULL, CardKind.POWER))
+    match.active_player.inventory.add_power(Card(CardId.GLASS_HALF_EMPTY, CardKind.POWER))
+    match.roll()
+    match.cast_hindrance(CardId.GLASS_HALF_FULL, bob)
+    with pytest.raises(WrongPhaseError):
+        match.cast_hindrance(CardId.GLASS_HALF_EMPTY, bob)
+
+
+def test_cannot_cast_hindrance_on_self():
+    match = Match(["Alice", "Bob"])
+    _begin_active_turn(match)
+    match.active_player.inventory.add_power(Card(CardId.GLASS_HALF_FULL, CardKind.POWER))
+    match.roll()
+    with pytest.raises(ValueError):
+        match.cast_hindrance(CardId.GLASS_HALF_FULL, match.active_player)
+
+
+def test_cast_hindrance_requires_turn_active():
+    match = Match(["Alice", "Bob"])
+    match.active_player.inventory.add_power(Card(CardId.GLASS_HALF_FULL, CardKind.POWER))
+    match.start_turn()
+    with pytest.raises(WrongPhaseError):
+        match.cast_hindrance(CardId.GLASS_HALF_FULL, match.players[1])

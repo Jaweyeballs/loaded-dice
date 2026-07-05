@@ -30,7 +30,7 @@ def _icarus_on_cast(player: Player, match: Match, **kwargs) -> None:
 
 def _parry_on_cast(player: Player, match: Match, **kwargs) -> None:
     # Parry is resolved during TURN_START when the player picks which queued
-    # hindrance to block (see Match.block_hindrance, M2). Cast marks readiness.
+    # hindrance to block via Match.block_hindrance. Cast marks readiness.
     player.parry_ready = True
 
 

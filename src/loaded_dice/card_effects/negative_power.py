@@ -34,6 +34,26 @@ HINDRANCE_RESOLVERS: dict[CardId, Callable[[Player, Player, Match], None]] = {
     # CardId.BLUE_SHELL: _blue_shell_on_resolve,  # add CardId when implemented
 }
 
+_GLASS_HALF_OPPOSITES: dict[CardId, CardId] = {
+    CardId.GLASS_HALF_FULL: CardId.GLASS_HALF_EMPTY,
+    CardId.GLASS_HALF_EMPTY: CardId.GLASS_HALF_FULL,
+}
+
+
+class HindranceConflictError(Exception):
+    """Raised when a hindrance cannot be queued on the target."""
+
+
+def validate_hindrance_queue(target: Player, card_id: CardId) -> None:
+    """Enforce queue rules before a hindrance is appended to *target*."""
+    opposite = _GLASS_HALF_OPPOSITES.get(card_id)
+    if opposite is None:
+        return
+    if any(hindrance.card_id == opposite for hindrance in target.queued_hindrances):
+        raise HindranceConflictError(
+            "Glass half empty and glass half full cannot both be queued on the same player"
+        )
+
 
 def resolve_hindrance(
     card_id: CardId,

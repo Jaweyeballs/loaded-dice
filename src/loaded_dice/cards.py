@@ -43,7 +43,7 @@ CARD_DEFS: dict[CardId, Card] = {
 # Positive powers that benefit another player — require target= in kwargs when implemented.
 POSITIVE_POWERS_REQUIRING_TARGET: frozenset[CardId] = frozenset()
 
-# Negative powers — cast via Match.cast_hindrance() (M2), not cast_power_card().
+# Negative powers — cast via Match.cast_hindrance(), not cast_power_card().
 NEGATIVE_POWER_IDS: frozenset[CardId] = frozenset(
     {CardId.GLASS_HALF_EMPTY, CardId.GLASS_HALF_FULL}
 )

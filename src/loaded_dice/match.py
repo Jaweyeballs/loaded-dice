@@ -16,7 +16,13 @@ from loaded_dice.cards import (
     CardId,
     CardInventory,
     CardNotInInventoryError,
+    NEGATIVE_POWER_IDS,
     POSITIVE_POWERS_REQUIRING_TARGET,
+)
+from loaded_dice.card_effects.negative_power import (
+    HindranceConflictError,
+    resolve_hindrance,
+    validate_hindrance_queue,
 )
 from loaded_dice.card_effects.positive_power import POSITIVE_POWER_CAST, cast_positive_power
 from loaded_dice.effects import TurnEffects
@@ -155,7 +161,28 @@ class Match:
         self._ensure_not_over()
         if self.phase != TurnPhase.TURN_START:
             raise WrongPhaseError(f"Cannot begin rolling during {self.phase.value}")
+        self._resolve_queued_hindrances(self.active_player)
+        self.active_player.parry_ready = False
         self.phase = TurnPhase.TURN_ACTIVE
+
+    def block_hindrance(self, hindrance_index: int) -> None:
+        """Cancel one queued hindrance during TURN_START (Parry, Guardian, etc.)."""
+        self._ensure_not_over()
+        if self.phase != TurnPhase.TURN_START:
+            raise WrongPhaseError(f"Cannot block hindrances during {self.phase.value}")
+
+        player = self.active_player
+        if hindrance_index < 0 or hindrance_index >= len(player.queued_hindrances):
+            raise ValueError(f"Invalid hindrance index: {hindrance_index}")
+
+        if player.parry_ready:
+            player.parry_ready = False
+        elif player.inventory.has_power(CardId.PARRY):
+            player.inventory.consume_power_by_id(CardId.PARRY)
+        else:
+            raise WrongPhaseError("No parry available")
+
+        player.queued_hindrances.pop(hindrance_index)
 
     def roll(self) -> list[int]:
         self._ensure_not_over()
@@ -202,6 +229,33 @@ class Match:
             raise WrongPhaseError(str(exc)) from exc
 
         cast_positive_power(card_id, player, self, **kwargs)
+
+    def cast_hindrance(self, card_id: CardId, target: Player) -> None:
+        """Queue a negative power card on *target* during the active player's turn."""
+        self._ensure_not_over()
+        if self.phase != TurnPhase.TURN_ACTIVE:
+            raise WrongPhaseError(f"Cannot cast hindrances during {self.phase.value}")
+        if card_id not in NEGATIVE_POWER_IDS:
+            raise WrongPhaseError(f"{card_id.value} is not a castable hindrance")
+        if target not in self.players:
+            raise ValueError("target must be a player in this match")
+        if target is self.active_player:
+            raise ValueError("Cannot cast a hindrance on yourself")
+
+        try:
+            validate_hindrance_queue(target, card_id)
+        except HindranceConflictError as exc:
+            raise WrongPhaseError(str(exc)) from exc
+
+        caster = self.active_player
+        try:
+            caster.inventory.consume_power_by_id(card_id)
+        except CardNotInInventoryError as exc:
+            raise WrongPhaseError(str(exc)) from exc
+
+        target.queued_hindrances.append(
+            QueuedHindrance(card_id=card_id, caster_name=caster.name)
+        )
 
     def score(
         self,
@@ -322,6 +376,15 @@ class Match:
         player.game_total += player.current_sheet.grand_total()
         player.sheets_completed += 1
         player.current_sheet = ScoreSheet()
+
+    def _resolve_queued_hindrances(self, player: Player) -> None:
+        caster_by_name = {candidate.name: candidate for candidate in self.players}
+        for hindrance in player.queued_hindrances:
+            caster = caster_by_name.get(hindrance.caster_name)
+            if caster is None:
+                raise ValueError(f"Unknown caster: {hindrance.caster_name}")
+            resolve_hindrance(hindrance.card_id, player, caster, self)
+        player.queued_hindrances.clear()
 
     def _end_turn(self) -> None:
         starting_index = self._current_index
