@@ -12,7 +12,11 @@ from loaded_dice.economy import (
     chips_for_unused_standard_rolls,
     InsufficientChipsError,
 )
+from loaded_dice.cards import CardInventory
+from loaded_dice.effects import TurnEffects
 from loaded_dice.scoring import Category, ScoreSheet
+from loaded_dice.shop import Shop, ShopError
+from loaded_dice.turn_effects import apply_turn_start_passives, resolve_turn_effects
 
 
 class TurnPhase(Enum):
@@ -54,6 +58,8 @@ class Player:
     game_total: int = 0
     sheets_completed: int = 0
     chips: int = 0
+    inventory: CardInventory = field(default_factory=CardInventory)
+    turn_effects: TurnEffects = field(default_factory=TurnEffects)
 
     def total_score(self) -> int:
         return self.game_total + self.current_sheet.grand_total()
@@ -90,6 +96,7 @@ class Match:
         self._current_index = 0
         self._dice: DiceSet | None = None
         self._rotation_count = 0
+        self.shop = Shop()
 
     @property
     def active_player(self) -> Player:
@@ -118,6 +125,8 @@ class Match:
 
         interest = calculate_interest(self.active_player.chips)
         self.active_player.earn_chips(interest)
+        self.active_player.turn_effects = resolve_turn_effects(self.active_player)
+        apply_turn_start_passives(self.active_player, self)
 
         self.phase = TurnPhase.TURN_START
         self._dice = DiceSet(
@@ -168,7 +177,11 @@ class Match:
             raise MustRollBeforeScoreError("Roll at least once before scoring")
 
         values = self._select_scoring_values(die_indices)
-        points = self.active_player.current_sheet.record(values, category)
+        points = self.active_player.current_sheet.record(
+            values,
+            category,
+            effects=self.active_player.turn_effects,
+        )
         self._award_scoring_income(self.active_player)
         self._on_sheet_completed(self.active_player)
         self._end_turn()
@@ -180,6 +193,34 @@ class Match:
         if self.phase != TurnPhase.TURN_ACTIVE:
             raise WrongPhaseError(f"Cannot end turn during {self.phase.value}")
         self._end_turn()
+
+    def can_use_shop(self, player: Player) -> bool:
+        """GDD: shop open between turns for the active player; anytime during others' turns."""
+        if self.is_over():
+            return False
+        if player is self.active_player:
+            return self.phase == TurnPhase.BETWEEN_TURNS
+        return self.phase in (TurnPhase.BETWEEN_TURNS, TurnPhase.TURN_START, TurnPhase.TURN_ACTIVE)
+
+    def buy_from_shop(self, player: Player, stock_index: int):
+        """Buy a card from the shop for *player*."""
+        self._ensure_not_over()
+        if not self.can_use_shop(player):
+            raise WrongPhaseError(f"{player.name} cannot use the shop right now")
+        try:
+            return self.shop.buy(player, stock_index)
+        except ShopError as exc:
+            raise WrongPhaseError(str(exc)) from exc
+
+    def reroll_shop(self, player: Player) -> None:
+        """Pay to refresh shop stock."""
+        self._ensure_not_over()
+        if not self.can_use_shop(player):
+            raise WrongPhaseError(f"{player.name} cannot use the shop right now")
+        try:
+            self.shop.reroll_stock(player)
+        except InsufficientChipsError as exc:
+            raise WrongPhaseError(str(exc)) from exc
 
     def get_standings(self) -> list[tuple[Player, int]]:
         ranked = sorted(self.players, key=lambda p: p.total_score(), reverse=True)

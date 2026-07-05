@@ -11,6 +11,8 @@ from __future__ import annotations
 from collections import Counter
 from enum import Enum
 
+from loaded_dice.effects import TurnEffects
+
 
 class Category(Enum):
     ONES = "ones"
@@ -72,6 +74,23 @@ def is_yahtzee(values: list[int]) -> bool:
     return len(values) == 5 and len(set(values)) == 1
 
 
+def apply_turn_modifiers(
+    base_score: int,
+    category: Category,
+    effects: TurnEffects | None,
+) -> int:
+    """Apply hindrances and character bonuses to a raw category score."""
+    if effects is None:
+        return base_score
+
+    score = base_score
+    if effects.zero_upper and category in UPPER_CATEGORIES:
+        score = 0
+    if effects.zero_lower and category in LOWER_CATEGORIES:
+        score = 0
+    return score + effects.score_bonus
+
+
 def score_hand(values: list[int], category: Category) -> int:
     """Return points for *values* in *category* (does not consult a score sheet)."""
     if len(values) != 5:
@@ -125,7 +144,12 @@ class ScoreSheet:
     def get_score(self, category: Category) -> int | None:
         return self._scores[category]
 
-    def record(self, values: list[int], category: Category) -> int:
+    def record(
+        self,
+        values: list[int],
+        category: Category,
+        effects: TurnEffects | None = None,
+    ) -> int:
         """Score *values* into *category*. Returns total points gained this action."""
         if not self.is_available(category):
             raise CategoryAlreadyUsedError(f"{category.value} is already filled")
@@ -133,7 +157,8 @@ class ScoreSheet:
         bonus = self._apply_yahtzee_bonus(values)
         self._enforce_joker_rule(values, category)
 
-        points = score_hand(values, category)
+        base_points = score_hand(values, category)
+        points = apply_turn_modifiers(base_points, category, effects)
         self._scores[category] = points
         return points + bonus
 

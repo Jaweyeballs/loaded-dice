@@ -19,8 +19,9 @@ def test_preview_picks_best_five_from_six():
 
 def test_best_scoring_hand_returns_indices():
     dice = [3, 3, 3, 3, 5, 3]
-    values, indices = best_scoring_hand(dice, Category.YAHTZEE)
+    values, indices, points = best_scoring_hand(dice, Category.YAHTZEE)
     assert values == [3, 3, 3, 3, 3]
+    assert points == 50
     assert len(indices) == 5
     assert all(dice[i] == 3 for i in indices)
 
