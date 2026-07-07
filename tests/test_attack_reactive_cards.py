@@ -1,0 +1,171 @@
+import pytest
+
+from loaded_dice.card_effects.negative_power import (
+    NEGATIVE_PUNISHMENT_CHIP_LOSS,
+    POSITIVE_PUNISHMENT_POINT_LOSS,
+)
+from loaded_dice.card_effects.positive_power import POSITIVE_REINFORCEMENT_BONUS
+from loaded_dice.cards import Card, CardId, CardKind
+from loaded_dice.match import Match, TurnPhase
+from loaded_dice.scoring import Category
+
+
+def _begin_active_turn(match: Match) -> None:
+    match.start_turn()
+    match.begin_rolling()
+
+
+def _end_turn_quickly(match: Match) -> None:
+    if match.phase == TurnPhase.BETWEEN_TURNS:
+        _begin_active_turn(match)
+    if match.phase == TurnPhase.TURN_START:
+        match.begin_rolling()
+    if match.phase == TurnPhase.TURN_ACTIVE:
+        if match.dice is not None and match.dice.rolls_this_turn < 1:
+            match.roll()
+        match.end_turn_without_scoring()
+
+
+def _complete_rotation(match: Match) -> None:
+    starting = match.active_player.name
+    while True:
+        _end_turn_quickly(match)
+        if match.active_player.name == starting and match.phase == TurnPhase.BETWEEN_TURNS:
+            break
+
+
+def test_positive_reinforcement_bonus_when_pacifist_last_rotation():
+    match = Match(["Alice", "Bob"])
+    _complete_rotation(match)
+    alice = match.active_player
+    assert alice.name == "Alice"
+    alice.inventory.add_power(Card(CardId.POSITIVE_REINFORCEMENT, CardKind.POWER))
+    _begin_active_turn(match)
+    match.roll()
+    match.cast_power_card(CardId.POSITIVE_REINFORCEMENT)
+    for die, value in zip(match.dice.dice, [3, 3, 3, 1, 2]):
+        die.value = value
+    points = match.score(Category.THREES)
+    assert points == 9 + POSITIVE_REINFORCEMENT_BONUS
+
+
+def test_positive_reinforcement_no_bonus_if_attacked_last_rotation():
+    match = Match(["Alice", "Bob"])
+    _begin_active_turn(match)
+    match.active_player.inventory.add_power(Card(CardId.GLASS_HALF_FULL, CardKind.POWER))
+    match.roll()
+    match.cast_hindrance(CardId.GLASS_HALF_FULL, match.players[1])
+    _complete_rotation(match)
+
+    alice = match.active_player
+    alice.inventory.add_power(Card(CardId.POSITIVE_REINFORCEMENT, CardKind.POWER))
+    _begin_active_turn(match)
+    match.roll()
+    match.cast_power_card(CardId.POSITIVE_REINFORCEMENT)
+    for die, value in zip(match.dice.dice, [3, 3, 3, 1, 2]):
+        die.value = value
+    points = match.score(Category.THREES)
+    assert points == 9
+
+
+def test_negative_reinforcement_grants_transparent_parry():
+    match = Match(["Alice", "Bob"])
+    _complete_rotation(match)
+    match.active_player.inventory.add_power(
+        Card(CardId.NEGATIVE_REINFORCEMENT, CardKind.POWER)
+    )
+    _begin_active_turn(match)
+    match.roll()
+    match.cast_power_card(CardId.NEGATIVE_REINFORCEMENT)
+    parry_cards = [
+        card
+        for card in match.active_player.inventory.power_cards
+        if card.id == CardId.PARRY
+    ]
+    assert len(parry_cards) == 1
+    assert parry_cards[0].transparent is True
+    assert match.active_player.inventory.power_slots_used() == 0
+
+
+def test_positive_punishment_penalizes_scoring_when_target_attacked_caster():
+    match = Match(["Alice", "Bob"])
+    alice = match.players[0]
+    bob = match.players[1]
+    _begin_active_turn(match)
+    _end_turn_quickly(match)
+    assert match.active_player.name == "Bob"
+    _begin_active_turn(match)
+    bob.inventory.add_power(Card(CardId.GLASS_HALF_FULL, CardKind.POWER))
+    match.roll()
+    match.cast_hindrance(CardId.GLASS_HALF_FULL, alice)
+    _end_turn_quickly(match)
+    assert match.rotation_count == 1
+    assert match.active_player.name == "Alice"
+
+    alice.inventory.add_power(Card(CardId.POSITIVE_PUNISHMENT, CardKind.POWER))
+    _begin_active_turn(match)
+    match.roll()
+    match.cast_hindrance(CardId.POSITIVE_PUNISHMENT, bob)
+    _end_turn_quickly(match)
+
+    match.start_turn()
+    match.begin_rolling()
+    match.roll()
+    for die, value in zip(match.dice.dice, [3, 3, 3, 1, 2]):
+        die.value = value
+    points = match.score(Category.THREES)
+    assert points == 9 - POSITIVE_PUNISHMENT_POINT_LOSS
+
+
+def test_positive_punishment_no_effect_if_target_did_not_attack_caster():
+    match = Match(["Alice", "Bob"])
+    _complete_rotation(match)
+    alice = match.active_player
+    bob = match.players[1]
+    alice.inventory.add_power(Card(CardId.POSITIVE_PUNISHMENT, CardKind.POWER))
+    _begin_active_turn(match)
+    match.roll()
+    match.cast_hindrance(CardId.POSITIVE_PUNISHMENT, bob)
+    _end_turn_quickly(match)
+
+    match.start_turn()
+    match.begin_rolling()
+    match.roll()
+    for die, value in zip(match.dice.dice, [3, 3, 3, 1, 2]):
+        die.value = value
+    points = match.score(Category.THREES)
+    assert points == 9
+
+
+def test_negative_punishment_deducts_chips_when_target_attacked_caster():
+    match = Match(["Alice", "Bob"])
+    alice = match.players[0]
+    bob = match.players[1]
+    bob.chips = 500
+    _begin_active_turn(match)
+    _end_turn_quickly(match)
+    _begin_active_turn(match)
+    bob.inventory.add_power(Card(CardId.GLASS_HALF_FULL, CardKind.POWER))
+    match.roll()
+    match.cast_hindrance(CardId.GLASS_HALF_FULL, alice)
+    _end_turn_quickly(match)
+
+    alice.inventory.add_power(Card(CardId.NEGATIVE_PUNISHMENT, CardKind.POWER))
+    _begin_active_turn(match)
+    match.roll()
+    match.cast_hindrance(CardId.NEGATIVE_PUNISHMENT, bob)
+    _end_turn_quickly(match)
+
+    match.start_turn()
+    chips_after_compensation = bob.chips
+    match.begin_rolling()
+    assert bob.chips == chips_after_compensation - NEGATIVE_PUNISHMENT_CHIP_LOSS
+
+
+def test_score_penalty_floors_at_zero():
+    from loaded_dice.effects import TurnEffects
+    from loaded_dice.scoring import apply_turn_modifiers, score_hand
+
+    effects = TurnEffects(score_penalty=20)
+    dice = [1, 1, 1, 1, 1]
+    assert apply_turn_modifiers(score_hand(dice, Category.ONES), Category.ONES, effects) == 0

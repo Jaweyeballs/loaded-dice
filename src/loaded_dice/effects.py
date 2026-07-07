@@ -12,3 +12,4 @@ class TurnEffects:
     zero_upper: bool = False
     zero_lower: bool = False
     score_bonus: int = 0
+    score_penalty: int = 0

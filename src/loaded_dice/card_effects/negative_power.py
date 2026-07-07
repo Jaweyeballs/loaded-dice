@@ -12,6 +12,8 @@ if TYPE_CHECKING:
 # --- Constants (balance here) ---
 
 BLUE_SHELL_POINT_LOSS = 10
+POSITIVE_PUNISHMENT_POINT_LOSS = 5
+NEGATIVE_PUNISHMENT_CHIP_LOSS = 200
 
 # --- Hindrance resolvers (run once when target clicks Start Turn) ---
 
@@ -28,9 +30,27 @@ def _blue_shell_on_resolve(target: Player, caster: Player, match: Match) -> None
     raise NotImplementedError("Blue Shell point deduction is not wired yet")
 
 
+def _positive_punishment_on_resolve(target: Player, caster: Player, match: Match) -> None:
+    if match.rotation_count == 0:
+        return
+    if not match.player_attacked_player_last_rotation(target, caster):
+        return
+    target.turn_effects.score_penalty += POSITIVE_PUNISHMENT_POINT_LOSS
+
+
+def _negative_punishment_on_resolve(target: Player, caster: Player, match: Match) -> None:
+    if match.rotation_count == 0:
+        return
+    if not match.player_attacked_player_last_rotation(target, caster):
+        return
+    target.lose_chips(NEGATIVE_PUNISHMENT_CHIP_LOSS)
+
+
 HINDRANCE_RESOLVERS: dict[CardId, Callable[[Player, Player, Match], None]] = {
     CardId.GLASS_HALF_FULL: _glass_half_full_on_resolve,
     CardId.GLASS_HALF_EMPTY: _glass_half_empty_on_resolve,
+    CardId.POSITIVE_PUNISHMENT: _positive_punishment_on_resolve,
+    CardId.NEGATIVE_PUNISHMENT: _negative_punishment_on_resolve,
     # CardId.BLUE_SHELL: _blue_shell_on_resolve,  # add CardId when implemented
 }
 

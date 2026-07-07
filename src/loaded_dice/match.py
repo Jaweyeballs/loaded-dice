@@ -124,6 +124,11 @@ class Player:
             )
         self.chips -= amount
 
+    def lose_chips(self, amount: int) -> None:
+        if amount < 0:
+            raise ValueError("Cannot lose a negative chip amount")
+        self.chips = max(0, self.chips - amount)
+
 
 class Match:
     """Orchestrates players, turns, dice, and scoring for a headless game."""
@@ -361,6 +366,16 @@ class Match:
     def attackers_on_player_last_rotation(self, player: Player) -> frozenset[str]:
         """Names of players who attacked *player* during the previous rotation."""
         return frozenset(self._previous_rotation_attacks.attacks_on.get(player.name, set()))
+
+    def player_attacked_player_last_rotation(
+        self,
+        attacker: Player,
+        victim: Player,
+    ) -> bool:
+        """Whether *attacker* cast a hindrance on *victim* during the previous rotation."""
+        return attacker.name in self._previous_rotation_attacks.attacks_on.get(
+            victim.name, set()
+        )
 
     def _ensure_not_over(self) -> None:
         if self.is_over():

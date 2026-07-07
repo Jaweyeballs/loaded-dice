@@ -88,7 +88,8 @@ def apply_turn_modifiers(
         score = 0
     if effects.zero_lower and category in LOWER_CATEGORIES:
         score = 0
-    return score + effects.score_bonus
+    score = score + effects.score_bonus - effects.score_penalty
+    return max(0, score)
 
 
 def score_hand(values: list[int], category: Category) -> int:

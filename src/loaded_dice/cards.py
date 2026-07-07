@@ -21,8 +21,12 @@ class CardId(Enum):
     ICARUS = "icarus"
     MERCHANT = "merchant"
     PARRY = "parry"
+    POSITIVE_REINFORCEMENT = "positive_reinforcement"
+    NEGATIVE_REINFORCEMENT = "negative_reinforcement"
     GLASS_HALF_EMPTY = "glass_half_empty"
     GLASS_HALF_FULL = "glass_half_full"
+    POSITIVE_PUNISHMENT = "positive_punishment"
+    NEGATIVE_PUNISHMENT = "negative_punishment"
 
 
 @dataclass(frozen=True)
@@ -36,8 +40,12 @@ CARD_DEFS: dict[CardId, Card] = {
     CardId.MERCHANT: Card(CardId.MERCHANT, CardKind.TRADING),
     CardId.PARRY: Card(CardId.PARRY, CardKind.POWER),
     CardId.ICARUS: Card(CardId.ICARUS, CardKind.POWER),
+    CardId.POSITIVE_REINFORCEMENT: Card(CardId.POSITIVE_REINFORCEMENT, CardKind.POWER),
+    CardId.NEGATIVE_REINFORCEMENT: Card(CardId.NEGATIVE_REINFORCEMENT, CardKind.POWER),
     CardId.GLASS_HALF_EMPTY: Card(CardId.GLASS_HALF_EMPTY, CardKind.POWER),
     CardId.GLASS_HALF_FULL: Card(CardId.GLASS_HALF_FULL, CardKind.POWER),
+    CardId.POSITIVE_PUNISHMENT: Card(CardId.POSITIVE_PUNISHMENT, CardKind.POWER),
+    CardId.NEGATIVE_PUNISHMENT: Card(CardId.NEGATIVE_PUNISHMENT, CardKind.POWER),
 }
 
 # Positive powers that benefit another player — require target= in kwargs when implemented.
@@ -45,7 +53,12 @@ POSITIVE_POWERS_REQUIRING_TARGET: frozenset[CardId] = frozenset()
 
 # Negative powers — cast via Match.cast_hindrance(), not cast_power_card().
 NEGATIVE_POWER_IDS: frozenset[CardId] = frozenset(
-    {CardId.GLASS_HALF_EMPTY, CardId.GLASS_HALF_FULL}
+    {
+        CardId.GLASS_HALF_EMPTY,
+        CardId.GLASS_HALF_FULL,
+        CardId.POSITIVE_PUNISHMENT,
+        CardId.NEGATIVE_PUNISHMENT,
+    }
 )
 
 
