@@ -93,7 +93,12 @@ export default function App() {
           onLeave={leave}
         />
       ) : (
-        <GameView room={room} playerName={playerName} onAction={sendAction} />
+        <GameView
+          room={room}
+          playerName={playerName}
+          onAction={sendAction}
+          onLeave={leave}
+        />
       )}
     </div>
   );

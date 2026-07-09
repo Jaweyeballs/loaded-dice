@@ -1,10 +1,11 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { MatchState, PlayerState, RoomState } from "./types";
 
 type Props = {
   room: RoomState;
   playerName: string;
   onAction: (action: Record<string, unknown>) => void;
+  onLeave: () => void;
 };
 
 const CATEGORIES = [
@@ -34,7 +35,7 @@ function label(id: string): string {
   return id.replace(/_/g, " ");
 }
 
-export function GameView({ room, playerName, onAction }: Props) {
+export function GameView({ room, playerName, onAction, onLeave }: Props) {
   const match = room.match as MatchState;
   const me = match.players.find((p) => p.name === playerName);
   const active = Boolean(match.you_are_active);
@@ -43,11 +44,28 @@ export function GameView({ room, playerName, onAction }: Props) {
     () => match.players.find((p) => p.name !== playerName)?.name ?? "",
   );
   const [selectedSheet, setSelectedSheet] = useState(playerName);
+  const [icarusArming, setIcarusArming] = useState(false);
 
   const sheetPlayer = useMemo(
     () => match.players.find((p) => p.name === selectedSheet) ?? match.players[0],
     [match.players, selectedSheet],
   );
+
+  useEffect(() => {
+    if (!active || match.phase !== "turn_active" || !match.dice) {
+      setIcarusArming(false);
+    }
+  }, [active, match.phase, match.dice]);
+
+  function handleDieClick(index: number, locked: boolean) {
+    if (!active) return;
+    if (icarusArming) {
+      onAction({ type: "cast_power", card_id: "icarus", die_index: index });
+      setIcarusArming(false);
+      return;
+    }
+    onAction({ type: locked ? "unlock" : "lock", index });
+  }
 
   return (
     <div className="game">
@@ -66,6 +84,9 @@ export function GameView({ room, playerName, onAction }: Props) {
               ? "Your turn"
               : `${match.active_player}'s turn — spectating`}
         </div>
+        <button type="button" className="secondary" onClick={onLeave}>
+          Leave
+        </button>
       </header>
 
       <div className="game-grid">
@@ -73,20 +94,24 @@ export function GameView({ room, playerName, onAction }: Props) {
           <h2>Dice</h2>
           {match.dice ? (
             <>
-              <div className="dice-row">
+              <div className={`dice-row ${icarusArming ? "targeting" : ""}`}>
                 {match.dice.values.map((value, index) => {
                   const locked = match.dice!.locked[index];
                   return (
                     <button
                       key={index}
                       type="button"
-                      className={`die ${locked ? "locked" : ""}`}
+                      className={`die ${locked ? "locked" : ""} ${
+                        icarusArming ? "targetable" : ""
+                      }`}
                       disabled={!active}
-                      onClick={() =>
-                        onAction({
-                          type: locked ? "unlock" : "lock",
-                          index,
-                        })
+                      onClick={() => handleDieClick(index, locked)}
+                      title={
+                        icarusArming
+                          ? `Bump die ${index}`
+                          : locked
+                            ? "Unlock"
+                            : "Lock"
                       }
                     >
                       {value}
@@ -95,8 +120,10 @@ export function GameView({ room, playerName, onAction }: Props) {
                 })}
               </div>
               <p className="hint">
-                Rolls {match.dice.rolls_this_turn}/{match.dice.max_rolls}
-                {!active && " · click disabled while spectating"}
+                {icarusArming
+                  ? "Icarus armed — click a die to bump it (or Cancel)."
+                  : `Rolls ${match.dice.rolls_this_turn}/${match.dice.max_rolls}`}
+                {!active && !icarusArming && " · spectating"}
               </p>
               <div className="row">
                 {match.phase === "between_turns" && active && (
@@ -114,16 +141,30 @@ export function GameView({ room, playerName, onAction }: Props) {
                 )}
                 {match.phase === "turn_active" && active && (
                   <>
-                    <button type="button" onClick={() => onAction({ type: "roll" })}>
+                    <button
+                      type="button"
+                      onClick={() => onAction({ type: "roll" })}
+                      disabled={icarusArming}
+                    >
                       Roll
                     </button>
                     <button
                       type="button"
                       className="secondary"
                       onClick={() => onAction({ type: "end_turn" })}
+                      disabled={icarusArming}
                     >
                       End without scoring
                     </button>
+                    {icarusArming && (
+                      <button
+                        type="button"
+                        className="secondary"
+                        onClick={() => setIcarusArming(false)}
+                      >
+                        Cancel Icarus
+                      </button>
+                    )}
                   </>
                 )}
               </div>
@@ -136,6 +177,11 @@ export function GameView({ room, playerName, onAction }: Props) {
                 </button>
               )}
               {!active && <p className="hint">Waiting for {match.active_player}…</p>}
+              {match.is_over && (
+                <button type="button" className="secondary" onClick={onLeave}>
+                  Back to lobby
+                </button>
+              )}
             </div>
           )}
         </section>
@@ -175,7 +221,7 @@ export function GameView({ room, playerName, onAction }: Props) {
             <>
               <div className="card-list">
                 {me.power_cards.filter((c) => !HINDRANCE_IDS.has(c.id)).length === 0 && (
-                  <span className="muted">No positive power cards</span>
+                  <span className="muted">No positive power cards. Buy some in the shop.</span>
                 )}
                 {me.power_cards
                   .filter((c) => !HINDRANCE_IDS.has(c.id))
@@ -183,23 +229,23 @@ export function GameView({ room, playerName, onAction }: Props) {
                     <button
                       key={`${card.id}-${i}`}
                       type="button"
-                      disabled={!active}
+                      disabled={!active || (card.id === "icarus" && !match.dice)}
+                      className={
+                        card.id === "icarus" && icarusArming ? "armed" : undefined
+                      }
                       onClick={() => {
                         if (card.id === "icarus") {
-                          const dieIndex = window.prompt("Die index to bump (0–4)", "0");
-                          if (dieIndex == null) return;
-                          onAction({
-                            type: "cast_power",
-                            card_id: card.id,
-                            die_index: Number(dieIndex),
-                          });
+                          if (!match.dice) return;
+                          setIcarusArming((armed) => !armed);
                           return;
                         }
+                        setIcarusArming(false);
                         onAction({ type: "cast_power", card_id: card.id });
                       }}
                     >
                       {label(card.id)}
                       {card.transparent ? " *" : ""}
+                      {card.id === "icarus" && icarusArming ? " (pick die)" : ""}
                     </button>
                   ))}
               </div>
@@ -218,6 +264,9 @@ export function GameView({ room, playerName, onAction }: Props) {
                       </option>
                     ))}
                 </select>
+                {me.power_cards.filter((c) => HINDRANCE_IDS.has(c.id)).length === 0 && (
+                  <span className="muted">No hindrance cards</span>
+                )}
                 {me.power_cards
                   .filter((c) => HINDRANCE_IDS.has(c.id))
                   .map((card, i) => (
@@ -225,13 +274,14 @@ export function GameView({ room, playerName, onAction }: Props) {
                       key={`h-${card.id}-${i}`}
                       type="button"
                       disabled={!active || !hindranceTarget}
-                      onClick={() =>
+                      onClick={() => {
+                        setIcarusArming(false);
                         onAction({
                           type: "cast_hindrance",
                           card_id: card.id,
                           target: hindranceTarget,
-                        })
-                      }
+                        });
+                      }}
                     >
                       Cast {label(card.id)}
                     </button>
@@ -248,6 +298,13 @@ export function GameView({ room, playerName, onAction }: Props) {
 
         <section className="panel">
           <h2>Shop {canShop ? "" : "(closed for you)"}</h2>
+          {!canShop && (
+            <p className="hint">
+              {active
+                ? "Shop opens for you between turns."
+                : "Shop unavailable right now."}
+            </p>
+          )}
           <ul className="shop-list">
             {match.shop.stock.map((offer) => (
               <li key={offer.index}>
@@ -274,6 +331,9 @@ export function GameView({ room, playerName, onAction }: Props) {
           >
             Reroll ({match.shop.reroll_cost} chips)
           </button>
+          {me && (
+            <p className="hint">You have {me.chips} chips</p>
+          )}
         </section>
 
         <section className="panel wide">
@@ -295,7 +355,13 @@ export function GameView({ room, playerName, onAction }: Props) {
             previews={
               sheetPlayer.name === match.active_player ? match.previews : null
             }
-            canScore={active && sheetPlayer.name === playerName}
+            canScore={
+              active &&
+              sheetPlayer.name === playerName &&
+              match.phase === "turn_active" &&
+              !icarusArming &&
+              Boolean(match.dice && match.dice.rolls_this_turn >= 1)
+            }
             onScore={(category) => onAction({ type: "score", category })}
           />
         </section>

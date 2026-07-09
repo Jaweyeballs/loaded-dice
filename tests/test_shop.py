@@ -19,7 +19,10 @@ def test_shop_buy_adds_trading_card():
     from loaded_dice.match import Player
 
     player = Player(name="Alice", chips=500)
-    card = shop.buy(player, 0)
+    merchant_index = next(
+        i for i, offer in enumerate(shop.stock) if offer.card_id == CardId.MERCHANT
+    )
+    card = shop.buy(player, merchant_index)
     assert card.id == CardId.MERCHANT
     assert player.inventory.has_trading(CardId.MERCHANT)
     assert player.chips == 100
@@ -30,10 +33,13 @@ def test_shop_buy_refunds_on_full_inventory():
     from loaded_dice.match import Player
 
     player = Player(name="Alice", chips=10_000)
+    merchant_index = next(
+        i for i, offer in enumerate(shop.stock) if offer.card_id == CardId.MERCHANT
+    )
     for _ in range(3):
-        shop.buy(player, 0)
+        shop.buy(player, merchant_index)
     with pytest.raises(ShopError):
-        shop.buy(player, 0)
+        shop.buy(player, merchant_index)
     assert player.chips == 10_000 - 400 * 3
 
 
@@ -75,7 +81,10 @@ def test_buy_from_shop_through_match():
     match.score(Category.CHANCE)
     alice = match.players[0]
     alice.chips = 500
-    card = match.buy_from_shop(alice, 0)
+    merchant_index = next(
+        i for i, offer in enumerate(match.shop.stock) if offer.card_id == CardId.MERCHANT
+    )
+    card = match.buy_from_shop(alice, merchant_index)
     assert card.kind == CardKind.TRADING
     assert alice.inventory.has_trading(CardId.MERCHANT)
 

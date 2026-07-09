@@ -23,10 +23,11 @@ CARD_PRICES: dict[CardId, int] = {
     CardId.NEGATIVE_PUNISHMENT: 350,
 }
 
+# Playtest-friendly mix: bump, hindrance, and a trading card.
 DEFAULT_STOCK_IDS: tuple[CardId, ...] = (
-    CardId.MERCHANT,
-    CardId.PARRY,
     CardId.ICARUS,
+    CardId.GLASS_HALF_FULL,
+    CardId.MERCHANT,
 )
 
 
