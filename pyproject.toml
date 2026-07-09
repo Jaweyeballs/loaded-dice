@@ -7,10 +7,12 @@ requires-python = ">=3.9"
 dependencies = []
 
 [project.optional-dependencies]
-dev = ["pytest>=7.0"]
+dev = ["pytest>=7.0", "httpx>=0.27", "fastapi>=0.115", "uvicorn[standard]>=0.30"]
+web = ["fastapi>=0.115", "uvicorn[standard]>=0.30"]
 
 [project.scripts]
 loaded-dice = "loaded_dice.sandbox:main"
+loaded-dice-server = "loaded_dice.server:main"
 
 [build-system]
 requires = ["hatchling"]
