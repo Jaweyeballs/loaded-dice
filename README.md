@@ -33,6 +33,16 @@ pip install -e ".[dev]"
 pytest
 ```
 
+## CLI sandbox (local playtest)
+
+```bash
+pip install -e ".[dev]"
+loaded-dice
+# or: python -m loaded_dice.sandbox Alice Bob Carol
+```
+
+Type `help` in-game for commands. Default is 2 players with 1000 starting chips.
+
 ## Project layout
 
 ```
@@ -46,6 +56,6 @@ docs/GDD.md        — design document
 - [x] M0 — Core engine (in progress: dice mechanics done, scoring next)
 - [ ] M1 — Currency, shop, and consumables
 - [ ] M2 — Opponent-targeting effects
-- [ ] M3 — Browser UI (single-player)
+- [ ] M3 — Browser UI (single-player) — CLI sandbox available via `loaded-dice`
 - [ ] M4 — Multiplayer sync
 - [ ] M5 — Deploy & playtest

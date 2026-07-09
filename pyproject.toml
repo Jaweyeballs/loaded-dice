@@ -9,6 +9,9 @@ dependencies = []
 [project.optional-dependencies]
 dev = ["pytest>=7.0"]
 
+[project.scripts]
+loaded-dice = "loaded_dice.sandbox:main"
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
