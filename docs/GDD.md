@@ -111,9 +111,44 @@ Permanent boosts with drawbacks, picked at the start of a run/match.
 
 ---
 
-## 7. Open Questions / Deferred
+## 7. In-Match HUD (browser)
 
-Everything blocking M0–M2 has been resolved (see Definitions in §4 and updated Currency rules in §2). These two are pure balance decisions — not blocking, to be tested and adjusted once the game is playable:
+Reference mock: [`docs/ui-refs/hud.jpg`](ui-refs/hud.jpg). The play surface is a **table**; HUD chrome peeks onto it and can be pulled in or pushed aside for clutter control.
+
+### Collapsible chrome
+- **Left panel** (Debuffs + Leaderboard tabs), **top-right scoresheet**, and **power / trading card trays** each have a control (button or arrow) to slide further onto the HUD or mostly off-screen so only a peek remains on the table edge.
+- Power and trading cards may **overlap slightly**, but each card must stay readable at a glance. Exact spacing need not match the mock.
+
+### Scoresheet (top right)
+- Modes: **Mine** (viewer’s sheet) and **Current player** (live sheet of whoever’s turn it is).
+- **Mine** is a dropdown listing every player in the lobby; selecting a name shows that player’s live scoresheet.
+- A **fullscreen** control expands the scoresheet so it can be read without scrolling.
+
+### Left panel — Debuffs
+- Shows hindrances / debuffs on **the viewing player**.
+- Updates live when new ones are cast; entries clear after the turn on which they take effect has finished.
+
+### Left panel — Leaderboard
+- Placement list of all lobby players with **current chips** and **scoresheet totals**.
+- Next to each score: a **+/−** live **net score change** heading into the next rotation.
+- An **up/down arrow** indicates predicted placement rise or fall next rotation.
+- **Ranking order only updates at the end of each rotation** (after every player’s turn has settled — scoring, power-ups, and debuffs). Mid-rotation the list order stays fixed even as chips/scores change.
+- Clicking a **name** on the leaderboard switches the top-right scoresheet to that player’s live sheet (same as picking them from the Mine dropdown).
+
+### Cards & shop
+- Hovering a **power card**, **trading card**, or **debuff** shows its description (copy TBD).
+- The **shop sign** is visible and usable when it is **not** your turn; it is **hidden during your turn**.
+
+### Dice
+- Dice always show the **active player’s** live rolls and locks (spectators see the same).
+- After a roll, dice **sort into ascending face order** in the tray above the power cards, where they can be locked.
+
+---
+
+## 8. Open Questions / Deferred
+
+Everything blocking M0–M2 has been resolved (see Definitions in §4 and updated Currency rules in §2). These are pure balance / later-product decisions — not blocking:
 
 1. **Miscounter/Cyclops drawback swap** — test during balancing.
 2. **Rarity + economy system** — needed before shop pricing/drop rates can be implemented, but not before M0.
+3. **QoL / deep customizability** — intentional product pillar; specifics deferred until the core HUD loop is solid.
