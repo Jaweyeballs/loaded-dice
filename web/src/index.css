@@ -383,9 +383,34 @@ select {
   font-size: 0.85rem;
 }
 
+.place-arrow {
+  font-size: 0.7rem;
+  line-height: 1;
+}
+
+.place-arrow.up {
+  color: var(--ok);
+}
+
+.place-arrow.down {
+  color: var(--danger);
+}
+
 .leaderboard .stats {
   font-size: 0.85rem;
   color: var(--ink-soft);
+}
+
+.score-delta {
+  font-variant-numeric: tabular-nums;
+}
+
+.score-delta.up {
+  color: var(--ok);
+}
+
+.score-delta.down {
+  color: var(--danger);
 }
 
 .hud-table {

@@ -12,8 +12,41 @@ def test_serialize_match_basic_shape():
     assert state["is_over"] is False
     assert len(state["players"]) == 2
     assert state["players"][0]["chips"] == 500
+    assert state["players"][0]["score_delta"] == 0
+    assert state["leaderboard_order"] == ["Alice", "Bob"]
     assert state["dice"] is None
     assert "shop" in state
+
+
+def test_score_delta_and_leaderboard_freeze_mid_rotation():
+    match = Match(["Alice", "Bob"])
+    # Force Alice ahead without finishing the rotation.
+    match.players[0].game_total = 50
+
+    state = serialize_match(match)
+    alice = next(p for p in state["players"] if p["name"] == "Alice")
+    bob = next(p for p in state["players"] if p["name"] == "Bob")
+    assert alice["score_delta"] == 50
+    assert bob["score_delta"] == 0
+    # Order stays frozen at rotation-start ties (name order), not live standings.
+    assert state["leaderboard_order"] == ["Alice", "Bob"]
+
+    # Advance through both turns so the rotation rolls over.
+    match.start_turn()
+    match.begin_rolling()
+    match.roll()
+    match.end_turn_without_scoring()
+    match.start_turn()
+    match.begin_rolling()
+    match.roll()
+    match.end_turn_without_scoring()
+
+    assert match.rotation_count == 1
+    state = serialize_match(match)
+    assert state["leaderboard_order"] == ["Alice", "Bob"]
+    alice = next(p for p in state["players"] if p["name"] == "Alice")
+    assert alice["total_score"] == 50
+    assert alice["score_delta"] == 0  # baseline reset at rotation boundary
 
 
 def test_serialize_includes_dice_after_start():

@@ -8,6 +8,8 @@ export type PlayerState = {
   name: string;
   chips: number;
   total_score: number;
+  /** Points gained on the scoresheet since this rotation started. */
+  score_delta: number;
   game_total: number;
   sheet: Record<string, number | null>;
   power_cards: CardInfo[];
@@ -29,6 +31,8 @@ export type MatchState = {
   active_player: string;
   is_over: boolean;
   winner: string | null;
+  /** Placement names frozen at rotation start (server authority). */
+  leaderboard_order: string[];
   players: PlayerState[];
   dice: {
     values: number[];

@@ -1,4 +1,23 @@
 import { useEffect, useMemo, useState } from "react";
+
+function formatScoreDelta(delta: number): string {
+  if (delta > 0) return `+${delta}`;
+  if (delta < 0) return `−${Math.abs(delta)}`;
+  return "+0";
+}
+
+/** Compare frozen place vs live standings; no arrow if placement would stay put. */
+function placementArrow(
+  name: string,
+  displayedPlace: number,
+  predictedOrder: string[],
+): "up" | "down" | null {
+  const predictedPlace = predictedOrder.indexOf(name);
+  if (predictedPlace < 0) return null;
+  if (predictedPlace < displayedPlace) return "up";
+  if (predictedPlace > displayedPlace) return "down";
+  return null;
+}
 import type { CardInfo, MatchState, PlayerState, RoomState } from "./types";
 
 type Props = {
@@ -62,26 +81,19 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
   );
   const [icarusArming, setIcarusArming] = useState(false);
 
-  // Leaderboard placement order — frozen mid-rotation (scores/chips still update live).
-  const [rankOrder, setRankOrder] = useState<string[]>(() =>
-    [...match.players]
-      .sort((a, b) => b.total_score - a.total_score || a.name.localeCompare(b.name))
-      .map((p) => p.name),
-  );
-
-  // Re-sort placements only when a full rotation completes (everyone has taken a turn).
-  // We intentionally omit match.players from deps so mid-rotation score changes don't reshuffle.
-  useEffect(() => {
-    setRankOrder(
+  // Where everyone would sit if the leaderboard re-sorted on current totals right now.
+  const predictedOrder = useMemo(
+    () =>
       [...match.players]
         .sort((a, b) => b.total_score - a.total_score || a.name.localeCompare(b.name))
         .map((p) => p.name),
-    );
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional: match.players omitted
-  }, [match.rotation_count]);
+    [match.players],
+  );
 
-  // Map frozen name order → live player objects (scores/chips stay current).
-  const rankedPlayers = rankOrder
+  // Frozen placement from the server; scores/chips on each row still update live.
+  const displayOrder =
+    match.leaderboard_order?.length > 0 ? match.leaderboard_order : predictedOrder;
+  const rankedPlayers = displayOrder
     .map((name) => match.players.find((p) => p.name === name))
     .filter((p): p is PlayerState => Boolean(p));
 
@@ -262,21 +274,43 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
             </div>
           ) : (
             <ol className="leaderboard">
-              {rankedPlayers.map((p, place) => (
-                <li key={p.name} className={p.name === match.active_player ? "playing" : ""}>
-                  <button
-                    type="button"
-                    className="name-link"
-                    onClick={() => selectSheetPlayer(p.name)}
-                  >
-                    <span className="place">#{place + 1}</span>
-                    <span className="name">{p.name}</span>
-                  </button>
-                  <span className="stats">
-                    {p.total_score} pts · {p.chips} chips
-                  </span>
-                </li>
-              ))}
+              {rankedPlayers.map((p, place) => {
+                const arrow = placementArrow(p.name, place, predictedOrder);
+                const delta = p.score_delta ?? 0;
+                return (
+                  <li key={p.name} className={p.name === match.active_player ? "playing" : ""}>
+                    <button
+                      type="button"
+                      className="name-link"
+                      onClick={() => selectSheetPlayer(p.name)}
+                    >
+                      <span className="place">#{place + 1}</span>
+                      <span className="name">{p.name}</span>
+                      {arrow === "up" && (
+                        <span className="place-arrow up" title="Predicted to rise next rotation">
+                          ▲
+                        </span>
+                      )}
+                      {arrow === "down" && (
+                        <span className="place-arrow down" title="Predicted to fall next rotation">
+                          ▼
+                        </span>
+                      )}
+                    </button>
+                    <span className="stats">
+                      {p.total_score} pts{" "}
+                      <span
+                        className={`score-delta ${delta > 0 ? "up" : delta < 0 ? "down" : ""}`}
+                        title="Net score change this rotation"
+                      >
+                        ({formatScoreDelta(delta)})
+                      </span>
+                      {" · "}
+                      {p.chips} chips
+                    </span>
+                  </li>
+                );
+              })}
             </ol>
           )}
         </div>

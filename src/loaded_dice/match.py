@@ -145,6 +145,9 @@ class Match:
         self._current_rotation_attacks = RotationAttackRecord()
         self._previous_rotation_attacks = RotationAttackRecord()
         self.shop = Shop()
+        # Leaderboard HUD: freeze placement + score baselines until rotation ends.
+        self._score_at_rotation_start = {p.name: p.total_score() for p in self.players}
+        self._leaderboard_order = self._ranked_player_names()
 
     @property
     def active_player(self) -> Player:
@@ -157,6 +160,16 @@ class Match:
     @property
     def rotation_count(self) -> int:
         return self._rotation_count
+
+    @property
+    def leaderboard_order(self) -> list[str]:
+        """Placement order frozen at the start of the current rotation."""
+        return list(self._leaderboard_order)
+
+    def score_delta_this_rotation(self, player: Player) -> int:
+        """Net scoresheet points gained since this rotation began."""
+        baseline = self._score_at_rotation_start.get(player.name, 0)
+        return player.total_score() - baseline
 
     def is_over(self) -> bool:
         if self.config.max_rotations is not None:
@@ -450,6 +463,19 @@ class Match:
             self._rotation_count += 1
             self._previous_rotation_attacks = self._current_rotation_attacks
             self._current_rotation_attacks = RotationAttackRecord()
+            self._score_at_rotation_start = {
+                p.name: p.total_score() for p in self.players
+            }
+            self._leaderboard_order = self._ranked_player_names()
+
+    def _ranked_player_names(self) -> list[str]:
+        return [
+            player.name
+            for player in sorted(
+                self.players,
+                key=lambda p: (-p.total_score(), p.name),
+            )
+        ]
 
     def _next_player_index(self) -> int:
         count = len(self.players)
