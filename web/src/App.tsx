@@ -72,7 +72,7 @@ export default function App() {
 
   if (!room) {
     return (
-      <div className="app">
+      <div className="app lobby">
         <p className="hint">Connecting to room {roomCode}…</p>
         {error && <p className="error">{error}</p>}
         <button type="button" className="secondary" onClick={leave}>
