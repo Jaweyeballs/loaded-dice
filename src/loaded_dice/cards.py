@@ -24,6 +24,10 @@ class CardId(Enum):
     LAWYER = "lawyer"
     PERSUADER = "persuader"
     GECKO = "gecko"
+    TODDLER = "toddler"
+    PSYCHIC = "psychic"
+    GUARDIAN = "guardian"
+    FORECASTER = "forecaster"
     PARRY = "parry"
     POSITIVE_REINFORCEMENT = "positive_reinforcement"
     NEGATIVE_REINFORCEMENT = "negative_reinforcement"
@@ -46,6 +50,10 @@ CARD_DEFS: dict[CardId, Card] = {
     CardId.LAWYER: Card(CardId.LAWYER, CardKind.TRADING),
     CardId.PERSUADER: Card(CardId.PERSUADER, CardKind.TRADING),
     CardId.GECKO: Card(CardId.GECKO, CardKind.TRADING),
+    CardId.TODDLER: Card(CardId.TODDLER, CardKind.TRADING),
+    CardId.PSYCHIC: Card(CardId.PSYCHIC, CardKind.TRADING),
+    CardId.GUARDIAN: Card(CardId.GUARDIAN, CardKind.TRADING),
+    CardId.FORECASTER: Card(CardId.FORECASTER, CardKind.TRADING),
     CardId.PARRY: Card(CardId.PARRY, CardKind.POWER),
     CardId.ICARUS: Card(CardId.ICARUS, CardKind.POWER),
     CardId.POSITIVE_REINFORCEMENT: Card(CardId.POSITIVE_REINFORCEMENT, CardKind.POWER),

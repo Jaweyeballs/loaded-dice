@@ -48,6 +48,7 @@ def serialize_player(player: Player, match: Match) -> dict[str, Any]:
         "can_use_shop": match.can_use_shop(player),
         "gambler_cost": player.gambler_next_cost,
         "lawyer_cooldown": player.lawyer_cooldown_turns,
+        "guardian_cooldown": player.guardian_cooldown_turns,
     }
 
 
@@ -100,4 +101,7 @@ def serialize_match(match: Match) -> dict[str, Any]:
         "dice": serialize_dice(match),
         "shop": serialize_shop(match),
         "previews": serialize_previews(match),
+        "psychic_previews": {
+            str(index): face for index, face in match.psychic_previews.items()
+        },
     }

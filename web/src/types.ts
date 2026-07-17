@@ -25,6 +25,7 @@ export type PlayerState = {
   can_use_shop: boolean;
   gambler_cost: number;
   lawyer_cooldown: number;
+  guardian_cooldown: number;
 };
 
 export type MatchState = {
@@ -47,6 +48,8 @@ export type MatchState = {
     reroll_cost: number;
   };
   previews: Record<string, number> | null;
+  psychic_previews?: Record<string, number>;
+  forecaster_reveals?: Record<string, string[]> | null;
   you_are_active?: boolean;
   you_can_use_shop?: boolean;
 };

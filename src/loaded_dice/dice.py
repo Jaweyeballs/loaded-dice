@@ -51,11 +51,25 @@ class DiceSet:
         self.standard_max_rolls = max_rolls
         self.max_rolls = max_rolls
         self.rolls_this_turn = 0
+        # Psychic: next unlocked roll for these indices uses the queued face.
+        self._forced_next_values: dict[int, int] = {}
 
     def grant_extra_rolls(self, count: int = 1) -> None:
         """Increase the per-turn roll limit (e.g. The Gambler, The Toddler)."""
         self.max_rolls += count
         # standard_max_rolls stays fixed — only ability-free rolls earn chip income.
+
+    def queue_forced_roll(self, index: int, value: int) -> None:
+        """Force the next roll of die *index* to *value* (Psychic)."""
+        if index < 0 or index >= len(self.dice):
+            raise IndexError(f"Invalid die index: {index}")
+        if value < 1 or value > 6:
+            raise ValueError(f"Standard die face must be 1–6, got {value}")
+        self._forced_next_values[index] = value
+
+    @property
+    def forced_next_values(self) -> dict[int, int]:
+        return dict(self._forced_next_values)
 
     def roll(self) -> list[int]:
         """Roll all unlocked dice. Raises TooManyRollsError past the per-turn limit."""
@@ -64,8 +78,14 @@ class DiceSet:
                 f"Already rolled {self.rolls_this_turn} times this turn "
                 f"(max {self.max_rolls})."
             )
-        for die in self.dice:
-            die.roll()
+        for index, die in enumerate(self.dice):
+            if die.locked:
+                continue
+            forced = self._forced_next_values.pop(index, None)
+            if forced is not None:
+                die.value = forced
+            else:
+                die.roll()
         self.rolls_this_turn += 1
         return self.values
 
@@ -82,6 +102,7 @@ class DiceSet:
     def reset_for_new_turn(self) -> None:
         """Unlock every die and reset the roll counter — call at the start of each turn."""
         self.rolls_this_turn = 0
+        self._forced_next_values.clear()
         for die in self.dice:
             die.locked = False
 

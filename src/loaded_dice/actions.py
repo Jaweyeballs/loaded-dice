@@ -117,7 +117,10 @@ def _cast_hindrance(match: Match, _actor: Player, action: dict[str, Any]) -> Non
 
 def _activate_trading(match: Match, _actor: Player, action: dict[str, Any]) -> None:
     card_id = _parse_card_id(str(_require(action, "card_id")))
-    match.activate_trading_card(card_id)
+    kwargs: dict[str, Any] = {}
+    if "die_indices" in action and action["die_indices"] is not None:
+        kwargs["die_indices"] = [int(i) for i in action["die_indices"]]
+    match.activate_trading_card(card_id, **kwargs)
 
 
 def _score(match: Match, _actor: Player, action: dict[str, Any]) -> None:

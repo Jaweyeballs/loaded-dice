@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
+import { cardBlurb, cardTipLabel } from "./cardCopy";
+import { Tip } from "./Tip";
 import type { CardInfo, MatchState, PlayerState, RoomState } from "./types";
 
 type Props = {
@@ -31,27 +33,13 @@ const HINDRANCE_IDS = new Set([
   "negative_punishment",
 ]);
 
-/** Trading cards clicked to activate (stay in party). Others are passives. */
-const ACTIVATABLE_TRADING = new Set(["gambler", "lawyer"]);
-
-const CARD_BLURBS: Record<string, string> = {
-  merchant: "Earn 200 chips at the start of your turn (passive).",
-  persuader: "+3 points on every scored hand (passive).",
-  gecko: "+100 chips to compensation payouts (passive).",
-  gambler: "Pay chips for an extra reroll; cost rises each use.",
-  lawyer: "End your turn without scoring (2-turn cooldown).",
-  icarus: "Bump one die face up by 1.",
-  parry: "Block a queued hindrance at turn start.",
-  glass_half_full: "Target’s upper-section score is 0 this turn.",
-  glass_half_empty: "Target’s lower-section score is 0 this turn.",
-  positive_reinforcement: "Attack-reactive buff (see GDD).",
-  negative_reinforcement: "Attack-reactive buff (see GDD).",
-  positive_punishment: "Attack-reactive hindrance (see GDD).",
-  negative_punishment: "Attack-reactive hindrance (see GDD).",
-};
+/** Trading cards clicked to activate (stay in party). Others are passives / turn-start. */
+const ACTIVATABLE_TRADING = new Set(["gambler", "lawyer", "toddler", "psychic"]);
+const DIE_PICK_TRADING = new Set(["toddler", "psychic"]);
 
 type SheetMode = "mine" | "current";
 type LeftTab = "debuffs" | "leaderboard";
+type DiePickMode = { cardId: "toddler" | "psychic"; picked: number[] };
 
 function formatScoreDelta(delta: number): string {
   if (delta > 0) return `+${delta}`;
@@ -76,10 +64,10 @@ function label(id: string): string {
   return id.replace(/_/g, " ");
 }
 
-function cardTitle(card: CardInfo, extra?: string): string {
-  const blurb = CARD_BLURBS[card.id] ?? "description TBD";
-  const base = `${label(card.id)}${card.transparent ? " (transparent)" : ""} — ${blurb}`;
-  return extra ? `${base} ${extra}` : base;
+function tipText(cardId: string, transparent = false, extra?: string): string {
+  const head = cardTipLabel(cardId, transparent);
+  const body = cardBlurb(cardId);
+  return extra ? `${head} — ${body} ${extra}` : `${head} — ${body}`;
 }
 
 
@@ -101,6 +89,7 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
     () => match.players.find((p) => p.name !== playerName)?.name ?? "",
   );
   const [icarusArming, setIcarusArming] = useState(false);
+  const [diePick, setDiePick] = useState<DiePickMode | null>(null);
 
   // Where everyone would sit if the leaderboard re-sorted on current totals right now.
   const predictedOrder = useMemo(
@@ -135,10 +124,11 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
       .sort((a, b) => a.value - b.value || a.index - b.index); 
   }, [match.dice]);
 
-  // Cancel "pick a die for Icarus" if the turn ends or dice disappear.
+  // Cancel die-targeting modes if the turn ends or dice disappear.
   useEffect(() => {
     if (!active || match.phase !== "turn_active" || !match.dice) {
       setIcarusArming(false);
+      setDiePick(null);
     }
   }, [active, match.phase, match.dice]);
 
@@ -156,6 +146,23 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
 
   function handleDieClick(index: number, locked: boolean) {
     if (!active) return;
+    if (diePick) {
+      const already = diePick.picked.includes(index);
+      const next = already
+        ? diePick.picked.filter((i) => i !== index)
+        : [...diePick.picked, index].slice(0, 2);
+      if (next.length === 2) {
+        onAction({
+          type: "activate_trading",
+          card_id: diePick.cardId,
+          die_indices: next,
+        });
+        setDiePick(null);
+        return;
+      }
+      setDiePick({ ...diePick, picked: next });
+      return;
+    }
     // While Icarus is armed, a die click casts instead of lock/unlock.
     if (icarusArming) {
       onAction({ type: "cast_power", card_id: "icarus", die_index: index });
@@ -166,6 +173,7 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
   }
 
   function castPower(card: CardInfo) {
+    setDiePick(null);
     // Icarus needs a die target: first click arms, second click is on a die.
     if (card.id === "icarus") {
       if (!match.dice) return;
@@ -179,6 +187,7 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
   function castHindrance(card: CardInfo) {
     if (!hindranceTarget) return;
     setIcarusArming(false);
+    setDiePick(null);
     onAction({
       type: "cast_hindrance",
       card_id: card.id,
@@ -189,6 +198,16 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
   function activateTrading(card: CardInfo) {
     if (!ACTIVATABLE_TRADING.has(card.id)) return;
     setIcarusArming(false);
+    if (DIE_PICK_TRADING.has(card.id)) {
+      if (!match.dice) return;
+      setDiePick((current) =>
+        current?.cardId === card.id
+          ? null
+          : { cardId: card.id as "toddler" | "psychic", picked: [] },
+      );
+      return;
+    }
+    setDiePick(null);
     onAction({ type: "activate_trading", card_id: card.id });
   }
 
@@ -201,6 +220,9 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
     if (card.id === "lawyer") {
       return (me?.lawyer_cooldown ?? 0) > 0;
     }
+    if (card.id === "toddler" || card.id === "psychic") {
+      return !match.dice;
+    }
     return true;
   }
 
@@ -211,7 +233,26 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
     if (card.id === "lawyer" && (me?.lawyer_cooldown ?? 0) > 0) {
       return `${label(card.id)} (CD ${me?.lawyer_cooldown})`;
     }
+    if (card.id === "guardian" && (me?.guardian_cooldown ?? 0) > 0) {
+      return `${label(card.id)} (CD ${me?.guardian_cooldown})`;
+    }
+    if (diePick?.cardId === card.id) {
+      return `${label(card.id)} (${diePick.picked.length}/2)`;
+    }
     return label(card.id);
+  }
+
+  function canParry(): boolean {
+    if (!me) return false;
+    if (me.parry_ready) return true;
+    if (me.power_cards.some((c) => c.id === "parry")) return true;
+    if (
+      me.trading_cards.some((c) => c.id === "guardian") &&
+      (me.guardian_cooldown ?? 0) === 0
+    ) {
+      return true;
+    }
+    return false;
   }
 
   const powerCards = me?.power_cards.filter((c) => !HINDRANCE_IDS.has(c.id)) ?? [];
@@ -283,13 +324,16 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
                 active &&
                 myDebuffs.map((h, index) => (
                   <div key={`${h.card_id}-${index}`} className="debuff-row">
-                    <span title={cardTitle({ id: h.card_id, kind: "power", transparent: false })}>
-                      {label(h.card_id)}
-                      <span className="muted"> from {h.caster_name}</span>
-                    </span>
+                    <Tip text={tipText(h.card_id)} className="tip-below">
+                      <span>
+                        {label(h.card_id)}
+                        <span className="muted"> from {h.caster_name}</span>
+                      </span>
+                    </Tip>
                     <button
                       type="button"
                       className="inline"
+                      disabled={!canParry()}
                       onClick={() =>
                         onAction({ type: "block_hindrance", hindrance_index: index })
                       }
@@ -304,11 +348,13 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
               {myDebuffs.length > 0 && match.phase !== "turn_start" && (
                 <ul className="plain-list">
                   {myDebuffs.map((h, index) => (
-                    <li
-                      key={`q-${h.card_id}-${index}`}
-                      title={cardTitle({ id: h.card_id, kind: "power", transparent: false })}
-                    >
-                      {label(h.card_id)} <span className="muted">({h.caster_name})</span>
+                    <li key={`q-${h.card_id}-${index}`}>
+                      <Tip text={tipText(h.card_id)} className="tip-below">
+                        <span>
+                          {label(h.card_id)}{" "}
+                          <span className="muted">({h.caster_name})</span>
+                        </span>
+                      </Tip>
                     </li>
                   ))}
                 </ul>
@@ -462,7 +508,7 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
               <button
                 type="button"
                 onClick={() => onAction({ type: "roll" })}
-                disabled={icarusArming || !match.dice}
+                disabled={icarusArming || Boolean(diePick) || !match.dice}
               >
                 Roll
               </button>
@@ -470,7 +516,7 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
                 type="button"
                 className="secondary"
                 onClick={() => onAction({ type: "end_turn" })}
-                disabled={icarusArming}
+                disabled={icarusArming || Boolean(diePick)}
               >
                 End without scoring
               </button>
@@ -481,6 +527,15 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
                   onClick={() => setIcarusArming(false)}
                 >
                   Cancel Icarus
+                </button>
+              )}
+              {diePick && (
+                <button
+                  type="button"
+                  className="secondary"
+                  onClick={() => setDiePick(null)}
+                >
+                  Cancel {label(diePick.cardId)}
                 </button>
               )}
             </>
@@ -495,28 +550,52 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
           )}
         </div>
 
-        {match.dice && (
-          <div className={`dice-tray ${icarusArming ? "targeting" : ""}`}>
-            {sortedDice.map(({ value, index, locked }) => (
-              <button
-                key={index}
-                type="button"
-                className={`die ${locked ? "locked" : ""} ${
-                  icarusArming ? "targetable" : ""
-                }`}
-                disabled={!active}
-                onClick={() => handleDieClick(index, locked)}
-                title={
-                  icarusArming ? "Bump this die" : locked ? "Unlock" : "Lock"
-                }
-              >
-                {value}
-              </button>
+        {match.forecaster_reveals && (
+          <div className="forecaster-panel">
+            <h3>Forecaster</h3>
+            {Object.entries(match.forecaster_reveals).map(([name, cards]) => (
+              <div key={name}>
+                <strong>{name}:</strong>{" "}
+                {cards.length === 0
+                  ? "no hindrances"
+                  : cards.map((id) => label(id)).join(", ")}
+              </div>
             ))}
+          </div>
+        )}
+
+        {match.dice && (
+          <div
+            className={`dice-tray ${
+              icarusArming || diePick ? "targeting" : ""
+            }`}
+          >
+            {sortedDice.map(({ value, index, locked }) => {
+              const psychicFace = match.psychic_previews?.[String(index)];
+              const picked = diePick?.picked.includes(index);
+              return (
+                <button
+                  key={index}
+                  type="button"
+                  className={`die ${locked ? "locked" : ""} ${
+                    icarusArming || diePick ? "targetable" : ""
+                  } ${picked ? "picked" : ""}`}
+                  disabled={!active}
+                  onClick={() => handleDieClick(index, locked)}
+                >
+                  {value}
+                  {psychicFace != null && (
+                    <span className="psychic-note">→{psychicFace}</span>
+                  )}
+                </button>
+              );
+            })}
             <span className="dice-meta">
-              {icarusArming
-                ? "Click a die to bump"
-                : `${match.dice.rolls_this_turn}/${match.dice.max_rolls} rolls`}
+              {diePick
+                ? `Pick ${2 - diePick.picked.length} more die(s) for ${label(diePick.cardId)}`
+                : icarusArming
+                  ? "Click a die to bump"
+                  : `${match.dice.rolls_this_turn}/${match.dice.max_rolls} rolls`}
             </span>
           </div>
         )}
@@ -540,19 +619,22 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
                 <span className="empty-fan muted">Empty</span>
               )}
               {powerCards.map((card, i) => (
-                <button
+                <Tip
                   key={`p-${card.id}-${i}`}
-                  type="button"
-                  className={`fan-card power ${
-                    card.id === "icarus" && icarusArming ? "armed" : ""
-                  }`}
-                  disabled={!active || (card.id === "icarus" && !match.dice)}
-                  title={cardTitle(card)}
-                  onClick={() => castPower(card)}
-                  style={{ zIndex: i + 1 }}
+                  text={tipText(card.id, card.transparent)}
                 >
-                  {label(card.id)}
-                </button>
+                  <button
+                    type="button"
+                    className={`fan-card power ${
+                      card.id === "icarus" && icarusArming ? "armed" : ""
+                    }`}
+                    disabled={!active || (card.id === "icarus" && !match.dice)}
+                    onClick={() => castPower(card)}
+                    style={{ zIndex: i + 1 }}
+                  >
+                    {label(card.id)}
+                  </button>
+                </Tip>
               ))}
             </div>
             {active && hindranceCards.length > 0 && (
@@ -570,16 +652,16 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
                     ))}
                 </select>
                 {hindranceCards.map((card, i) => (
-                  <button
-                    key={`h-${card.id}-${i}`}
-                    type="button"
-                    className="fan-card hindrance"
-                    disabled={!hindranceTarget}
-                    title={cardTitle(card)}
-                    onClick={() => castHindrance(card)}
-                  >
-                    {label(card.id)}
-                  </button>
+                  <Tip key={`h-${card.id}-${i}`} text={tipText(card.id, card.transparent)}>
+                    <button
+                      type="button"
+                      className="fan-card hindrance"
+                      disabled={!hindranceTarget}
+                      onClick={() => castHindrance(card)}
+                    >
+                      {label(card.id)}
+                    </button>
+                  </Tip>
                 ))}
               </div>
             )}
@@ -593,33 +675,39 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
               )}
               {tradingCards.map((card, i) =>
                 ACTIVATABLE_TRADING.has(card.id) ? (
-                  <button
+                  <Tip
                     key={`t-${card.id}-${i}`}
-                    type="button"
-                    className="fan-card trading"
-                    style={{ zIndex: i + 1 }}
-                    disabled={tradingDisabled(card)}
-                    title={cardTitle(
-                      card,
+                    text={tipText(
+                      card.id,
+                      false,
                       card.id === "gambler"
                         ? `Cost ${me?.gambler_cost ?? 200} chips.`
-                        : (me?.lawyer_cooldown ?? 0) > 0
+                        : card.id === "lawyer" && (me?.lawyer_cooldown ?? 0) > 0
                           ? `Cooldown: ${me?.lawyer_cooldown} turns.`
                           : undefined,
                     )}
-                    onClick={() => activateTrading(card)}
                   >
-                    {tradingLabel(card)}
-                  </button>
+                    <button
+                      type="button"
+                      className={`fan-card trading ${
+                        diePick?.cardId === card.id ? "armed" : ""
+                      }`}
+                      style={{ zIndex: i + 1 }}
+                      disabled={tradingDisabled(card)}
+                      onClick={() => activateTrading(card)}
+                    >
+                      {tradingLabel(card)}
+                    </button>
+                  </Tip>
                 ) : (
-                  <div
-                    key={`t-${card.id}-${i}`}
-                    className="fan-card trading passive"
-                    title={cardTitle(card)}
-                    style={{ zIndex: i + 1 }}
-                  >
-                    {label(card.id)}
-                  </div>
+                  <Tip key={`t-${card.id}-${i}`} text={tipText(card.id)}>
+                    <div
+                      className="fan-card trading passive"
+                      style={{ zIndex: i + 1 }}
+                    >
+                      {tradingLabel(card)}
+                    </div>
+                  </Tip>
                 ),
               )}
             </div>
@@ -649,9 +737,11 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
           <ul className="shop-list">
             {match.shop.stock.map((offer) => (
               <li key={offer.index}>
-                <span title={`${label(offer.card_id)} — description TBD`}>
-                  {label(offer.card_id)} — {offer.price}
-                </span>
+                <Tip text={tipText(offer.card_id)} className="tip-below">
+                  <span>
+                    {label(offer.card_id)} — {offer.price}
+                  </span>
+                </Tip>
                 <button
                   type="button"
                   onClick={() => onAction({ type: "buy", stock_index: offer.index })}

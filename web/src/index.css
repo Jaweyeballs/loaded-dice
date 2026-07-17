@@ -476,6 +476,11 @@ select {
   cursor: crosshair;
 }
 
+.die.picked {
+  outline: 3px solid #7ec8ff;
+  outline-offset: 1px;
+}
+
 .dice-meta {
   font-size: 0.85rem;
   opacity: 0.85;
@@ -552,7 +557,20 @@ select {
 }
 
 .fan-card:first-child,
+.fan > .tip-wrap:first-child .fan-card,
 .empty-fan {
+  margin-left: 0;
+}
+
+.fan > .tip-wrap {
+  margin-left: -1.35rem;
+}
+
+.fan > .tip-wrap:first-child {
+  margin-left: 0;
+}
+
+.fan > .tip-wrap .fan-card {
   margin-left: 0;
 }
 
@@ -699,6 +717,70 @@ select {
 .sheet button {
   padding: 0.2rem 0.45rem;
   font-size: 0.75rem;
+}
+
+.tip-wrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.tip-box {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 8px);
+  transform: translateX(-50%);
+  z-index: 60;
+  width: max-content;
+  max-width: min(220px, 70vw);
+  padding: 0.45rem 0.55rem;
+  border-radius: 6px;
+  background: #1a221c;
+  color: #f3efe6;
+  border: 1px solid color-mix(in srgb, var(--cream) 22%, transparent);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
+  font-size: 0.75rem;
+  font-weight: 500;
+  line-height: 1.35;
+  text-transform: none;
+  letter-spacing: 0;
+  text-align: left;
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.12s ease;
+}
+
+.tip-wrap:hover .tip-box,
+.tip-wrap:focus-within .tip-box {
+  opacity: 1;
+  visibility: visible;
+}
+
+.tip-wrap.tip-below .tip-box {
+  bottom: auto;
+  top: calc(100% + 8px);
+}
+
+.forecaster-panel {
+  margin: 0.75rem 0 0;
+  padding: 0.55rem 0.7rem;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--felt-deep) 70%, black);
+  border: 1px solid color-mix(in srgb, white 14%, transparent);
+  font-size: 0.85rem;
+  max-width: min(360px, 90vw);
+}
+
+.forecaster-panel h3 {
+  margin: 0 0 0.35rem;
+  font-family: "Fraunces", Georgia, serif;
+  font-size: 0.95rem;
+}
+
+.psychic-note {
+  margin-left: 0.35rem;
+  font-size: 0.8rem;
+  color: #c9e8ff;
 }
 
 @media (max-width: 800px) {

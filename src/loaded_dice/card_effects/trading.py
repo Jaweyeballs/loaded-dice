@@ -18,6 +18,10 @@ GECKO_COMPENSATION_BONUS = 100
 GAMBLER_BASE_COST = 200
 GAMBLER_COST_STEP = 100
 LAWYER_COOLDOWN_TURNS = 2
+# End-of-turn ticks: set to 2 so the next full turn is unavailable (GDD: 1-turn CD).
+GUARDIAN_COOLDOWN_TURNS = 2
+TODDLER_DIE_COUNT = 2
+PSYCHIC_DIE_COUNT = 2
 
 # --- Turn-start handlers (income, reveals, etc.) ---
 
@@ -64,5 +68,9 @@ ACTIVATABLE_TRADING_IDS: frozenset[CardId] = frozenset(
     {
         CardId.GAMBLER,
         CardId.LAWYER,
+        CardId.TODDLER,
+        CardId.PSYCHIC,
     }
 )
+
+# Guardian is used via block_hindrance at turn start, not activate_trading.

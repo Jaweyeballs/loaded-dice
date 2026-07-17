@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
+import random
 
 from loaded_dice.dice import DEFAULT_MAX_ROLLS_PER_TURN, DiceSet, TooManyRollsError
 from loaded_dice.economy import (
@@ -30,7 +31,10 @@ from loaded_dice.card_effects.trading import (
     ACTIVATABLE_TRADING_IDS,
     GAMBLER_BASE_COST,
     GAMBLER_COST_STEP,
+    GUARDIAN_COOLDOWN_TURNS,
     LAWYER_COOLDOWN_TURNS,
+    PSYCHIC_DIE_COUNT,
+    TODDLER_DIE_COUNT,
     gecko_compensation_bonus,
 )
 from loaded_dice.effects import TurnEffects
@@ -110,6 +114,7 @@ class Player:
     parry_ready: bool = False
     gambler_next_cost: int = GAMBLER_BASE_COST
     lawyer_cooldown_turns: int = 0
+    guardian_cooldown_turns: int = 0
 
     def total_score(self) -> int:
         return self.game_total + self.current_sheet.grand_total()
@@ -157,6 +162,12 @@ class Match:
         # Leaderboard HUD: freeze placement + score baselines until rotation ends.
         self._score_at_rotation_start = {p.name: p.total_score() for p in self.players}
         self._leaderboard_order = self._ranked_player_names()
+        # Psychic: die_index → previewed face for the active turn (viewer HUD).
+        self._psychic_previews: dict[int, int] = {}
+
+    @property
+    def psychic_previews(self) -> dict[int, int]:
+        return dict(self._psychic_previews)
 
     @property
     def active_player(self) -> Player:
@@ -234,6 +245,11 @@ class Match:
             player.parry_ready = False
         elif player.inventory.has_power(CardId.PARRY):
             player.inventory.consume_power_by_id(CardId.PARRY)
+        elif (
+            player.inventory.has_trading(CardId.GUARDIAN)
+            and player.guardian_cooldown_turns == 0
+        ):
+            player.guardian_cooldown_turns = GUARDIAN_COOLDOWN_TURNS
         else:
             raise WrongPhaseError("No parry available")
 
@@ -245,7 +261,13 @@ class Match:
             raise WrongPhaseError(f"Cannot roll during {self.phase.value}")
         if self._dice is None:
             raise WrongPhaseError("No dice set for this turn")
-        return self._dice.roll()
+        values = self._dice.roll()
+        self._psychic_previews = {
+            index: face
+            for index, face in self._psychic_previews.items()
+            if index in self._dice.forced_next_values
+        }
+        return values
 
     def lock(self, index: int) -> None:
         self._require_active_dice()
@@ -260,7 +282,12 @@ class Match:
         self._require_active_dice()
         self._dice.grant_extra_rolls(count)
 
-    def activate_trading_card(self, card_id: CardId) -> None:
+    def activate_trading_card(
+        self,
+        card_id: CardId,
+        *,
+        die_indices: list[int] | None = None,
+    ) -> None:
         """Use an activatable trading card from the active player's party (stays in inventory)."""
         self._ensure_not_over()
         if self.phase != TurnPhase.TURN_ACTIVE:
@@ -294,7 +321,51 @@ class Match:
             player.lawyer_cooldown_turns = LAWYER_COOLDOWN_TURNS
             return
 
+        if card_id == CardId.TODDLER:
+            self._activate_toddler(die_indices)
+            return
+
+        if card_id == CardId.PSYCHIC:
+            self._activate_psychic(die_indices)
+            return
+
         raise WrongPhaseError(f"Unhandled trading activation: {card_id.value}")
+
+    def _require_die_indices(self, die_indices: list[int] | None, count: int) -> list[int]:
+        self._require_active_dice()
+        assert self._dice is not None
+        if die_indices is None or len(die_indices) != count:
+            raise ValueError(f"Exactly {count} die indices are required")
+        if len(set(die_indices)) != count:
+            raise ValueError("Die indices must be unique")
+        size = len(self._dice.dice)
+        for index in die_indices:
+            if index < 0 or index >= size:
+                raise ValueError(f"Invalid die index: {index}")
+        return list(die_indices)
+
+    def _activate_toddler(self, die_indices: list[int] | None) -> None:
+        """Grant an extra reroll that only rolls the two chosen dice."""
+        chosen = self._require_die_indices(die_indices, TODDLER_DIE_COUNT)
+        assert self._dice is not None
+        chosen_set = set(chosen)
+        for index in range(len(self._dice.dice)):
+            if index in chosen_set:
+                self._dice.unlock(index)
+            else:
+                self._dice.lock(index)
+        self.grant_extra_rolls(1)
+
+    def _activate_psychic(self, die_indices: list[int] | None) -> None:
+        """Preview (and lock in) the next rolled face for two dice."""
+        chosen = self._require_die_indices(die_indices, PSYCHIC_DIE_COUNT)
+        assert self._dice is not None
+        previews: dict[int, int] = {}
+        for index in chosen:
+            face = random.randint(1, 6)
+            self._dice.queue_forced_roll(index, face)
+            previews[index] = face
+        self._psychic_previews.update(previews)
 
     def cast_power_card(self, card_id: CardId, **kwargs) -> None:
         """Play a positive power card from the active player's inventory during rolling."""
@@ -501,8 +572,11 @@ class Match:
         finishing = self.players[starting_index]
         if finishing.lawyer_cooldown_turns > 0:
             finishing.lawyer_cooldown_turns -= 1
+        if finishing.guardian_cooldown_turns > 0:
+            finishing.guardian_cooldown_turns -= 1
 
         self._dice = None
+        self._psychic_previews = {}
         self.phase = TurnPhase.BETWEEN_TURNS
 
         if self.is_over():
