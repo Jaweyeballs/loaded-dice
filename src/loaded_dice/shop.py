@@ -23,12 +23,22 @@ CARD_PRICES: dict[CardId, int] = {
     CardId.FORECASTER: 450,
     CardId.PARRY: 300,
     CardId.ICARUS: 250,
+    CardId.SUPER_SERUM: 300,
+    CardId.DO_OVER: 350,
+    CardId.BENCHWARMER: 300,
+    CardId.HELPING_HAND: 350,
+    CardId.TWINS: 300,
+    CardId.SPACE_DIE: 400,
+    CardId.BOOLEAN: 350,
+    CardId.WRITE_OFF: 250,
     CardId.POSITIVE_REINFORCEMENT: 300,
     CardId.NEGATIVE_REINFORCEMENT: 300,
     CardId.GLASS_HALF_EMPTY: 350,
     CardId.GLASS_HALF_FULL: 350,
     CardId.POSITIVE_PUNISHMENT: 350,
     CardId.NEGATIVE_PUNISHMENT: 350,
+    CardId.BLUE_SHELL: 400,
+    CardId.ALREADY_IN_JAIL: 350,
 }
 
 # Playtest-friendly mix: power, trading activate, trading passive.

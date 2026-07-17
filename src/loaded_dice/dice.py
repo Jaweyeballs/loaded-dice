@@ -4,24 +4,36 @@ A DiceSet holds one or more Die objects (default 5). Locked dice are skipped on
 reroll, matching standard Yahtzee keep/reroll behavior. Default is 3 rolls per
 turn; card effects may grant more. Card effects may also add extra dice;
 scoring always uses 5 selected values (see GDD). Standard dice use faces 1–6;
-special dice (e.g. The Coin's blank faces) may use 0 or other face sets when
-card effects are implemented.
+special dice (e.g. Boolean blanks, Benchwarmer 1–3) may use other face sets.
 """
+
+from __future__ import annotations
 
 import random
 
+STANDARD_FACES = (1, 2, 3, 4, 5, 6)
+BENCHWARMER_FACES = (1, 2, 3)
+BOOLEAN_FACES = (6, 6, 6, 0, 0, 0)
+
 
 class Die:
-    """A single six-sided die that can be locked between rolls."""
+    """A die that can be locked between rolls; faces may be non-standard."""
 
-    def __init__(self, value: int = 1):
-        self.value = value
+    def __init__(
+        self,
+        value: int = 1,
+        faces: tuple[int, ...] | list[int] | None = None,
+    ):
+        self.faces = tuple(faces) if faces is not None else STANDARD_FACES
+        if not self.faces:
+            raise ValueError("Die must have at least one face")
+        self.value = value if value in self.faces else self.faces[0]
         self.locked = False
 
     def roll(self) -> int:
         """Roll this die, unless it is locked. Returns the resulting value."""
         if not self.locked:
-            self.value = random.randint(1, 6)
+            self.value = random.choice(self.faces)
         return self.value
 
     def __repr__(self) -> str:
@@ -34,6 +46,32 @@ def bump_die_face(value: int) -> int:
     if value < 1 or value > 6:
         raise ValueError(f"Standard die face must be 1–6, got {value}")
     return (value % 6) + 1
+
+
+def bump_die(die: Die) -> None:
+    """Bump a die's showing face by one within its face set when possible (wraps)."""
+    if die.value in STANDARD_FACES and set(die.faces) >= set(STANDARD_FACES):
+        die.value = bump_die_face(die.value)
+        return
+    # Non-standard: step to the next distinct face value in sorted unique faces.
+    unique = sorted(set(die.faces))
+    try:
+        idx = unique.index(die.value)
+    except ValueError:
+        die.value = unique[0]
+        return
+    die.value = unique[(idx + 1) % len(unique)]
+
+
+def raise_die_no_wrap(die: Die) -> None:
+    """Increase a die's face by one without wrapping (Super serum: 6 stays 6)."""
+    unique = sorted(set(die.faces))
+    try:
+        idx = unique.index(die.value)
+    except ValueError:
+        return
+    if idx + 1 < len(unique):
+        die.value = unique[idx + 1]
 
 
 class TooManyRollsError(Exception):
@@ -51,7 +89,7 @@ class DiceSet:
         self.standard_max_rolls = max_rolls
         self.max_rolls = max_rolls
         self.rolls_this_turn = 0
-        # Psychic: next unlocked roll for these indices uses the queued face.
+        # Psychic / Twins: next unlocked roll for these indices uses the queued face.
         self._forced_next_values: dict[int, int] = {}
 
     def grant_extra_rolls(self, count: int = 1) -> None:
@@ -59,12 +97,26 @@ class DiceSet:
         self.max_rolls += count
         # standard_max_rolls stays fixed — only ability-free rolls earn chip income.
 
+    def add_die(
+        self,
+        faces: tuple[int, ...] | list[int],
+        *,
+        value: int | None = None,
+        locked: bool = False,
+    ) -> int:
+        """Append a die and return its index (Benchwarmer, Boolean, etc.)."""
+        die = Die(value=value if value is not None else faces[0], faces=faces)
+        die.locked = locked
+        self.dice.append(die)
+        return len(self.dice) - 1
+
     def queue_forced_roll(self, index: int, value: int) -> None:
-        """Force the next roll of die *index* to *value* (Psychic)."""
+        """Force the next roll of die *index* to *value* (Psychic / Twins)."""
         if index < 0 or index >= len(self.dice):
             raise IndexError(f"Invalid die index: {index}")
-        if value < 1 or value > 6:
-            raise ValueError(f"Standard die face must be 1–6, got {value}")
+        die = self.dice[index]
+        if value not in die.faces:
+            raise ValueError(f"Face {value} not on die faces {die.faces}")
         self._forced_next_values[index] = value
 
     @property

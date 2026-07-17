@@ -19,6 +19,14 @@ class CardId(Enum):
     """Known cards — expand as effects are implemented."""
 
     ICARUS = "icarus"
+    SUPER_SERUM = "super_serum"
+    DO_OVER = "do_over"
+    BENCHWARMER = "benchwarmer"
+    HELPING_HAND = "helping_hand"
+    TWINS = "twins"
+    SPACE_DIE = "space_die"
+    BOOLEAN = "boolean"
+    WRITE_OFF = "write_off"
     MERCHANT = "merchant"
     GAMBLER = "gambler"
     LAWYER = "lawyer"
@@ -35,6 +43,8 @@ class CardId(Enum):
     GLASS_HALF_FULL = "glass_half_full"
     POSITIVE_PUNISHMENT = "positive_punishment"
     NEGATIVE_PUNISHMENT = "negative_punishment"
+    BLUE_SHELL = "blue_shell"
+    ALREADY_IN_JAIL = "already_in_jail"
 
 
 @dataclass(frozen=True)
@@ -56,16 +66,30 @@ CARD_DEFS: dict[CardId, Card] = {
     CardId.FORECASTER: Card(CardId.FORECASTER, CardKind.TRADING),
     CardId.PARRY: Card(CardId.PARRY, CardKind.POWER),
     CardId.ICARUS: Card(CardId.ICARUS, CardKind.POWER),
+    CardId.SUPER_SERUM: Card(CardId.SUPER_SERUM, CardKind.POWER),
+    CardId.DO_OVER: Card(CardId.DO_OVER, CardKind.POWER),
+    CardId.BENCHWARMER: Card(CardId.BENCHWARMER, CardKind.POWER),
+    CardId.HELPING_HAND: Card(CardId.HELPING_HAND, CardKind.POWER),
+    CardId.TWINS: Card(CardId.TWINS, CardKind.POWER),
+    CardId.SPACE_DIE: Card(CardId.SPACE_DIE, CardKind.POWER),
+    CardId.BOOLEAN: Card(CardId.BOOLEAN, CardKind.POWER),
+    CardId.WRITE_OFF: Card(CardId.WRITE_OFF, CardKind.POWER),
     CardId.POSITIVE_REINFORCEMENT: Card(CardId.POSITIVE_REINFORCEMENT, CardKind.POWER),
     CardId.NEGATIVE_REINFORCEMENT: Card(CardId.NEGATIVE_REINFORCEMENT, CardKind.POWER),
     CardId.GLASS_HALF_EMPTY: Card(CardId.GLASS_HALF_EMPTY, CardKind.POWER),
     CardId.GLASS_HALF_FULL: Card(CardId.GLASS_HALF_FULL, CardKind.POWER),
     CardId.POSITIVE_PUNISHMENT: Card(CardId.POSITIVE_PUNISHMENT, CardKind.POWER),
     CardId.NEGATIVE_PUNISHMENT: Card(CardId.NEGATIVE_PUNISHMENT, CardKind.POWER),
+    CardId.BLUE_SHELL: Card(CardId.BLUE_SHELL, CardKind.POWER),
+    CardId.ALREADY_IN_JAIL: Card(CardId.ALREADY_IN_JAIL, CardKind.POWER),
 }
 
-# Positive powers that benefit another player — require target= in kwargs when implemented.
-POSITIVE_POWERS_REQUIRING_TARGET: frozenset[CardId] = frozenset()
+# Positive powers that require target= (another player).
+POSITIVE_POWERS_REQUIRING_TARGET: frozenset[CardId] = frozenset(
+    {
+        CardId.HELPING_HAND,
+    }
+)
 
 # Negative powers — cast via Match.cast_hindrance(), not cast_power_card().
 NEGATIVE_POWER_IDS: frozenset[CardId] = frozenset(
@@ -74,6 +98,15 @@ NEGATIVE_POWER_IDS: frozenset[CardId] = frozenset(
         CardId.GLASS_HALF_FULL,
         CardId.POSITIVE_PUNISHMENT,
         CardId.NEGATIVE_PUNISHMENT,
+        CardId.BLUE_SHELL,
+        CardId.ALREADY_IN_JAIL,
+    }
+)
+
+# Untargeted hindrances — Match picks the victim (e.g. current leader).
+UNTARGETED_HINDRANCE_IDS: frozenset[CardId] = frozenset(
+    {
+        CardId.BLUE_SHELL,
     }
 )
 

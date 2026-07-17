@@ -11,6 +11,16 @@ export const CARD_BLURBS: Record<string, string> = {
   guardian: "Block a queued hindrance at turn start (1-turn cooldown).",
   forecaster: "On your turn, see hindrance cards held by other players (passive).",
   icarus: "Bump one die face up by 1 (wraps 6 → 1).",
+  super_serum: "Increase every die by 1 (6s stay 6 — no wrap).",
+  do_over:
+    "If your dice match your last scored hand (not Yahtzee), overwrite that score.",
+  benchwarmer: "Add an extra die (faces 1–3). Pick 5 dice when scoring.",
+  helping_hand:
+    "Take 400 chips or +10 on this hand; the other goes to a chosen player.",
+  twins: "Pick 2 dice; on the next roll they are guaranteed to match.",
+  space_die: "Set one die to any face it can show.",
+  boolean: "Add a 6/blank die for the rest of this turn. Pick 5 when scoring.",
+  write_off: "End your turn without scoring.",
   parry: "Block a single queued hindrance at turn start (consumable).",
   glass_half_full: "Target’s upper-section score is 0 this turn.",
   glass_half_empty: "Target’s lower-section score is 0 this turn.",
@@ -22,6 +32,9 @@ export const CARD_BLURBS: Record<string, string> = {
     "If the target attacked you last rotation, −5 on their next scored hand.",
   negative_punishment:
     "If the target attacked you last rotation, they lose 200 chips.",
+  blue_shell: "The player currently in 1st place loses 10 points (auto-target).",
+  already_in_jail:
+    "The first die the target locks this turn cannot be unlocked.",
 };
 
 export function cardBlurb(cardId: string): string {

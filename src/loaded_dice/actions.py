@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any, Callable
 
-from loaded_dice.cards import CardId, CardNotInInventoryError, NEGATIVE_POWER_IDS
+from loaded_dice.cards import CardId, CardNotInInventoryError, NEGATIVE_POWER_IDS, UNTARGETED_HINDRANCE_IDS
 from loaded_dice.card_effects.positive_power import POSITIVE_POWER_CAST
 from loaded_dice.dice import TooManyRollsError
 from loaded_dice.economy import InsufficientChipsError
@@ -102,6 +102,12 @@ def _cast_power(match: Match, _actor: Player, action: dict[str, Any]) -> None:
     kwargs: dict[str, Any] = {}
     if "die_index" in action and action["die_index"] is not None:
         kwargs["die_index"] = int(action["die_index"])
+    if "face_value" in action and action["face_value"] is not None:
+        kwargs["face_value"] = int(action["face_value"])
+    if "die_indices" in action and action["die_indices"] is not None:
+        kwargs["die_indices"] = [int(i) for i in action["die_indices"]]
+    if "choice" in action and action["choice"] is not None:
+        kwargs["choice"] = str(action["choice"])
     if "target" in action and action["target"] is not None:
         kwargs["target"] = _player_by_name(match, str(action["target"]))
     match.cast_power_card(card_id, **kwargs)
@@ -111,6 +117,9 @@ def _cast_hindrance(match: Match, _actor: Player, action: dict[str, Any]) -> Non
     card_id = _parse_card_id(str(_require(action, "card_id")))
     if card_id not in NEGATIVE_POWER_IDS:
         raise ActionError(f"{card_id.value} is not a castable hindrance")
+    if card_id in UNTARGETED_HINDRANCE_IDS:
+        match.cast_hindrance(card_id, target=None)
+        return
     target = _player_by_name(match, str(_require(action, "target")))
     match.cast_hindrance(card_id, target)
 

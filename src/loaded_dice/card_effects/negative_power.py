@@ -27,7 +27,12 @@ def _glass_half_empty_on_resolve(target: Player, caster: Player, match: Match) -
 
 
 def _blue_shell_on_resolve(target: Player, caster: Player, match: Match) -> None:
-    raise NotImplementedError("Blue Shell point deduction is not wired yet")
+    target.lose_points(BLUE_SHELL_POINT_LOSS)
+
+
+def _already_in_jail_on_resolve(target: Player, caster: Player, match: Match) -> None:
+    target.jail_armed = True
+    target.jail_locked_index = None
 
 
 def _positive_punishment_on_resolve(target: Player, caster: Player, match: Match) -> None:
@@ -51,7 +56,8 @@ HINDRANCE_RESOLVERS: dict[CardId, Callable[[Player, Player, Match], None]] = {
     CardId.GLASS_HALF_EMPTY: _glass_half_empty_on_resolve,
     CardId.POSITIVE_PUNISHMENT: _positive_punishment_on_resolve,
     CardId.NEGATIVE_PUNISHMENT: _negative_punishment_on_resolve,
-    # CardId.BLUE_SHELL: _blue_shell_on_resolve,  # add CardId when implemented
+    CardId.BLUE_SHELL: _blue_shell_on_resolve,
+    CardId.ALREADY_IN_JAIL: _already_in_jail_on_resolve,
 }
 
 _GLASS_HALF_OPPOSITES: dict[CardId, CardId] = {

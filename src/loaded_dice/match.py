@@ -20,6 +20,7 @@ from loaded_dice.cards import (
     CardNotInInventoryError,
     NEGATIVE_POWER_IDS,
     POSITIVE_POWERS_REQUIRING_TARGET,
+    UNTARGETED_HINDRANCE_IDS,
 )
 from loaded_dice.card_effects.negative_power import (
     HindranceConflictError,
@@ -115,6 +116,10 @@ class Player:
     gambler_next_cost: int = GAMBLER_BASE_COST
     lawyer_cooldown_turns: int = 0
     guardian_cooldown_turns: int = 0
+    last_scored_values: list[int] | None = None
+    last_scored_category: Category | None = None
+    jail_armed: bool = False
+    jail_locked_index: int | None = None
 
     def total_score(self) -> int:
         return self.game_total + self.current_sheet.grand_total()
@@ -142,6 +147,12 @@ class Player:
         if amount < 0:
             raise ValueError("Cannot lose a negative chip amount")
         self.chips = max(0, self.chips - amount)
+
+    def lose_points(self, amount: int) -> None:
+        """Subtract points from the run total (Blue Shell, etc.)."""
+        if amount < 0:
+            raise ValueError("Cannot lose a negative point amount")
+        self.game_total -= amount
 
 
 class Match:
@@ -271,10 +282,19 @@ class Match:
 
     def lock(self, index: int) -> None:
         self._require_active_dice()
+        assert self._dice is not None
+        player = self.active_player
         self._dice.lock(index)
+        if player.jail_armed and player.jail_locked_index is None:
+            player.jail_locked_index = index
+            player.jail_armed = False
 
     def unlock(self, index: int) -> None:
         self._require_active_dice()
+        assert self._dice is not None
+        player = self.active_player
+        if player.jail_locked_index == index:
+            raise WrongPhaseError("Already in jail: that die cannot be unlocked")
         self._dice.unlock(index)
 
     def grant_extra_rolls(self, count: int = 1) -> None:
@@ -392,16 +412,21 @@ class Match:
 
         cast_positive_power(card_id, player, self, **kwargs)
 
-    def cast_hindrance(self, card_id: CardId, target: Player) -> None:
-        """Queue a negative power card on *target* during the active player's turn."""
+    def cast_hindrance(self, card_id: CardId, target: Player | None = None) -> None:
+        """Queue a negative power card (Blue Shell auto-targets current leader)."""
         self._ensure_not_over()
         if self.phase != TurnPhase.TURN_ACTIVE:
             raise WrongPhaseError(f"Cannot cast hindrances during {self.phase.value}")
         if card_id not in NEGATIVE_POWER_IDS:
             raise WrongPhaseError(f"{card_id.value} is not a castable hindrance")
+
+        if card_id in UNTARGETED_HINDRANCE_IDS:
+            target = self._leader_player()
+        elif target is None:
+            raise ValueError(f"{card_id.value} requires target")
         if target not in self.players:
             raise ValueError("target must be a player in this match")
-        if target is self.active_player:
+        if target is self.active_player and card_id not in UNTARGETED_HINDRANCE_IDS:
             raise ValueError("Cannot cast a hindrance on yourself")
 
         try:
@@ -419,6 +444,37 @@ class Match:
             QueuedHindrance(card_id=card_id, caster_name=caster.name)
         )
         self._current_rotation_attacks.record(caster.name, target.name)
+
+    def _leader_player(self) -> Player:
+        """Current first-place player (name tie-break) for Blue Shell."""
+        return max(self.players, key=lambda p: (p.total_score(), p.name))
+
+    def select_scoring_values_for_effects(
+        self,
+        die_indices: list[int] | None = None,
+    ) -> list[int]:
+        """Expose scoring-hand selection for card effects (Do over)."""
+        return self._select_scoring_values(die_indices)
+
+    def apply_do_over(
+        self,
+        player: Player,
+        values: list[int],
+        category: Category,
+    ) -> int:
+        """Overwrite last scored category and end the turn."""
+        if player is not self.active_player:
+            raise WrongPhaseError("Only the active player can use Do over")
+        points = player.current_sheet.overwrite(
+            values,
+            category,
+            effects=player.turn_effects,
+        )
+        player.last_scored_values = list(values)
+        player.last_scored_category = category
+        self._award_scoring_income(player)
+        self._end_turn()
+        return points
 
     def score(
         self,
@@ -440,6 +496,8 @@ class Match:
             category,
             effects=self.active_player.turn_effects,
         )
+        self.active_player.last_scored_values = list(values)
+        self.active_player.last_scored_category = category
         self._award_scoring_income(self.active_player)
         self._on_sheet_completed(self.active_player)
         self._end_turn()
@@ -574,6 +632,8 @@ class Match:
             finishing.lawyer_cooldown_turns -= 1
         if finishing.guardian_cooldown_turns > 0:
             finishing.guardian_cooldown_turns -= 1
+        finishing.jail_armed = False
+        finishing.jail_locked_index = None
 
         self._dice = None
         self._psychic_previews = {}

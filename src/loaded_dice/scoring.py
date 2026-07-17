@@ -163,6 +163,20 @@ class ScoreSheet:
         self._scores[category] = points
         return points + bonus
 
+    def overwrite(
+        self,
+        values: list[int],
+        category: Category,
+        effects: TurnEffects | None = None,
+    ) -> int:
+        """Replace an already-filled category (Do over). Returns new box points."""
+        if self.is_available(category):
+            raise ValueError(f"{category.value} has not been scored yet")
+        base_points = score_hand(values, category)
+        points = apply_turn_modifiers(base_points, category, effects)
+        self._scores[category] = points
+        return points
+
     def _yahtzee_scored_fifty(self) -> bool:
         return self._scores[Category.YAHTZEE] == 50
 
