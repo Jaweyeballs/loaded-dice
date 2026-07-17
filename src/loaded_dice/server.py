@@ -3,15 +3,35 @@
 from __future__ import annotations
 
 import json
+import os
+from pathlib import Path
 from typing import Any, Dict, Optional
 
 from fastapi import Body, FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from loaded_dice.actions import ActionError, apply_action
 from loaded_dice.rooms import Room, RoomError, RoomManager
 from loaded_dice.sandbox import SANDBOX_STARTING_CHIPS
+
+
+def _static_dir() -> Path | None:
+    """Built Vite assets (production / Fly). Local `npm run dev` does not need this."""
+    configured = os.environ.get("LOADED_DICE_STATIC")
+    candidates = []
+    if configured:
+        candidates.append(Path(configured))
+    # Docker image layout: /app/web/dist
+    candidates.append(Path.cwd() / "web" / "dist")
+    # Editable install from repo root
+    candidates.append(Path(__file__).resolve().parents[2] / "web" / "dist")
+    for path in candidates:
+        if (path / "index.html").is_file():
+            return path
+    return None
+
 
 app = FastAPI(title="Loaded Dice")
 app.add_middleware(
@@ -149,10 +169,18 @@ async def room_socket(websocket: WebSocket, room_code: str) -> None:
                     pass
 
 
+# Serve the built web UI last so /rooms, /health, and /ws stay authoritative.
+_static = _static_dir()
+if _static is not None:
+    app.mount("/", StaticFiles(directory=str(_static), html=True), name="static")
+
+
 def main() -> None:
     import uvicorn
 
-    uvicorn.run("loaded_dice.server:app", host="0.0.0.0", port=8000, reload=True)
+    port = int(os.environ.get("PORT", "8000"))
+    reload = os.environ.get("LOADED_DICE_RELOAD", "1") not in ("0", "false", "False")
+    uvicorn.run("loaded_dice.server:app", host="0.0.0.0", port=port, reload=reload)
 
 
 if __name__ == "__main__":

@@ -76,6 +76,36 @@ and ensure the API is reachable (server bound with `--host 0.0.0.0`). You can
 also set `VITE_API_BASE=http://<host-lan-ip>:8000` in `web/.env` if not using
 the Vite proxy.
 
+## Deploy on Fly.io (public playtest)
+
+One Fly app serves the React UI and the WebSocket API at the same origin
+(`https://<app-name>.fly.dev`). Anyone with the link can create a room and
+invite friends — that *is* the public website path for now.
+
+**Requirements:** [flyctl](https://fly.io/docs/flyctl/install/) installed and a
+Fly account (`fly auth login`).
+
+```bash
+# From the repo root (first time):
+fly launch --no-deploy   # pick a unique app name / region; keep this fly.toml
+fly deploy
+
+# Later updates:
+fly deploy
+```
+
+Open the URL Fly prints (or `fly open`). Create a room, share the **page URL +
+room code** with friends.
+
+**Notes for later growth**
+
+- Rooms are **in memory on one machine**. Keep `min_machines_running = 1` and
+  `fly scale count 1` so sleep/redeploys don't wipe active games, and so players
+  don't land on different machines.
+- When you need many concurrent games or zero downtime deploys, add shared
+  room storage (e.g. Redis) and sticky sessions / a single writer — same Fly
+  host pattern still works; you just scale the backend.
+
 ## Project layout
 
 ```
@@ -83,6 +113,8 @@ src/loaded_dice/   — core game engine + multiplayer server
 web/               — React + Vite client
 tests/             — unit tests
 docs/GDD.md        — design document
+Dockerfile         — production image (UI + API)
+fly.toml           — Fly.io app config
 ```
 
 ## Roadmap
@@ -90,6 +122,6 @@ docs/GDD.md        — design document
 - [x] M0 — Core engine
 - [x] M1 — Currency, shop, and consumables
 - [x] M2 — Opponent-targeting effects
-- [ ] M3 — Browser multiplayer (rooms + WebSockets — in progress)
-- [ ] M4 — Deploy (Fly.io / Vercel) & playtest polish
+- [x] M3 — Browser multiplayer (rooms + WebSockets)
+- [ ] M4 — Deploy (Fly.io) & playtest polish
 - [ ] M5 — Broader playtest / balance

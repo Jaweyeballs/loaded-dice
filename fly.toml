@@ -1,0 +1,29 @@
+# fly.toml app configuration file generated for Loaded Dice
+#
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+#
+# First deploy:
+#   fly auth login
+#   fly launch --no-deploy   # confirm name/region; keep this fly.toml
+#   fly deploy
+#
+# Public URL will be https://<app-name>.fly.dev — share that link to play.
+
+app = 'loaded-dice'
+primary_region = 'iad'
+
+[build]
+
+[http_service]
+  internal_port = 8000
+  force_https = true
+  auto_stop_machines = 'stop'
+  auto_start_machines = true
+  # Keep one machine warm so rooms aren't wiped by sleep mid-game.
+  min_machines_running = 1
+  processes = ['app']
+
+[[vm]]
+  memory = '512mb'
+  cpu_kind = 'shared'
+  cpus = 1
