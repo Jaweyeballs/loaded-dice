@@ -9,6 +9,7 @@ from loaded_dice.card_effects.negative_power import (
 )
 from loaded_dice.card_effects.positive_power import POSITIVE_POWER_CAST, cast_positive_power
 from loaded_dice.card_effects.trading import (
+    ACTIVATABLE_TRADING_IDS,
     MERCHANT_CHIPS_PER_TURN,
     TRADING_ON_TURN_START,
     apply_trading_scoring_modifiers,
@@ -16,6 +17,7 @@ from loaded_dice.card_effects.trading import (
 )
 
 __all__ = [
+    "ACTIVATABLE_TRADING_IDS",
     "BLUE_SHELL_POINT_LOSS",
     "HINDRANCE_RESOLVERS",
     "HindranceConflictError",

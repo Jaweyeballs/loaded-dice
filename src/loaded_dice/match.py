@@ -26,6 +26,13 @@ from loaded_dice.card_effects.negative_power import (
     validate_hindrance_queue,
 )
 from loaded_dice.card_effects.positive_power import POSITIVE_POWER_CAST, cast_positive_power
+from loaded_dice.card_effects.trading import (
+    ACTIVATABLE_TRADING_IDS,
+    GAMBLER_BASE_COST,
+    GAMBLER_COST_STEP,
+    LAWYER_COOLDOWN_TURNS,
+    gecko_compensation_bonus,
+)
 from loaded_dice.effects import TurnEffects
 from loaded_dice.scoring import Category, ScoreSheet
 from loaded_dice.shop import Shop, ShopError
@@ -101,6 +108,8 @@ class Player:
     turn_effects: TurnEffects = field(default_factory=TurnEffects)
     queued_hindrances: list[QueuedHindrance] = field(default_factory=list)
     parry_ready: bool = False
+    gambler_next_cost: int = GAMBLER_BASE_COST
+    lawyer_cooldown_turns: int = 0
 
     def total_score(self) -> int:
         return self.game_total + self.current_sheet.grand_total()
@@ -191,6 +200,7 @@ class Match:
                 self._previous_rotation_attacks.attacker_count_on(self.active_player.name),
                 self._previous_rotation_attacks.player_attacked(self.active_player.name),
             )
+            compensation += gecko_compensation_bonus(self.active_player)
             self.active_player.earn_chips(compensation)
         self.active_player.turn_effects = resolve_turn_effects(self.active_player)
         apply_turn_start_passives(self.active_player, self)
@@ -249,6 +259,42 @@ class Match:
         """Pass-through for card effects (e.g. The Gambler) on the active turn."""
         self._require_active_dice()
         self._dice.grant_extra_rolls(count)
+
+    def activate_trading_card(self, card_id: CardId) -> None:
+        """Use an activatable trading card from the active player's party (stays in inventory)."""
+        self._ensure_not_over()
+        if self.phase != TurnPhase.TURN_ACTIVE:
+            raise WrongPhaseError(
+                f"Cannot activate trading cards during {self.phase.value}"
+            )
+        if card_id not in ACTIVATABLE_TRADING_IDS:
+            raise WrongPhaseError(f"{card_id.value} is not an activatable trading card")
+
+        player = self.active_player
+        if not player.inventory.has_trading(card_id):
+            raise CardNotInInventoryError(f"No {card_id.value} in trading inventory")
+
+        if card_id == CardId.GAMBLER:
+            self._require_active_dice()
+            try:
+                player.spend_chips(player.gambler_next_cost)
+            except InsufficientChipsError as exc:
+                raise WrongPhaseError(str(exc)) from exc
+            self.grant_extra_rolls(1)
+            player.gambler_next_cost += GAMBLER_COST_STEP
+            return
+
+        if card_id == CardId.LAWYER:
+            if player.lawyer_cooldown_turns > 0:
+                raise WrongPhaseError(
+                    f"Lawyer on cooldown ({player.lawyer_cooldown_turns} turns left)"
+                )
+            self.end_turn_without_scoring()
+            # Set after end so this turn's cooldown tick does not consume the fresh CD.
+            player.lawyer_cooldown_turns = LAWYER_COOLDOWN_TURNS
+            return
+
+        raise WrongPhaseError(f"Unhandled trading activation: {card_id.value}")
 
     def cast_power_card(self, card_id: CardId, **kwargs) -> None:
         """Play a positive power card from the active player's inventory during rolling."""
@@ -452,6 +498,10 @@ class Match:
 
     def _end_turn(self) -> None:
         starting_index = self._current_index
+        finishing = self.players[starting_index]
+        if finishing.lawyer_cooldown_turns > 0:
+            finishing.lawyer_cooldown_turns -= 1
+
         self._dice = None
         self.phase = TurnPhase.BETWEEN_TURNS
 

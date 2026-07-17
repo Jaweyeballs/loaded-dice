@@ -23,6 +23,8 @@ export type PlayerState = {
   };
   parry_ready: boolean;
   can_use_shop: boolean;
+  gambler_cost: number;
+  lawyer_cooldown: number;
 };
 
 export type MatchState = {

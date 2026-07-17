@@ -1,23 +1,4 @@
 import { useEffect, useMemo, useState } from "react";
-
-function formatScoreDelta(delta: number): string {
-  if (delta > 0) return `+${delta}`;
-  if (delta < 0) return `−${Math.abs(delta)}`;
-  return "+0";
-}
-
-/** Compare frozen place vs live standings; no arrow if placement would stay put. */
-function placementArrow(
-  name: string,
-  displayedPlace: number,
-  predictedOrder: string[],
-): "up" | "down" | null {
-  const predictedPlace = predictedOrder.indexOf(name);
-  if (predictedPlace < 0) return null;
-  if (predictedPlace < displayedPlace) return "up";
-  if (predictedPlace > displayedPlace) return "down";
-  return null;
-}
 import type { CardInfo, MatchState, PlayerState, RoomState } from "./types";
 
 type Props = {
@@ -50,15 +31,55 @@ const HINDRANCE_IDS = new Set([
   "negative_punishment",
 ]);
 
+/** Trading cards clicked to activate (stay in party). Others are passives. */
+const ACTIVATABLE_TRADING = new Set(["gambler", "lawyer"]);
+
+const CARD_BLURBS: Record<string, string> = {
+  merchant: "Earn 200 chips at the start of your turn (passive).",
+  persuader: "+3 points on every scored hand (passive).",
+  gecko: "+100 chips to compensation payouts (passive).",
+  gambler: "Pay chips for an extra reroll; cost rises each use.",
+  lawyer: "End your turn without scoring (2-turn cooldown).",
+  icarus: "Bump one die face up by 1.",
+  parry: "Block a queued hindrance at turn start.",
+  glass_half_full: "Target’s upper-section score is 0 this turn.",
+  glass_half_empty: "Target’s lower-section score is 0 this turn.",
+  positive_reinforcement: "Attack-reactive buff (see GDD).",
+  negative_reinforcement: "Attack-reactive buff (see GDD).",
+  positive_punishment: "Attack-reactive hindrance (see GDD).",
+  negative_punishment: "Attack-reactive hindrance (see GDD).",
+};
+
 type SheetMode = "mine" | "current";
 type LeftTab = "debuffs" | "leaderboard";
+
+function formatScoreDelta(delta: number): string {
+  if (delta > 0) return `+${delta}`;
+  if (delta < 0) return `−${Math.abs(delta)}`;
+  return "+0";
+}
+
+/** Compare frozen place vs live standings; no arrow if placement would stay put. */
+function placementArrow(
+  name: string,
+  displayedPlace: number,
+  predictedOrder: string[],
+): "up" | "down" | null {
+  const predictedPlace = predictedOrder.indexOf(name);
+  if (predictedPlace < 0) return null;
+  if (predictedPlace < displayedPlace) return "up";
+  if (predictedPlace > displayedPlace) return "down";
+  return null;
+}
 
 function label(id: string): string {
   return id.replace(/_/g, " ");
 }
 
-function cardTitle(card: CardInfo): string {
-  return `${label(card.id)}${card.transparent ? " (transparent)" : ""} — description TBD`;
+function cardTitle(card: CardInfo, extra?: string): string {
+  const blurb = CARD_BLURBS[card.id] ?? "description TBD";
+  const base = `${label(card.id)}${card.transparent ? " (transparent)" : ""} — ${blurb}`;
+  return extra ? `${base} ${extra}` : base;
 }
 
 
@@ -163,6 +184,34 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
       card_id: card.id,
       target: hindranceTarget,
     });
+  }
+
+  function activateTrading(card: CardInfo) {
+    if (!ACTIVATABLE_TRADING.has(card.id)) return;
+    setIcarusArming(false);
+    onAction({ type: "activate_trading", card_id: card.id });
+  }
+
+  function tradingDisabled(card: CardInfo): boolean {
+    if (!active || match.phase !== "turn_active") return true;
+    if (card.id === "gambler") {
+      const cost = me?.gambler_cost ?? 200;
+      return !match.dice || (me?.chips ?? 0) < cost;
+    }
+    if (card.id === "lawyer") {
+      return (me?.lawyer_cooldown ?? 0) > 0;
+    }
+    return true;
+  }
+
+  function tradingLabel(card: CardInfo): string {
+    if (card.id === "gambler") {
+      return `${label(card.id)} (${me?.gambler_cost ?? 200})`;
+    }
+    if (card.id === "lawyer" && (me?.lawyer_cooldown ?? 0) > 0) {
+      return `${label(card.id)} (CD ${me?.lawyer_cooldown})`;
+    }
+    return label(card.id);
   }
 
   const powerCards = me?.power_cards.filter((c) => !HINDRANCE_IDS.has(c.id)) ?? [];
@@ -542,16 +591,37 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
               {tradingCards.length === 0 && (
                 <span className="empty-fan muted">Empty</span>
               )}
-              {tradingCards.map((card, i) => (
-                <div
-                  key={`t-${card.id}-${i}`}
-                  className="fan-card trading"
-                  title={cardTitle(card)}
-                  style={{ zIndex: i + 1 }}
-                >
-                  {label(card.id)}
-                </div>
-              ))}
+              {tradingCards.map((card, i) =>
+                ACTIVATABLE_TRADING.has(card.id) ? (
+                  <button
+                    key={`t-${card.id}-${i}`}
+                    type="button"
+                    className="fan-card trading"
+                    style={{ zIndex: i + 1 }}
+                    disabled={tradingDisabled(card)}
+                    title={cardTitle(
+                      card,
+                      card.id === "gambler"
+                        ? `Cost ${me?.gambler_cost ?? 200} chips.`
+                        : (me?.lawyer_cooldown ?? 0) > 0
+                          ? `Cooldown: ${me?.lawyer_cooldown} turns.`
+                          : undefined,
+                    )}
+                    onClick={() => activateTrading(card)}
+                  >
+                    {tradingLabel(card)}
+                  </button>
+                ) : (
+                  <div
+                    key={`t-${card.id}-${i}`}
+                    className="fan-card trading passive"
+                    title={cardTitle(card)}
+                    style={{ zIndex: i + 1 }}
+                  >
+                    {label(card.id)}
+                  </div>
+                ),
+              )}
             </div>
           </div>
         </div>

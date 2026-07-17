@@ -13,6 +13,10 @@ SHOP_REROLL_COST = 100
 # Stub prices until rarity tiers are designed.
 CARD_PRICES: dict[CardId, int] = {
     CardId.MERCHANT: 400,
+    CardId.GAMBLER: 350,
+    CardId.LAWYER: 300,
+    CardId.PERSUADER: 450,
+    CardId.GECKO: 400,
     CardId.PARRY: 300,
     CardId.ICARUS: 250,
     CardId.POSITIVE_REINFORCEMENT: 300,
@@ -23,10 +27,10 @@ CARD_PRICES: dict[CardId, int] = {
     CardId.NEGATIVE_PUNISHMENT: 350,
 }
 
-# Playtest-friendly mix: bump, hindrance, and a trading card.
+# Playtest-friendly mix: power, trading activate, trading passive.
 DEFAULT_STOCK_IDS: tuple[CardId, ...] = (
     CardId.ICARUS,
-    CardId.GLASS_HALF_FULL,
+    CardId.GAMBLER,
     CardId.MERCHANT,
 )
 

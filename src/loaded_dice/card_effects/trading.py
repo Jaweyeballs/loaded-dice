@@ -1,4 +1,4 @@
-"""Trading card effects — passive income and scoring modifiers."""
+"""Trading card effects — passives and activated abilities."""
 
 from __future__ import annotations
 
@@ -13,6 +13,11 @@ if TYPE_CHECKING:
 # --- Constants (balance here) ---
 
 MERCHANT_CHIPS_PER_TURN = 200
+PERSUADER_SCORE_BONUS = 3
+GECKO_COMPENSATION_BONUS = 100
+GAMBLER_BASE_COST = 200
+GAMBLER_COST_STEP = 100
+LAWYER_COOLDOWN_TURNS = 2
 
 # --- Turn-start handlers (income, reveals, etc.) ---
 
@@ -43,4 +48,21 @@ def apply_trading_turn_start(player: Player, match: Match | None = None) -> None
 
 def apply_trading_scoring_modifiers(player: Player, effects: TurnEffects) -> None:
     """Apply passive scoring changes from trading cards to *effects*."""
-    # Persuader (+3): effects.score_bonus += 3 when implemented.
+    if player.inventory.has_trading(CardId.PERSUADER):
+        effects.score_bonus += PERSUADER_SCORE_BONUS
+
+
+def gecko_compensation_bonus(player: Player) -> int:
+    """Extra chips added to a compensation payout when The Gecko is held."""
+    if player.inventory.has_trading(CardId.GECKO):
+        return GECKO_COMPENSATION_BONUS
+    return 0
+
+
+# Trading cards that stay in party but are clicked to activate (not consumable).
+ACTIVATABLE_TRADING_IDS: frozenset[CardId] = frozenset(
+    {
+        CardId.GAMBLER,
+        CardId.LAWYER,
+    }
+)

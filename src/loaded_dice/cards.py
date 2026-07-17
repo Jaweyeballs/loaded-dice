@@ -20,6 +20,10 @@ class CardId(Enum):
 
     ICARUS = "icarus"
     MERCHANT = "merchant"
+    GAMBLER = "gambler"
+    LAWYER = "lawyer"
+    PERSUADER = "persuader"
+    GECKO = "gecko"
     PARRY = "parry"
     POSITIVE_REINFORCEMENT = "positive_reinforcement"
     NEGATIVE_REINFORCEMENT = "negative_reinforcement"
@@ -38,6 +42,10 @@ class Card:
 
 CARD_DEFS: dict[CardId, Card] = {
     CardId.MERCHANT: Card(CardId.MERCHANT, CardKind.TRADING),
+    CardId.GAMBLER: Card(CardId.GAMBLER, CardKind.TRADING),
+    CardId.LAWYER: Card(CardId.LAWYER, CardKind.TRADING),
+    CardId.PERSUADER: Card(CardId.PERSUADER, CardKind.TRADING),
+    CardId.GECKO: Card(CardId.GECKO, CardKind.TRADING),
     CardId.PARRY: Card(CardId.PARRY, CardKind.POWER),
     CardId.ICARUS: Card(CardId.ICARUS, CardKind.POWER),
     CardId.POSITIVE_REINFORCEMENT: Card(CardId.POSITIVE_REINFORCEMENT, CardKind.POWER),

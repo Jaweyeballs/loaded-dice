@@ -574,6 +574,15 @@ select {
   align-items: flex-start;
 }
 
+.fan-card.trading.passive {
+  cursor: default;
+  opacity: 0.92;
+}
+
+.fan-card.trading:disabled {
+  opacity: 0.45;
+}
+
 .fan-card.hindrance {
   margin-left: 0.35rem;
   width: auto;

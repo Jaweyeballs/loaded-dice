@@ -46,6 +46,8 @@ def serialize_player(player: Player, match: Match) -> dict[str, Any]:
         },
         "parry_ready": player.parry_ready,
         "can_use_shop": match.can_use_shop(player),
+        "gambler_cost": player.gambler_next_cost,
+        "lawyer_cooldown": player.lawyer_cooldown_turns,
     }
 
 

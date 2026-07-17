@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any, Callable
 
-from loaded_dice.cards import CardId, NEGATIVE_POWER_IDS
+from loaded_dice.cards import CardId, CardNotInInventoryError, NEGATIVE_POWER_IDS
 from loaded_dice.card_effects.positive_power import POSITIVE_POWER_CAST
 from loaded_dice.dice import TooManyRollsError
 from loaded_dice.economy import InsufficientChipsError
@@ -29,6 +29,7 @@ TURN_ACTIONS = frozenset(
         "unlock",
         "cast_power",
         "cast_hindrance",
+        "activate_trading",
         "score",
         "end_turn",
     }
@@ -114,6 +115,11 @@ def _cast_hindrance(match: Match, _actor: Player, action: dict[str, Any]) -> Non
     match.cast_hindrance(card_id, target)
 
 
+def _activate_trading(match: Match, _actor: Player, action: dict[str, Any]) -> None:
+    card_id = _parse_card_id(str(_require(action, "card_id")))
+    match.activate_trading_card(card_id)
+
+
 def _score(match: Match, _actor: Player, action: dict[str, Any]) -> None:
     category = _parse_category(str(_require(action, "category")))
     die_indices = action.get("die_indices")
@@ -143,6 +149,7 @@ HANDLERS: dict[str, Callable[[Match, Player, dict[str, Any]], None]] = {
     "unlock": _unlock,
     "cast_power": _cast_power,
     "cast_hindrance": _cast_hindrance,
+    "activate_trading": _activate_trading,
     "score": _score,
     "end_turn": _end_turn,
     "buy": _buy,
@@ -180,6 +187,7 @@ def apply_action(match: Match, actor_name: str, action: dict[str, Any]) -> None:
         InvalidDieSelectionError,
         TooManyRollsError,
         InsufficientChipsError,
+        CardNotInInventoryError,
         ShopError,
         ValueError,
     ) as exc:
