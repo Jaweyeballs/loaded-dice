@@ -18,7 +18,8 @@ COPY --from=web /web/dist ./web/dist
 
 ENV LOADED_DICE_STATIC=/app/web/dist
 ENV LOADED_DICE_RELOAD=0
+# Render sets PORT (often 10000); local/Docker default stays 8000.
 ENV PORT=8000
 
 EXPOSE 8000
-CMD ["uvicorn", "loaded_dice.server:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["sh", "-c", "uvicorn loaded_dice.server:app --host 0.0.0.0 --port ${PORT:-8000}"]

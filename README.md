@@ -76,35 +76,30 @@ and ensure the API is reachable (server bound with `--host 0.0.0.0`). You can
 also set `VITE_API_BASE=http://<host-lan-ip>:8000` in `web/.env` if not using
 the Vite proxy.
 
-## Deploy on Fly.io (public playtest)
+## Deploy on Render (public playtest)
 
-One Fly app serves the React UI and the WebSocket API at the same origin
-(`https://<app-name>.fly.dev`). Anyone with the link can create a room and
-invite friends — that *is* the public website path for now.
+One free Render web service serves the React UI and the WebSocket API at the
+same origin (`https://<service>.onrender.com`). Anyone with the link can create
+a room and invite friends.
 
-**Requirements:** [flyctl](https://fly.io/docs/flyctl/install/) installed and a
-Fly account (`fly auth login`).
+**Requirements:** a [Render](https://render.com) account and this repo on
+GitHub (Render builds from the remote).
 
-```bash
-# From the repo root (first time):
-fly launch --no-deploy   # pick a unique app name / region; keep this fly.toml
-fly deploy
+1. Push `main` (or your deploy branch) to GitHub.
+2. In the [Render Dashboard](https://dashboard.render.com): **New** →
+   **Blueprint** → connect the repo (uses `render.yaml`), **or** **New** →
+   **Web Service** → Docker → choose the **Free** plan.
+3. Deploy. Open the service URL when the build finishes.
 
-# Later updates:
-fly deploy
-```
+Create a room, then share the **page URL + room code** with friends.
 
-Open the URL Fly prints (or `fly open`). Create a room, share the **page URL +
-room code** with friends.
+**Free-tier notes**
 
-**Notes for later growth**
-
-- Rooms are **in memory on one machine**. Keep `min_machines_running = 1` and
-  `fly scale count 1` so sleep/redeploys don't wipe active games, and so players
-  don't land on different machines.
-- When you need many concurrent games or zero downtime deploys, add shared
-  room storage (e.g. Redis) and sticky sessions / a single writer — same Fly
-  host pattern still works; you just scale the backend.
+- The service **sleeps after ~15 minutes** with no traffic. The next visit can
+  take ~30–60s to wake; in-memory rooms are gone after a restart/sleep.
+- Stay on **one** free instance — rooms live only in that process’s memory.
+- For always-on or many concurrent games later, upgrade the plan and/or add
+  shared room storage (e.g. Redis).
 
 ## Project layout
 
@@ -114,7 +109,7 @@ web/               — React + Vite client
 tests/             — unit tests
 docs/GDD.md        — design document
 Dockerfile         — production image (UI + API)
-fly.toml           — Fly.io app config
+render.yaml        — Render Blueprint (free web service)
 ```
 
 ## Roadmap
@@ -123,5 +118,5 @@ fly.toml           — Fly.io app config
 - [x] M1 — Currency, shop, and consumables
 - [x] M2 — Opponent-targeting effects
 - [x] M3 — Browser multiplayer (rooms + WebSockets)
-- [ ] M4 — Deploy (Fly.io) & playtest polish
+- [ ] M4 — Deploy (Render) & playtest polish
 - [ ] M5 — Broader playtest / balance

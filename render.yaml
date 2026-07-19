@@ -1,0 +1,12 @@
+# Render Blueprint
+# https://render.com/docs/blueprint-spec
+
+services:
+  - type: web
+    name: loaded-dice
+    runtime: docker
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: LOADED_DICE_RELOAD
+        value: "0"
