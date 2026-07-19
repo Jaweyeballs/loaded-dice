@@ -1,9 +1,8 @@
 # Loaded Dice
 
-A multiplayer dice game built on classic Yahtzee scoring, wrapped in a
-run-based economy: earn chips, spend them on consumables between rounds,
-and cast effects that boost you or hinder the table. Full design lives in
-[`docs/GDD.md`](docs/GDD.md).
+A multiplayer Yahtzee party game: score big, spend chips on cards that power
+you up or debuff your friends, and fight for the leaderboard. Full design
+lives in [`docs/GDD.md`](docs/GDD.md).
 
 ## Setup
 

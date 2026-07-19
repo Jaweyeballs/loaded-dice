@@ -1,7 +1,7 @@
 [project]
 name = "loaded-dice"
 version = "0.1.0"
-description = "Multiplayer Yahtzee with a run-based economy"
+description = "Multiplayer Yahtzee party game — power yourself up and debuff the table"
 readme = "README.md"
 requires-python = ">=3.9"
 dependencies = []
