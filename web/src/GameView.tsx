@@ -544,7 +544,10 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
             <button
               type="button"
               className={sheetMode === "mine" ? "tab active" : "tab"}
-              onClick={() => setSheetMode("mine")}
+              onClick={() => {
+                setMineSelection(playerName);
+                setSheetMode("mine");
+              }}
             >
               Mine
             </button>
