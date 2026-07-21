@@ -263,7 +263,7 @@ select {
 .hud-left {
   top: 4.5rem;
   left: 0;
-  bottom: 13.5rem;
+  bottom: 15rem;
   width: min(300px, 86vw);
 }
 
@@ -274,7 +274,7 @@ select {
 .hud-sheet {
   top: 4.5rem;
   right: 0;
-  bottom: 13.5rem;
+  bottom: 15rem;
   width: min(340px, 90vw);
 }
 
@@ -448,7 +448,7 @@ select {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 5rem 1rem 14rem;
+  padding: 5rem 1rem 15.5rem;
   pointer-events: none;
 }
 
@@ -520,7 +520,7 @@ select {
   left: 0;
   right: 0;
   bottom: 0;
-  padding: 0.45rem clamp(1.25rem, 7vw, 4.5rem) 1rem;
+  padding: 0.45rem clamp(1rem, 5vw, 3rem) 1rem;
   background: linear-gradient(to top, rgba(12, 28, 18, 0.78), transparent);
   transition: transform 0.28s ease;
 }
@@ -543,10 +543,13 @@ select {
 .card-trays {
   display: flex;
   flex-wrap: wrap;
-  gap: 1.25rem 2rem;
-  justify-content: space-between;
+  gap: clamp(2rem, 9vw, 5.5rem);
+  justify-content: center;
   align-items: flex-end;
-  padding-inline: clamp(0.5rem, 4vw, 2.5rem);
+  width: min(52rem, 100%);
+  margin-inline: auto;
+  padding-right: 5.75rem;
+  box-sizing: border-box;
 }
 
 .card-tray {
@@ -565,18 +568,18 @@ select {
 .fan {
   display: flex;
   align-items: flex-end;
-  min-height: 8.75rem;
+  min-height: 9.75rem;
 }
 
 .fan-card {
-  width: 5.9rem;
-  height: 8.4rem;
-  margin-left: -1.5rem;
-  border-radius: 10px;
+  width: 6.55rem;
+  height: 9.35rem;
+  margin-left: -1.65rem;
+  border-radius: 11px;
   border: 1px solid rgba(0, 0, 0, 0.2);
   box-shadow: 0 8px 18px rgba(0, 0, 0, 0.3);
-  padding: 0.55rem 0.45rem;
-  font-size: 0.78rem;
+  padding: 0.6rem 0.5rem;
+  font-size: 0.82rem;
   font-weight: 700;
   text-transform: capitalize;
   line-height: 1.2;
@@ -591,7 +594,7 @@ select {
 }
 
 .fan > .tip-wrap {
-  margin-left: -1.5rem;
+  margin-left: -1.65rem;
 }
 
 .fan > .tip-wrap:first-child {
@@ -660,9 +663,9 @@ select {
 .shop-sign {
   position: absolute;
   z-index: 55;
-  right: 0.85rem;
+  right: 1rem;
   top: auto;
-  bottom: 14.5rem;
+  bottom: 1rem;
   width: 4.6rem;
   height: 4.6rem;
   border-radius: 10px;
@@ -675,7 +678,7 @@ select {
   text-transform: uppercase;
   box-shadow: var(--shadow);
   border: 3px solid color-mix(in srgb, white 25%, transparent);
-  transform: rotate(6deg);
+  transform: rotate(-5deg);
 }
 
 .shop-sign.open {
@@ -685,9 +688,9 @@ select {
 .shop-panel {
   position: absolute;
   z-index: 56;
-  right: 5.75rem;
+  right: 1rem;
   top: auto;
-  bottom: 14.5rem;
+  bottom: 6.25rem;
   width: min(280px, 80vw);
   max-height: min(42vh, 320px);
   overflow: auto;
@@ -841,28 +844,35 @@ select {
 @media (max-width: 800px) {
   .hud-left,
   .hud-sheet {
-    bottom: 12.5rem;
+    bottom: 14rem;
+  }
+
+  .card-trays {
+    max-width: calc(100% - 5.5rem);
+    padding-right: 5.25rem;
+    gap: 1.5rem;
   }
 
   .fan-card {
-    width: 5rem;
-    height: 7.1rem;
-    margin-left: -1.2rem;
-    font-size: 0.68rem;
+    width: 5.5rem;
+    height: 7.85rem;
+    margin-left: -1.3rem;
+    font-size: 0.72rem;
   }
 
   .fan > .tip-wrap {
-    margin-left: -1.2rem;
+    margin-left: -1.3rem;
   }
 
   .shop-sign {
     top: auto;
-    bottom: 13rem;
+    bottom: 0.75rem;
+    right: 0.75rem;
   }
 
   .shop-panel {
     top: auto;
-    bottom: 13rem;
+    bottom: 5.75rem;
     right: 0.75rem;
   }
 }
