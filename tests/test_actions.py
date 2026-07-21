@@ -48,3 +48,35 @@ def test_unknown_action_type():
     match = Match(["Alice"])
     with pytest.raises(ActionError, match="Unknown action type"):
         apply_action(match, "Alice", {"type": "dance"})
+
+
+def test_free_end_turn_action_removed():
+    match = Match(["Alice", "Bob"])
+    apply_action(match, "Alice", {"type": "start_turn"})
+    apply_action(match, "Alice", {"type": "begin_rolling"})
+    apply_action(match, "Alice", {"type": "roll"})
+    with pytest.raises(ActionError, match="Unknown action type"):
+        apply_action(match, "Alice", {"type": "end_turn"})
+    assert match.phase == TurnPhase.TURN_ACTIVE
+
+
+def test_lawyer_activate_ends_without_scoring():
+    match = Match(["Alice", "Bob"])
+    match.players[0].inventory.add_trading(Card(CardId.LAWYER, CardKind.TRADING))
+    apply_action(match, "Alice", {"type": "start_turn"})
+    apply_action(match, "Alice", {"type": "begin_rolling"})
+    apply_action(match, "Alice", {"type": "roll"})
+    apply_action(match, "Alice", {"type": "activate_trading", "card_id": "lawyer"})
+    assert match.active_player.name == "Bob"
+    assert match.players[0].lawyer_cooldown_turns == 2
+
+
+def test_write_off_cast_ends_without_scoring():
+    match = Match(["Alice", "Bob"])
+    match.players[0].inventory.add_power(Card(CardId.WRITE_OFF, CardKind.POWER))
+    apply_action(match, "Alice", {"type": "start_turn"})
+    apply_action(match, "Alice", {"type": "begin_rolling"})
+    apply_action(match, "Alice", {"type": "roll"})
+    apply_action(match, "Alice", {"type": "cast_power", "card_id": "write_off"})
+    assert match.active_player.name == "Bob"
+    assert not match.players[0].inventory.has_power(CardId.WRITE_OFF)

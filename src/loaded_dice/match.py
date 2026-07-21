@@ -504,7 +504,7 @@ class Match:
         return points
 
     def end_turn_without_scoring(self) -> None:
-        """End the turn without filling a category (Write off, The Lawyer, etc.)."""
+        """End the turn without filling a category (Lawyer / Write off only)."""
         self._ensure_not_over()
         if self.phase != TurnPhase.TURN_ACTIVE:
             raise WrongPhaseError(f"Cannot end turn during {self.phase.value}")

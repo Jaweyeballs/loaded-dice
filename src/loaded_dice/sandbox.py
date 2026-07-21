@@ -119,7 +119,7 @@ Commands:
   hindrance <card> <target>    Queue a negative power card
   block <index>                Parry a queued hindrance (turn start)
   score <category>             Score and end turn (name or 1-13)
-  end                          End turn without scoring
+  end                          End without scoring (requires Lawyer or Write off)
   quit                         Exit sandbox
 """
     )
@@ -222,8 +222,17 @@ def _handle_command(match: Match, line: str) -> bool:
             points = match.score(category)
             print(f"Scored {points} in {category.value}.")
         elif command == "end":
-            match.end_turn_without_scoring()
-            print("Turn ended without scoring.")
+            player = match.active_player
+            if player.inventory.has_trading(CardId.LAWYER) and player.lawyer_cooldown_turns == 0:
+                match.activate_trading_card(CardId.LAWYER)
+                print("Lawyer: turn ended without scoring.")
+            elif player.inventory.has_power(CardId.WRITE_OFF):
+                match.cast_power_card(CardId.WRITE_OFF)
+                print("Write off: turn ended without scoring.")
+            else:
+                raise WrongPhaseError(
+                    "Need Lawyer (ready) or Write off to end without scoring"
+                )
         elif command in {"quit", "exit", "q"}:
             return False
         else:

@@ -587,14 +587,6 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
               >
                 Roll
               </button>
-              <button
-                type="button"
-                className="secondary"
-                onClick={() => onAction({ type: "end_turn" })}
-                disabled={aiming}
-              >
-                End without scoring
-              </button>
               {spaceArming && (
                 <label className="face-picker">
                   Face
