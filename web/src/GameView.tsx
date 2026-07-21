@@ -830,7 +830,7 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
 
         <div className="card-trays">
           <div className="card-tray debuff-tray">
-            <span className="tray-label">On you</span>
+            <span className="tray-label">Debuffs</span>
             <div className={`fan ${blockArming ? "block-targeting" : ""}`}>
               {myDebuffs.length === 0 && (
                 <span className="empty-fan muted">None</span>
