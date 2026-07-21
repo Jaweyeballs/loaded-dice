@@ -50,6 +50,15 @@ export type MatchState = {
   previews: Record<string, number> | null;
   psychic_previews?: Record<string, number>;
   forecaster_reveals?: Record<string, string[]> | null;
+  /** Newest last — hindrance cast/block killfeed for the History tab. */
+  hindrance_feed?: {
+    card_id: string;
+    caster_name: string;
+    target_name: string;
+    rotation: number;
+    blocked: boolean;
+    blocker_card_id?: string | null;
+  }[];
   you_are_active?: boolean;
   you_can_use_shop?: boolean;
 };

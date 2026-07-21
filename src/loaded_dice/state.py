@@ -104,4 +104,17 @@ def serialize_match(match: Match) -> dict[str, Any]:
         "psychic_previews": {
             str(index): face for index, face in match.psychic_previews.items()
         },
+        "hindrance_feed": [
+            {
+                "card_id": entry.card_id.value,
+                "caster_name": entry.caster_name,
+                "target_name": entry.target_name,
+                "rotation": entry.rotation,
+                "blocked": entry.blocked,
+                "blocker_card_id": (
+                    entry.blocker_card_id.value if entry.blocker_card_id else None
+                ),
+            }
+            for entry in match.hindrance_feed
+        ],
     }

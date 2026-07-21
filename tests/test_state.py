@@ -71,3 +71,13 @@ def test_serialize_inventory_and_hindrances():
     bob = next(p for p in state["players"] if p["name"] == "Bob")
     assert bob["queued_hindrances"][0]["card_id"] == "glass_half_full"
     assert bob["queued_hindrances"][0]["caster_name"] == "Alice"
+    assert state["hindrance_feed"] == [
+        {
+            "card_id": "glass_half_full",
+            "caster_name": "Alice",
+            "target_name": "Bob",
+            "rotation": 0,
+            "blocked": False,
+            "blocker_card_id": None,
+        }
+    ]

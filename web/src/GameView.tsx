@@ -41,7 +41,7 @@ const UNTARGETED_HINDRANCES = new Set(["blue_shell"]);
 const ACTIVATABLE_TRADING = new Set(["gambler", "lawyer", "toddler", "psychic"]);
 
 type SheetMode = "mine" | "current";
-type LeftTab = "debuffs" | "leaderboard";
+type LeftTab = "history" | "leaderboard";
 type DiePickMode =
   | { mode: "trading"; cardId: "toddler" | "psychic"; picked: number[] }
   | { mode: "twins"; picked: number[] }
@@ -76,6 +76,26 @@ function tipText(cardId: string, transparent = false, extra?: string): string {
   return extra ? `${head} — ${body} ${extra}` : `${head} — ${body}`;
 }
 
+function debuffOnYouTip(cardId: string, casterName: string): string {
+  return `${tipText(cardId)}\nCast on you by ${casterName}`;
+}
+
+function killfeedLine(entry: {
+  card_id: string;
+  caster_name: string;
+  target_name: string;
+  blocked: boolean;
+  blocker_card_id?: string | null;
+}): string {
+  if (entry.blocked) {
+    const withCard = entry.blocker_card_id
+      ? ` with ${label(entry.blocker_card_id)}`
+      : "";
+    return `${entry.target_name} has blocked ${entry.caster_name}'s ${label(entry.card_id)}${withCard}`;
+  }
+  return `${entry.caster_name} → ${entry.target_name}: ${label(entry.card_id)}`;
+}
+
 
 export function GameView({ room, playerName, onAction, onLeave }: Props) {
   const match = room.match as MatchState;
@@ -99,6 +119,7 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
   const [spaceFace, setSpaceFace] = useState(6);
   const [helpingChoice, setHelpingChoice] = useState<"chips" | "points">("chips");
   const [diePick, setDiePick] = useState<DiePickMode | null>(null);
+  const [blockArming, setBlockArming] = useState<"parry" | "guardian" | null>(null);
 
   // Where everyone would sit if the leaderboard re-sorted on current totals right now.
   const predictedOrder = useMemo(
@@ -133,12 +154,22 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
       .sort((a, b) => a.value - b.value || a.index - b.index); 
   }, [match.dice]);
 
-  // Cancel die-targeting modes if the turn ends or dice disappear.
+  // Cancel die-targeting / block-arm modes if the turn leaves turn_start/active.
   useEffect(() => {
-    if (!active || match.phase !== "turn_active" || !match.dice) {
+    if (!active || (match.phase !== "turn_active" && match.phase !== "turn_start")) {
       setIcarusArming(false);
       setSpaceArming(false);
       setDiePick(null);
+      setBlockArming(null);
+      return;
+    }
+    if (match.phase !== "turn_active" || !match.dice) {
+      setIcarusArming(false);
+      setSpaceArming(false);
+      setDiePick(null);
+    }
+    if (match.phase !== "turn_start") {
+      setBlockArming(null);
     }
   }, [active, match.phase, match.dice]);
 
@@ -158,6 +189,7 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
     setIcarusArming(false);
     setSpaceArming(false);
     setDiePick(null);
+    setBlockArming(null);
   }
 
   function handleDieClick(index: number, locked: boolean) {
@@ -222,6 +254,15 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
       clearAiming();
       return;
     }
+    if (card.id === "parry" && blockArming === "parry") {
+      clearAiming();
+      return;
+    }
+    if (card.id === "parry" && match.phase === "turn_start" && active) {
+      clearAiming();
+      setBlockArming("parry");
+      return;
+    }
     clearAiming();
     if (!match.dice && card.id !== "write_off" && card.id !== "parry") {
       // most powers need dice; write_off/parry edge cases handled below
@@ -283,6 +324,17 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
   }
 
   function activateTrading(card: CardInfo) {
+    if (card.id === "guardian") {
+      if (!active || match.phase !== "turn_start") return;
+      if ((me?.guardian_cooldown ?? 0) > 0) return;
+      if (blockArming === "guardian") {
+        clearAiming();
+        return;
+      }
+      clearAiming();
+      setBlockArming("guardian");
+      return;
+    }
     if (!ACTIVATABLE_TRADING.has(card.id)) return;
     if (diePick?.mode === "trading" && diePick.cardId === card.id) {
       clearAiming();
@@ -302,6 +354,14 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
   }
 
   function tradingDisabled(card: CardInfo): boolean {
+    if (card.id === "guardian") {
+      return (
+        !active ||
+        match.phase !== "turn_start" ||
+        (me?.guardian_cooldown ?? 0) > 0 ||
+        (me?.queued_hindrances.length ?? 0) === 0
+      );
+    }
     if (!active || match.phase !== "turn_active") return true;
     if (card.id === "gambler") {
       const cost = me?.gambler_cost ?? 200;
@@ -332,22 +392,14 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
     return label(card.id);
   }
 
-  function canParry(): boolean {
-    if (!me) return false;
-    if (me.parry_ready) return true;
-    if (me.power_cards.some((c) => c.id === "parry")) return true;
-    if (
-      me.trading_cards.some((c) => c.id === "guardian") &&
-      (me.guardian_cooldown ?? 0) === 0
-    ) {
-      return true;
-    }
-    return false;
-  }
-
+  const canArmParry =
+    Boolean(me?.parry_ready) ||
+    Boolean(me?.power_cards.some((c) => c.id === "parry"));
   const aiming =
-    icarusArming || spaceArming || Boolean(diePick);
+    icarusArming || spaceArming || Boolean(diePick) || Boolean(blockArming);
   const powerCards = me?.power_cards.filter((c) => !HINDRANCE_IDS.has(c.id)) ?? [];
+  const showParryReadyChip =
+    Boolean(me?.parry_ready) && !powerCards.some((c) => c.id === "parry");
   const hindranceCards =
     me?.power_cards.filter((c) => HINDRANCE_IDS.has(c.id)) ?? [];
   const tradingCards = me?.trading_cards ?? [];
@@ -411,10 +463,10 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
           <div className="tab-row">
             <button
               type="button"
-              className={leftTab === "debuffs" ? "tab active" : "tab"}
-              onClick={() => setLeftTab("debuffs")}
+              className={leftTab === "history" ? "tab active" : "tab"}
+              onClick={() => setLeftTab("history")}
             >
-              Debuffs
+              History
             </button>
             <button
               type="button"
@@ -425,51 +477,21 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
             </button>
           </div>
 
-          {leftTab === "debuffs" ? (
+          {leftTab === "history" ? (
             <div className="dock-content">
-              {match.phase === "turn_start" &&
-                active &&
-                myDebuffs.map((h, index) => (
-                  <div key={`${h.card_id}-${index}`} className="debuff-row">
-                    <Tip text={tipText(h.card_id)} className="tip-below">
-                      <span>
-                        {label(h.card_id)}
-                        <span className="muted"> from {h.caster_name}</span>
-                      </span>
-                    </Tip>
-                    <button
-                      type="button"
-                      className="inline"
-                      disabled={!canParry()}
-                      onClick={() =>
-                        onAction({ type: "block_hindrance", hindrance_index: index })
-                      }
+              {(match.hindrance_feed?.length ?? 0) === 0 ? (
+                <p className="hint">No hindrances cast yet.</p>
+              ) : (
+                <ul className="killfeed">
+                  {[...(match.hindrance_feed ?? [])].reverse().map((entry, index) => (
+                    <li
+                      key={`${entry.rotation}-${entry.card_id}-${entry.caster_name}-${entry.target_name}-${index}`}
+                      className={entry.blocked ? "blocked" : ""}
                     >
-                      Parry
-                    </button>
-                  </div>
-                ))}
-              {myDebuffs.length === 0 && activeEffects.length === 0 && (
-                <p className="hint">No debuffs on you.</p>
-              )}
-              {myDebuffs.length > 0 && match.phase !== "turn_start" && (
-                <ul className="plain-list">
-                  {myDebuffs.map((h, index) => (
-                    <li key={`q-${h.card_id}-${index}`}>
-                      <Tip text={tipText(h.card_id)} className="tip-below">
-                        <span>
-                          {label(h.card_id)}{" "}
-                          <span className="muted">({h.caster_name})</span>
-                        </span>
+                      <Tip text={tipText(entry.card_id)} className="tip-below">
+                        <span className="killfeed-line">{killfeedLine(entry)}</span>
                       </Tip>
                     </li>
-                  ))}
-                </ul>
-              )}
-              {activeEffects.length > 0 && (
-                <ul className="plain-list">
-                  {activeEffects.map((text) => (
-                    <li key={String(text)}>{text}</li>
                   ))}
                 </ul>
               )}
@@ -613,9 +635,17 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
             </button>
           )}
           {match.phase === "turn_start" && active && (
-            <button type="button" onClick={() => onAction({ type: "begin_rolling" })}>
-              Begin rolling
-            </button>
+            <>
+              <button type="button" onClick={() => onAction({ type: "begin_rolling" })}>
+                Begin rolling
+              </button>
+              {blockArming && (
+                <p className="hint table-hint">
+                  Click a purple debuff to block with {label(blockArming)} (or click the
+                  card again to cancel)
+                </p>
+              )}
+            </>
           )}
           {match.phase === "turn_active" && active && (
             <>
@@ -736,6 +766,47 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
         </button>
 
         <div className="card-trays">
+          <div className="card-tray debuff-tray">
+            <span className="tray-label">On you</span>
+            <div className={`fan ${blockArming ? "block-targeting" : ""}`}>
+              {myDebuffs.length === 0 && (
+                <span className="empty-fan muted">None</span>
+              )}
+              {myDebuffs.map((h, i) => (
+                <Tip
+                  key={`d-${h.card_id}-${i}`}
+                  text={debuffOnYouTip(h.card_id, h.caster_name)}
+                  tipAlign="start"
+                >
+                  <button
+                    type="button"
+                    className={`fan-card debuff ${blockArming ? "targetable" : ""}`}
+                    style={{ zIndex: i + 1 }}
+                    disabled={!blockArming}
+                    onClick={() => {
+                      if (!blockArming) return;
+                      onAction({
+                        type: "block_hindrance",
+                        hindrance_index: i,
+                        blocker_card_id: blockArming,
+                      });
+                      clearAiming();
+                    }}
+                  >
+                    {label(h.card_id)}
+                  </button>
+                </Tip>
+              ))}
+            </div>
+            {activeEffects.length > 0 && (
+              <ul className="active-effect-strip">
+                {activeEffects.map((text) => (
+                  <li key={String(text)}>{text}</li>
+                ))}
+              </ul>
+            )}
+          </div>
+
           <div className="card-tray power-tray">
             <span className="tray-label">Power</span>
             <div className="fan">
@@ -753,20 +824,25 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
                     className={`fan-card power ${
                       (card.id === "icarus" && icarusArming) ||
                       (card.id === "space_die" && spaceArming) ||
-                      (card.id === "twins" && diePick?.mode === "twins")
+                      (card.id === "twins" && diePick?.mode === "twins") ||
+                      (card.id === "parry" && blockArming === "parry")
                         ? "armed"
                         : ""
                     }`}
                     disabled={
                       !active ||
-                      ((card.id === "icarus" ||
-                        card.id === "space_die" ||
-                        card.id === "twins" ||
-                        card.id === "super_serum" ||
-                        card.id === "benchwarmer" ||
-                        card.id === "boolean" ||
-                        card.id === "do_over") &&
-                        !match.dice)
+                      (card.id === "parry"
+                        ? match.phase !== "turn_start" ||
+                          !canArmParry ||
+                          myDebuffs.length === 0
+                        : (card.id === "icarus" ||
+                            card.id === "space_die" ||
+                            card.id === "twins" ||
+                            card.id === "super_serum" ||
+                            card.id === "benchwarmer" ||
+                            card.id === "boolean" ||
+                            card.id === "do_over") &&
+                          !match.dice)
                     }
                     onClick={() => castPower(card)}
                     style={{ zIndex: i + 1 }}
@@ -775,6 +851,26 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
                   </button>
                 </Tip>
               ))}
+              {showParryReadyChip && match.phase === "turn_start" && active && (
+                <Tip text={tipText("parry")} tipAlign="start">
+                  <button
+                    type="button"
+                    className={`fan-card power ${blockArming === "parry" ? "armed" : ""}`}
+                    disabled={myDebuffs.length === 0}
+                    onClick={() => {
+                      if (blockArming === "parry") {
+                        clearAiming();
+                        return;
+                      }
+                      clearAiming();
+                      setBlockArming("parry");
+                    }}
+                    style={{ zIndex: powerCards.length + 1 }}
+                  >
+                    parry
+                  </button>
+                </Tip>
+              )}
             </div>
             {active && hindranceCards.length > 0 && (
               <div className="hindrance-cast">
@@ -815,7 +911,7 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
                 <span className="empty-fan muted">Empty</span>
               )}
               {tradingCards.map((card, i) =>
-                ACTIVATABLE_TRADING.has(card.id) ? (
+                ACTIVATABLE_TRADING.has(card.id) || card.id === "guardian" ? (
                   <Tip
                     key={`t-${card.id}-${i}`}
                     tipAlign="end"
@@ -826,13 +922,16 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
                         ? `Cost ${me?.gambler_cost ?? 200} chips.`
                         : card.id === "lawyer" && (me?.lawyer_cooldown ?? 0) > 0
                           ? `Cooldown: ${me?.lawyer_cooldown} turns.`
-                          : undefined,
+                          : card.id === "guardian" && (me?.guardian_cooldown ?? 0) > 0
+                            ? `Cooldown: ${me?.guardian_cooldown} turns.`
+                            : undefined,
                     )}
                   >
                     <button
                       type="button"
                       className={`fan-card trading ${
-                        diePick?.mode === "trading" && diePick.cardId === card.id
+                        (diePick?.mode === "trading" && diePick.cardId === card.id) ||
+                        (card.id === "guardian" && blockArming === "guardian")
                           ? "armed"
                           : ""
                       }`}

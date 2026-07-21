@@ -428,6 +428,27 @@ select {
   color: var(--ink-soft);
 }
 
+.killfeed {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.killfeed li {
+  padding: 0.4rem 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 0.88rem;
+  line-height: 1.35;
+}
+
+.killfeed li.blocked {
+  opacity: 0.72;
+}
+
+.killfeed-line {
+  display: inline;
+}
+
 .score-delta {
   font-variant-numeric: tabular-nums;
 }
@@ -543,10 +564,10 @@ select {
 .card-trays {
   display: flex;
   flex-wrap: wrap;
-  gap: clamp(2rem, 9vw, 5.5rem);
+  gap: clamp(1.25rem, 5vw, 3.5rem);
   justify-content: center;
   align-items: flex-end;
-  width: min(52rem, 100%);
+  width: min(62rem, 100%);
   margin-inline: auto;
   padding-right: 5.75rem;
   box-sizing: border-box;
@@ -614,6 +635,35 @@ select {
 .fan-card.power {
   background: linear-gradient(160deg, #3f9a5f, var(--power));
   color: #f3fff6;
+}
+
+.fan-card.debuff {
+  background: linear-gradient(160deg, #8b5cf6, #5b21b6);
+  color: #f5f0ff;
+  cursor: default;
+}
+
+.fan-card.debuff:disabled {
+  cursor: default;
+  opacity: 0.92;
+}
+
+.fan.block-targeting .fan-card.debuff.targetable:not(:disabled) {
+  box-shadow: 0 0 0 3px #c4b5fd, 0 8px 18px rgba(0, 0, 0, 0.3);
+  cursor: crosshair;
+}
+
+.active-effect-strip {
+  list-style: none;
+  margin: 0.25rem 0 0;
+  padding: 0;
+  font-size: 0.72rem;
+  opacity: 0.85;
+  max-width: 12rem;
+}
+
+.active-effect-strip li {
+  padding: 0.1rem 0;
 }
 
 .fan-card.trading {
@@ -788,6 +838,7 @@ select {
   opacity: 0;
   visibility: hidden;
   transition: opacity 0.12s ease;
+  white-space: pre-line;
 }
 
 .tip-wrap:hover .tip-box,

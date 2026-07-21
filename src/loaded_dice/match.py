@@ -74,6 +74,18 @@ class QueuedHindrance:
     caster_name: str
 
 
+@dataclass(frozen=True)
+class HindranceFeedEntry:
+    """Killfeed row: a hindrance cast (or blocked) during the match."""
+
+    card_id: CardId
+    caster_name: str
+    target_name: str
+    rotation: int
+    blocked: bool = False
+    blocker_card_id: CardId | None = None
+
+
 @dataclass
 class RotationAttackRecord:
     """Attack activity for one rotation — used for compensation and card checks."""
@@ -175,6 +187,8 @@ class Match:
         self._leaderboard_order = self._ranked_player_names()
         # Psychic: die_index → previewed face for the active turn (viewer HUD).
         self._psychic_previews: dict[int, int] = {}
+        # Cast/block history for the left-panel killfeed (newest last).
+        self.hindrance_feed: list[HindranceFeedEntry] = []
 
     @property
     def psychic_previews(self) -> dict[int, int]:
@@ -242,7 +256,11 @@ class Match:
         self.active_player.parry_ready = False
         self.phase = TurnPhase.TURN_ACTIVE
 
-    def block_hindrance(self, hindrance_index: int) -> None:
+    def block_hindrance(
+        self,
+        hindrance_index: int,
+        blocker_card_id: CardId | None = None,
+    ) -> None:
         """Cancel one queued hindrance during TURN_START (Parry, Guardian, etc.)."""
         self._ensure_not_over()
         if self.phase != TurnPhase.TURN_START:
@@ -252,19 +270,79 @@ class Match:
         if hindrance_index < 0 or hindrance_index >= len(player.queued_hindrances):
             raise ValueError(f"Invalid hindrance index: {hindrance_index}")
 
-        if player.parry_ready:
-            player.parry_ready = False
-        elif player.inventory.has_power(CardId.PARRY):
-            player.inventory.consume_power_by_id(CardId.PARRY)
-        elif (
-            player.inventory.has_trading(CardId.GUARDIAN)
-            and player.guardian_cooldown_turns == 0
-        ):
-            player.guardian_cooldown_turns = GUARDIAN_COOLDOWN_TURNS
-        else:
+        used = self._consume_block_card(player, blocker_card_id)
+        blocked = player.queued_hindrances.pop(hindrance_index)
+        self._append_hindrance_feed(
+            card_id=blocked.card_id,
+            caster_name=blocked.caster_name,
+            target_name=player.name,
+            blocked=True,
+            blocker_card_id=used,
+        )
+
+    def _consume_block_card(
+        self,
+        player: Player,
+        blocker_card_id: CardId | None,
+    ) -> CardId:
+        """Spend Parry/Guardian (or auto-pick) and return which card was used."""
+        if blocker_card_id is None:
+            if player.parry_ready:
+                player.parry_ready = False
+                return CardId.PARRY
+            if player.inventory.has_power(CardId.PARRY):
+                player.inventory.consume_power_by_id(CardId.PARRY)
+                return CardId.PARRY
+            if (
+                player.inventory.has_trading(CardId.GUARDIAN)
+                and player.guardian_cooldown_turns == 0
+            ):
+                player.guardian_cooldown_turns = GUARDIAN_COOLDOWN_TURNS
+                return CardId.GUARDIAN
             raise WrongPhaseError("No parry available")
 
-        player.queued_hindrances.pop(hindrance_index)
+        if blocker_card_id == CardId.PARRY:
+            if player.parry_ready:
+                player.parry_ready = False
+                return CardId.PARRY
+            if player.inventory.has_power(CardId.PARRY):
+                player.inventory.consume_power_by_id(CardId.PARRY)
+                return CardId.PARRY
+            raise WrongPhaseError("No Parry available")
+
+        if blocker_card_id == CardId.GUARDIAN:
+            if (
+                player.inventory.has_trading(CardId.GUARDIAN)
+                and player.guardian_cooldown_turns == 0
+            ):
+                player.guardian_cooldown_turns = GUARDIAN_COOLDOWN_TURNS
+                return CardId.GUARDIAN
+            raise WrongPhaseError("Guardian unavailable")
+
+        raise WrongPhaseError(f"{blocker_card_id.value} cannot block a hindrance")
+
+    def _append_hindrance_feed(
+        self,
+        *,
+        card_id: CardId,
+        caster_name: str,
+        target_name: str,
+        blocked: bool = False,
+        blocker_card_id: CardId | None = None,
+    ) -> None:
+        self.hindrance_feed.append(
+            HindranceFeedEntry(
+                card_id=card_id,
+                caster_name=caster_name,
+                target_name=target_name,
+                rotation=self._rotation_count,
+                blocked=blocked,
+                blocker_card_id=blocker_card_id,
+            )
+        )
+        # Keep the killfeed bounded for long matches.
+        if len(self.hindrance_feed) > 40:
+            self.hindrance_feed = self.hindrance_feed[-40:]
 
     def roll(self) -> list[int]:
         self._ensure_not_over()
@@ -444,6 +522,11 @@ class Match:
             QueuedHindrance(card_id=card_id, caster_name=caster.name)
         )
         self._current_rotation_attacks.record(caster.name, target.name)
+        self._append_hindrance_feed(
+            card_id=card_id,
+            caster_name=caster.name,
+            target_name=target.name,
+        )
 
     def _leader_player(self) -> Player:
         """Current first-place player (name tie-break) for Blue Shell."""

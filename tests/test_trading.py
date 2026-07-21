@@ -176,9 +176,11 @@ def test_guardian_blocks_hindrance_with_cooldown():
 
     match.start_turn()  # Bob
     assert len(bob.queued_hindrances) == 1
-    match.block_hindrance(0)
+    match.block_hindrance(0, CardId.GUARDIAN)
     assert bob.queued_hindrances == []
     assert bob.guardian_cooldown_turns == 2
+    assert match.hindrance_feed[-1].blocked is True
+    assert match.hindrance_feed[-1].blocker_card_id == CardId.GUARDIAN
 
 
 def test_forecaster_reveals_only_to_active_holder():
