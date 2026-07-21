@@ -209,6 +209,19 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
   }
 
   function castPower(card: CardInfo) {
+    // Clicking an already-armed card cancels targeting (e.g. accidental Icarus).
+    if (card.id === "icarus" && icarusArming) {
+      clearAiming();
+      return;
+    }
+    if (card.id === "space_die" && spaceArming) {
+      clearAiming();
+      return;
+    }
+    if (card.id === "twins" && diePick?.mode === "twins") {
+      clearAiming();
+      return;
+    }
     clearAiming();
     if (!match.dice && card.id !== "write_off" && card.id !== "parry") {
       // most powers need dice; write_off/parry edge cases handled below
@@ -271,6 +284,10 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
 
   function activateTrading(card: CardInfo) {
     if (!ACTIVATABLE_TRADING.has(card.id)) return;
+    if (diePick?.mode === "trading" && diePick.cardId === card.id) {
+      clearAiming();
+      return;
+    }
     clearAiming();
     if (card.id === "toddler" || card.id === "psychic") {
       if (!match.dice) return;
@@ -334,6 +351,10 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
   const hindranceCards =
     me?.power_cards.filter((c) => HINDRANCE_IDS.has(c.id)) ?? [];
   const tradingCards = me?.trading_cards ?? [];
+  const myPlace =
+    rankedPlayers.findIndex((p) => p.name === playerName) + 1 || null;
+  const sheetPlace =
+    rankedPlayers.findIndex((p) => p.name === sheetPlayer.name) + 1 || null;
   const myDebuffs = me?.queued_hindrances ?? [];
   const activeEffects = me
     ? [
@@ -356,6 +377,17 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
         <div className="hud-brand">
           <strong>Loaded Dice</strong>
           <span>Room {room.room_code}</span>
+        </div>
+        <div className="hud-you-stats" aria-label="Your chips, score, and place">
+          <span>
+            <em>Chips</em> {me?.chips ?? 0}
+          </span>
+          <span>
+            <em>Score</em> {me?.total_score ?? 0}
+          </span>
+          <span>
+            <em>Place</em> {myPlace != null ? `#${myPlace}` : "—"}
+          </span>
         </div>
         <div className="hud-status">
           <span>
@@ -549,6 +581,10 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
             {sheetPlayer.name}
             {sheetMode === "current" ? " · live turn" : ""}
           </p>
+          <p className="sheet-summary">
+            {sheetPlayer.total_score} pts · {sheetPlayer.chips} chips
+            {sheetPlace != null ? ` · #${sheetPlace}` : ""}
+          </p>
           <ScoreSheetTable
             player={sheetPlayer}
             previews={
@@ -707,6 +743,7 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
                 <Tip
                   key={`p-${card.id}-${i}`}
                   text={tipText(card.id, card.transparent)}
+                  tipAlign="start"
                 >
                   <button
                     type="button"
@@ -778,6 +815,7 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
                 ACTIVATABLE_TRADING.has(card.id) ? (
                   <Tip
                     key={`t-${card.id}-${i}`}
+                    tipAlign="end"
                     text={tipText(
                       card.id,
                       false,
@@ -803,7 +841,7 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
                     </button>
                   </Tip>
                 ) : (
-                  <Tip key={`t-${card.id}-${i}`} text={tipText(card.id)}>
+                  <Tip key={`t-${card.id}-${i}`} tipAlign="end" text={tipText(card.id)}>
                     <div
                       className="fan-card trading passive"
                       style={{ zIndex: i + 1 }}
