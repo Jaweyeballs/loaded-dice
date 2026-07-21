@@ -26,6 +26,10 @@ export type PlayerState = {
   gambler_cost: number;
   lawyer_cooldown: number;
   guardian_cooldown: number;
+  /** True if this player cast a hindrance last rotation. */
+  attacked_last_rotation?: boolean;
+  /** Players who cast a hindrance on this player last rotation. */
+  attacked_by_last_rotation?: string[];
 };
 
 export type MatchState = {

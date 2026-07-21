@@ -40,6 +40,12 @@ const UNTARGETED_HINDRANCES = new Set(["blue_shell"]);
 /** Trading cards clicked to activate (stay in party). Others are passives / turn-start. */
 const ACTIVATABLE_TRADING = new Set(["gambler", "lawyer", "toddler", "psychic"]);
 
+const REINFORCEMENT_IDS = new Set([
+  "positive_reinforcement",
+  "negative_reinforcement",
+]);
+const PUNISHMENT_IDS = new Set(["positive_punishment", "negative_punishment"]);
+
 type SheetMode = "mine" | "current";
 type LeftTab = "history" | "leaderboard";
 type DiePickMode =
@@ -94,6 +100,58 @@ function killfeedLine(entry: {
     return `${entry.target_name} has blocked ${entry.caster_name}'s ${label(entry.card_id)}${withCard}`;
   }
   return `${entry.caster_name} → ${entry.target_name}: ${label(entry.card_id)}`;
+}
+
+function conditionStatus(
+  cardId: string,
+  me: PlayerState | undefined,
+  rotationCount: number,
+): "ACTIVE" | "DORMANT" | null {
+  if (REINFORCEMENT_IDS.has(cardId)) {
+    if (rotationCount <= 0) return "DORMANT";
+    return me?.attacked_last_rotation ? "DORMANT" : "ACTIVE";
+  }
+  if (PUNISHMENT_IDS.has(cardId)) {
+    if (rotationCount <= 0) return "DORMANT";
+    return (me?.attacked_by_last_rotation?.length ?? 0) > 0 ? "ACTIVE" : "DORMANT";
+  }
+  return null;
+}
+
+function cooldownTurnsLeft(cardId: string, me: PlayerState | undefined): number {
+  if (cardId === "guardian") return me?.guardian_cooldown ?? 0;
+  if (cardId === "lawyer") return me?.lawyer_cooldown ?? 0;
+  return 0;
+}
+
+function CardFace({
+  cardId,
+  me,
+  rotationCount,
+  title,
+}: {
+  cardId: string;
+  me: PlayerState | undefined;
+  rotationCount: number;
+  title?: string;
+}) {
+  const status = conditionStatus(cardId, me, rotationCount);
+  const cd = cooldownTurnsLeft(cardId, me);
+  return (
+    <>
+      {title ?? label(cardId)}
+      {status && (
+        <span className={`card-status ${status === "ACTIVE" ? "active" : "dormant"}`}>
+          {status}
+        </span>
+      )}
+      {cd > 0 && (
+        <span className="card-cooldown">
+          COOLDOWN: {cd} turn{cd === 1 ? "" : "s"} left
+        </span>
+      )}
+    </>
+  );
 }
 
 
@@ -380,12 +438,6 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
     if (card.id === "gambler") {
       return `${label(card.id)} (${me?.gambler_cost ?? 200})`;
     }
-    if (card.id === "lawyer" && (me?.lawyer_cooldown ?? 0) > 0) {
-      return `${label(card.id)} (CD ${me?.lawyer_cooldown})`;
-    }
-    if (card.id === "guardian" && (me?.guardian_cooldown ?? 0) > 0) {
-      return `${label(card.id)} (CD ${me?.guardian_cooldown})`;
-    }
     if (diePick?.mode === "trading" && diePick.cardId === card.id) {
       return `${label(card.id)} (${diePick.picked.length}/2)`;
     }
@@ -502,36 +554,47 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
                 const arrow = placementArrow(p.name, place, predictedOrder);
                 const delta = p.score_delta ?? 0;
                 return (
-                  <li key={p.name} className={p.name === match.active_player ? "playing" : ""}>
+                  <li
+                    key={p.name}
+                    className={p.name === match.active_player ? "playing" : ""}
+                  >
                     <button
                       type="button"
-                      className="name-link"
+                      className="leaderboard-row"
                       onClick={() => selectSheetPlayer(p.name)}
                     >
-                      <span className="place">#{place + 1}</span>
-                      <span className="name">{p.name}</span>
-                      {arrow === "up" && (
-                        <span className="place-arrow up" title="Predicted to rise next rotation">
-                          ▲
-                        </span>
-                      )}
-                      {arrow === "down" && (
-                        <span className="place-arrow down" title="Predicted to fall next rotation">
-                          ▼
-                        </span>
-                      )}
-                    </button>
-                    <span className="stats">
-                      {p.total_score} pts{" "}
-                      <span
-                        className={`score-delta ${delta > 0 ? "up" : delta < 0 ? "down" : ""}`}
-                        title="Net score change this rotation"
-                      >
-                        ({formatScoreDelta(delta)})
+                      <span className="name-link">
+                        <span className="place">#{place + 1}</span>
+                        <span className="name">{p.name}</span>
+                        {arrow === "up" && (
+                          <span
+                            className="place-arrow up"
+                            title="Predicted to rise next rotation"
+                          >
+                            ▲
+                          </span>
+                        )}
+                        {arrow === "down" && (
+                          <span
+                            className="place-arrow down"
+                            title="Predicted to fall next rotation"
+                          >
+                            ▼
+                          </span>
+                        )}
                       </span>
-                      {" · "}
-                      {p.chips} chips
-                    </span>
+                      <span className="stats">
+                        {p.total_score} pts{" "}
+                        <span
+                          className={`score-delta ${delta > 0 ? "up" : delta < 0 ? "down" : ""}`}
+                          title="Net score change this rotation"
+                        >
+                          ({formatScoreDelta(delta)})
+                        </span>
+                        {" · "}
+                        {p.chips} chips
+                      </span>
+                    </button>
                   </li>
                 );
               })}
@@ -813,7 +876,10 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
               {powerCards.length === 0 && (
                 <span className="empty-fan muted">Empty</span>
               )}
-              {powerCards.map((card, i) => (
+              {powerCards.map((card, i) => {
+                const status = conditionStatus(card.id, me, match.rotation_count);
+                const cd = cooldownTurnsLeft(card.id, me);
+                return (
                 <Tip
                   key={`p-${card.id}-${i}`}
                   text={tipText(card.id, card.transparent)}
@@ -828,6 +894,8 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
                       (card.id === "parry" && blockArming === "parry")
                         ? "armed"
                         : ""
+                    } ${cd > 0 ? "on-cooldown" : ""} ${
+                      status === "DORMANT" ? "dormant" : ""
                     }`}
                     disabled={
                       !active ||
@@ -847,10 +915,15 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
                     onClick={() => castPower(card)}
                     style={{ zIndex: i + 1 }}
                   >
-                    {label(card.id)}
+                    <CardFace
+                      cardId={card.id}
+                      me={me}
+                      rotationCount={match.rotation_count}
+                    />
                   </button>
                 </Tip>
-              ))}
+                );
+              })}
               {showParryReadyChip && match.phase === "turn_start" && active && (
                 <Tip text={tipText("parry")} tipAlign="start">
                   <button
@@ -886,20 +959,29 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
                       </option>
                     ))}
                 </select>
-                {hindranceCards.map((card, i) => (
+                {hindranceCards.map((card, i) => {
+                  const status = conditionStatus(card.id, me, match.rotation_count);
+                  return (
                   <Tip key={`h-${card.id}-${i}`} text={tipText(card.id, card.transparent)}>
                     <button
                       type="button"
-                      className="fan-card hindrance"
+                      className={`fan-card hindrance ${
+                        status === "DORMANT" ? "dormant" : ""
+                      }`}
                       disabled={
                         !UNTARGETED_HINDRANCES.has(card.id) && !hindranceTarget
                       }
                       onClick={() => castHindrance(card)}
                     >
-                      {label(card.id)}
+                      <CardFace
+                        cardId={card.id}
+                        me={me}
+                        rotationCount={match.rotation_count}
+                      />
                     </button>
                   </Tip>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
@@ -934,12 +1016,17 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
                         (card.id === "guardian" && blockArming === "guardian")
                           ? "armed"
                           : ""
-                      }`}
+                      } ${cooldownTurnsLeft(card.id, me) > 0 ? "on-cooldown" : ""}`}
                       style={{ zIndex: i + 1 }}
                       disabled={tradingDisabled(card)}
                       onClick={() => activateTrading(card)}
                     >
-                      {tradingLabel(card)}
+                      <CardFace
+                        cardId={card.id}
+                        me={me}
+                        rotationCount={match.rotation_count}
+                        title={tradingLabel(card)}
+                      />
                     </button>
                   </Tip>
                 ) : (
@@ -948,7 +1035,12 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
                       className="fan-card trading passive"
                       style={{ zIndex: i + 1 }}
                     >
-                      {tradingLabel(card)}
+                      <CardFace
+                        cardId={card.id}
+                        me={me}
+                        rotationCount={match.rotation_count}
+                        title={tradingLabel(card)}
+                      />
                     </div>
                   </Tip>
                 ),

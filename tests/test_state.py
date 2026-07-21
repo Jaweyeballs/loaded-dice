@@ -81,3 +81,6 @@ def test_serialize_inventory_and_hindrances():
             "blocker_card_id": None,
         }
     ]
+    alice = next(p for p in state["players"] if p["name"] == "Alice")
+    assert alice["attacked_last_rotation"] is False
+    assert bob["attacked_by_last_rotation"] == []

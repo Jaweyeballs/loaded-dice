@@ -49,6 +49,10 @@ def serialize_player(player: Player, match: Match) -> dict[str, Any]:
         "gambler_cost": player.gambler_next_cost,
         "lawyer_cooldown": player.lawyer_cooldown_turns,
         "guardian_cooldown": player.guardian_cooldown_turns,
+        "attacked_last_rotation": match.player_attacked_last_rotation(player),
+        "attacked_by_last_rotation": sorted(
+            match.attackers_on_player_last_rotation(player)
+        ),
     }
 
 
