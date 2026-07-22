@@ -403,11 +403,24 @@ select {
   background: color-mix(in srgb, var(--ink) 10%, transparent);
 }
 
+.leaderboard-row.pick-target {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ok) 35%, transparent);
+}
+
+.leaderboard-row.pick-target:hover {
+  background: color-mix(in srgb, var(--ok) 16%, transparent);
+}
+
+.leaderboard-row.self-blocked:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 .leaderboard li.playing .leaderboard-row {
   background: color-mix(in srgb, var(--ok) 12%, transparent);
 }
 
-.leaderboard li.playing .leaderboard-row:hover {
+.leaderboard li.playing .leaderboard-row:hover:not(:disabled) {
   background: color-mix(in srgb, var(--ok) 20%, transparent);
 }
 
@@ -506,6 +519,14 @@ select {
   margin: 0;
   color: color-mix(in srgb, var(--cream) 85%, transparent);
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+}
+
+.target-prompt {
+  width: 100%;
+  text-align: center;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--cream);
 }
 
 .dice-tray {
@@ -707,6 +728,10 @@ select {
   min-height: 2.4rem;
   background: #5a2f38;
   color: #ffe8e4;
+}
+
+.fan-card.hindrance.armed {
+  box-shadow: 0 0 0 3px #f0c14a, 0 8px 18px rgba(0, 0, 0, 0.3);
 }
 
 .hindrance-cast {

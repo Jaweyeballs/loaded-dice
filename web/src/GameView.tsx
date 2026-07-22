@@ -52,6 +52,10 @@ type DiePickMode =
   | { mode: "trading"; cardId: "toddler" | "psychic"; picked: number[] }
   | { mode: "twins"; picked: number[] }
   | { mode: "score"; category: string; picked: number[] };
+/** Armed card waiting for a leaderboard click to pick another player. */
+type PlayerTargetMode =
+  | { kind: "hindrance"; cardId: string }
+  | { kind: "helping_hand" };
 
 function formatScoreDelta(delta: number): string {
   if (delta > 0) return `+${delta}`;
@@ -169,15 +173,13 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
   const [mineSelection, setMineSelection] = useState(playerName);
   const [cardsOpen, setCardsOpen] = useState(true);
   const [shopOpen, setShopOpen] = useState(false);
-  const [hindranceTarget, setHindranceTarget] = useState(
-    () => match.players.find((p) => p.name !== playerName)?.name ?? "",
-  );
   const [icarusArming, setIcarusArming] = useState(false);
   const [spaceArming, setSpaceArming] = useState(false);
   const [spaceFace, setSpaceFace] = useState(6);
   const [helpingChoice, setHelpingChoice] = useState<"chips" | "points">("chips");
   const [diePick, setDiePick] = useState<DiePickMode | null>(null);
   const [blockArming, setBlockArming] = useState<"parry" | "guardian" | null>(null);
+  const [playerTarget, setPlayerTarget] = useState<PlayerTargetMode | null>(null);
 
   // Where everyone would sit if the leaderboard re-sorted on current totals right now.
   const predictedOrder = useMemo(
@@ -219,12 +221,14 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
       setSpaceArming(false);
       setDiePick(null);
       setBlockArming(null);
+      setPlayerTarget(null);
       return;
     }
     if (match.phase !== "turn_active" || !match.dice) {
       setIcarusArming(false);
       setSpaceArming(false);
       setDiePick(null);
+      setPlayerTarget(null);
     }
     if (match.phase !== "turn_start") {
       setBlockArming(null);
@@ -248,6 +252,36 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
     setSpaceArming(false);
     setDiePick(null);
     setBlockArming(null);
+    setPlayerTarget(null);
+  }
+
+  function armPlayerTarget(mode: PlayerTargetMode) {
+    clearAiming();
+    setLeftTab("leaderboard");
+    setLeftOpen(true);
+    setPlayerTarget(mode);
+  }
+
+  function selectLeaderboardPlayer(name: string) {
+    if (playerTarget && name !== playerName) {
+      if (playerTarget.kind === "helping_hand") {
+        onAction({
+          type: "cast_power",
+          card_id: "helping_hand",
+          choice: helpingChoice,
+          target: name,
+        });
+      } else {
+        onAction({
+          type: "cast_hindrance",
+          card_id: playerTarget.cardId,
+          target: name,
+        });
+      }
+      clearAiming();
+      return;
+    }
+    selectSheetPlayer(name);
   }
 
   function handleDieClick(index: number, locked: boolean) {
@@ -316,6 +350,10 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
       clearAiming();
       return;
     }
+    if (card.id === "helping_hand" && playerTarget?.kind === "helping_hand") {
+      clearAiming();
+      return;
+    }
     if (card.id === "parry" && match.phase === "turn_start" && active) {
       clearAiming();
       setBlockArming("parry");
@@ -341,33 +379,26 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
       return;
     }
     if (card.id === "helping_hand") {
-      const target =
-        hindranceTarget ||
-        match.players.find((p) => p.name !== playerName)?.name;
-      if (!target) return;
-      onAction({
-        type: "cast_power",
-        card_id: "helping_hand",
-        choice: helpingChoice,
-        target,
-      });
+      armPlayerTarget({ kind: "helping_hand" });
       return;
     }
     onAction({ type: "cast_power", card_id: card.id });
   }
 
   function castHindrance(card: CardInfo) {
-    clearAiming();
+    if (
+      playerTarget?.kind === "hindrance" &&
+      playerTarget.cardId === card.id
+    ) {
+      clearAiming();
+      return;
+    }
     if (UNTARGETED_HINDRANCES.has(card.id)) {
+      clearAiming();
       onAction({ type: "cast_hindrance", card_id: card.id });
       return;
     }
-    if (!hindranceTarget) return;
-    onAction({
-      type: "cast_hindrance",
-      card_id: card.id,
-      target: hindranceTarget,
-    });
+    armPlayerTarget({ kind: "hindrance", cardId: card.id });
   }
 
   function requestScore(category: string) {
@@ -448,7 +479,11 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
     Boolean(me?.parry_ready) ||
     Boolean(me?.power_cards.some((c) => c.id === "parry"));
   const aiming =
-    icarusArming || spaceArming || Boolean(diePick) || Boolean(blockArming);
+    icarusArming ||
+    spaceArming ||
+    Boolean(diePick) ||
+    Boolean(blockArming) ||
+    Boolean(playerTarget);
   const powerCards = me?.power_cards.filter((c) => !HINDRANCE_IDS.has(c.id)) ?? [];
   const showParryReadyChip =
     Boolean(me?.parry_ready) && !powerCards.some((c) => c.id === "parry");
@@ -560,8 +595,13 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
                   >
                     <button
                       type="button"
-                      className="leaderboard-row"
-                      onClick={() => selectSheetPlayer(p.name)}
+                      className={`leaderboard-row ${
+                        playerTarget && p.name !== playerName ? "pick-target" : ""
+                      } ${
+                        playerTarget && p.name === playerName ? "self-blocked" : ""
+                      }`}
+                      disabled={Boolean(playerTarget && p.name === playerName)}
+                      onClick={() => selectLeaderboardPlayer(p.name)}
                     >
                       <span className="name-link">
                         <span className="place">#{place + 1}</span>
@@ -734,7 +774,8 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
                   </select>
                 </label>
               )}
-              {powerCards.some((c) => c.id === "helping_hand") && (
+              {(powerCards.some((c) => c.id === "helping_hand") ||
+                playerTarget?.kind === "helping_hand") && (
                 <label className="face-picker">
                   Helping hand
                   <select
@@ -752,6 +793,15 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
                 <button type="button" className="secondary" onClick={clearAiming}>
                   Cancel aim
                 </button>
+              )}
+              {playerTarget && (
+                <p className="hint table-hint target-prompt">
+                  Choose your target on the leaderboard
+                  {playerTarget.kind === "helping_hand"
+                    ? " for helping hand"
+                    : ` for ${label(playerTarget.cardId)}`}{" "}
+                  (click the card again to cancel)
+                </p>
               )}
             </>
           )}
@@ -891,7 +941,9 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
                       (card.id === "icarus" && icarusArming) ||
                       (card.id === "space_die" && spaceArming) ||
                       (card.id === "twins" && diePick?.mode === "twins") ||
-                      (card.id === "parry" && blockArming === "parry")
+                      (card.id === "parry" && blockArming === "parry") ||
+                      (card.id === "helping_hand" &&
+                        playerTarget?.kind === "helping_hand")
                         ? "armed"
                         : ""
                     } ${cd > 0 ? "on-cooldown" : ""} ${
@@ -947,18 +999,6 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
             </div>
             {active && hindranceCards.length > 0 && (
               <div className="hindrance-cast">
-                <select
-                  value={hindranceTarget}
-                  onChange={(e) => setHindranceTarget(e.target.value)}
-                >
-                  {match.players
-                    .filter((p) => p.name !== playerName)
-                    .map((p) => (
-                      <option key={p.name} value={p.name}>
-                        {p.name}
-                      </option>
-                    ))}
-                </select>
                 {hindranceCards.map((card, i) => {
                   const status = conditionStatus(card.id, me, match.rotation_count);
                   return (
@@ -967,10 +1007,12 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
                       type="button"
                       className={`fan-card hindrance ${
                         status === "DORMANT" ? "dormant" : ""
+                      } ${
+                        playerTarget?.kind === "hindrance" &&
+                        playerTarget.cardId === card.id
+                          ? "armed"
+                          : ""
                       }`}
-                      disabled={
-                        !UNTARGETED_HINDRANCES.has(card.id) && !hindranceTarget
-                      }
                       onClick={() => castHindrance(card)}
                     >
                       <CardFace
@@ -1116,7 +1158,7 @@ function ScoreSheetTable({
         <tr>
           <th>Category</th>
           <th>Score</th>
-          <th>Prev</th>
+          <th>Preview</th>
           <th />
         </tr>
       </thead>
