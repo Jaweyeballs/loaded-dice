@@ -162,6 +162,8 @@ def serialize_match(match: Match) -> dict[str, Any]:
         "psychic_previews": {
             str(index): face for index, face in match.psychic_previews.items()
         },
+        "toddler_used_this_turn": match.toddler_used_this_turn,
+        "psychic_used_this_turn": match.psychic_used_this_turn,
         "hindrance_feed": [
             {
                 "card_id": entry.card_id.value,

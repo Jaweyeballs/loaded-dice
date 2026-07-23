@@ -490,6 +490,9 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
     clearAiming();
     if (card.id === "toddler" || card.id === "psychic") {
       if (!match.dice) return;
+      if (card.id === "toddler" && match.toddler_used_this_turn) return;
+      if (card.id === "psychic" && match.psychic_used_this_turn) return;
+      if ((match.dice.rolls_this_turn ?? 0) < 1) return;
       setDiePick({
         mode: "trading",
         cardId: card.id,
@@ -518,7 +521,15 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
       return (me?.lawyer_cooldown ?? 0) > 0;
     }
     if (card.id === "toddler" || card.id === "psychic") {
-      return !match.dice;
+      const used =
+        card.id === "toddler"
+          ? Boolean(match.toddler_used_this_turn)
+          : Boolean(match.psychic_used_this_turn);
+      return (
+        !match.dice ||
+        used ||
+        (match.dice.rolls_this_turn ?? 0) < 1
+      );
     }
     return true;
   }
@@ -1127,7 +1138,11 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
                           ? `Cooldown: ${me?.lawyer_cooldown} turns.`
                           : card.id === "guardian" && (me?.guardian_cooldown ?? 0) > 0
                             ? `Cooldown: ${me?.guardian_cooldown} turns.`
-                            : undefined,
+                            : card.id === "toddler" && match.toddler_used_this_turn
+                              ? "Already used this turn."
+                              : card.id === "psychic" && match.psychic_used_this_turn
+                                ? "Already used this turn."
+                                : undefined,
                     )}
                   >
                     <button

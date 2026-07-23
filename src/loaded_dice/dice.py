@@ -99,9 +99,24 @@ class DiceSet:
         self._twins_links: dict[int, int] = {}
 
     def grant_extra_rolls(self, count: int = 1) -> None:
-        """Increase the per-turn roll limit (e.g. The Gambler, The Toddler)."""
+        """Increase the per-turn roll limit (e.g. The Gambler)."""
         self.max_rolls += count
         # standard_max_rolls stays fixed — only ability-free rolls earn chip income.
+
+    def roll_die_now(self, index: int) -> int:
+        """Immediately roll one die without consuming a turn roll (Toddler).
+
+        Honors a queued Psychic force if present. Ignores lock state.
+        """
+        if index < 0 or index >= len(self.dice):
+            raise IndexError(f"Invalid die index: {index}")
+        die = self.dice[index]
+        forced = self._forced_next_values.pop(index, None)
+        if forced is not None:
+            die.value = forced
+        else:
+            die.value = random.choice(die.faces)
+        return die.value
 
     def add_die(
         self,

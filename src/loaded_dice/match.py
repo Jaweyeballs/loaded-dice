@@ -191,12 +191,22 @@ class Match:
         self._leaderboard_order = self._ranked_player_names()
         # Psychic: die_index → previewed face for the active turn (viewer HUD).
         self._psychic_previews: dict[int, int] = {}
+        self._toddler_used_this_turn = False
+        self._psychic_used_this_turn = False
         # Cast/block history for the left-panel killfeed (newest last).
         self.hindrance_feed: list[HindranceFeedEntry] = []
 
     @property
     def psychic_previews(self) -> dict[int, int]:
         return dict(self._psychic_previews)
+
+    @property
+    def toddler_used_this_turn(self) -> bool:
+        return self._toddler_used_this_turn
+
+    @property
+    def psychic_used_this_turn(self) -> bool:
+        return self._psychic_used_this_turn
 
     @property
     def active_player(self) -> Player:
@@ -250,6 +260,9 @@ class Match:
             size=self.config.dice_size,
             max_rolls=self.config.max_rolls_per_turn,
         )
+        self._toddler_used_this_turn = False
+        self._psychic_used_this_turn = False
+        self._psychic_previews = {}
 
     def begin_rolling(self) -> None:
         """Move from TURN_START to TURN_ACTIVE (GDD: Start Turn button pressed)."""
@@ -447,27 +460,33 @@ class Match:
         return list(die_indices)
 
     def _activate_toddler(self, die_indices: list[int] | None) -> None:
-        """Grant an extra reroll that only rolls the two chosen dice."""
+        """Immediately roll the two chosen dice (once per turn)."""
+        if self._toddler_used_this_turn:
+            raise WrongPhaseError("Toddler can only be used once per turn")
         chosen = self._require_die_indices(die_indices, TODDLER_DIE_COUNT)
         assert self._dice is not None
-        chosen_set = set(chosen)
-        for index in range(len(self._dice.dice)):
-            if index in chosen_set:
-                self._dice.unlock(index)
-            else:
-                self._dice.lock(index)
-        self.grant_extra_rolls(1)
+        if self._dice.rolls_this_turn < 1:
+            raise ValueError("Roll at least once before using Toddler")
+        for index in chosen:
+            self._dice.roll_die_now(index)
+            self._psychic_previews.pop(index, None)
+        self._toddler_used_this_turn = True
 
     def _activate_psychic(self, die_indices: list[int] | None) -> None:
-        """Preview (and lock in) the next rolled face for two dice."""
+        """Preview (and lock in) the next rolled face for two dice (once per turn)."""
+        if self._psychic_used_this_turn:
+            raise WrongPhaseError("Psychic can only be used once per turn")
         chosen = self._require_die_indices(die_indices, PSYCHIC_DIE_COUNT)
         assert self._dice is not None
+        if self._dice.rolls_this_turn < 1:
+            raise ValueError("Roll at least once before using Psychic")
         previews: dict[int, int] = {}
         for index in chosen:
             face = random.randint(1, 6)
             self._dice.queue_forced_roll(index, face)
             previews[index] = face
         self._psychic_previews.update(previews)
+        self._psychic_used_this_turn = True
 
     def cast_power_card(self, card_id: CardId, **kwargs) -> None:
         """Play a positive power card from the active player's inventory during rolling."""

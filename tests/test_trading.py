@@ -127,7 +127,7 @@ def test_activate_trading_via_action():
     assert match.players[0].chips == chips_before - GAMBLER_BASE_COST
 
 
-def test_toddler_locks_other_dice_and_grants_reroll():
+def test_toddler_immediately_rolls_selected_dice():
     match = Match(["Alice"])
     alice = match.players[0]
     alice.inventory.add_trading(card_for_id(CardId.TODDLER))
@@ -135,13 +135,19 @@ def test_toddler_locks_other_dice_and_grants_reroll():
     match.roll()
     assert match.dice is not None
     before_max = match.dice.max_rolls
+    before_rolls = match.dice.rolls_this_turn
+    for i, face in enumerate([1, 2, 3, 4, 5]):
+        match.dice.dice[i].value = face
     match.activate_trading_card(CardId.TODDLER, die_indices=[0, 2])
-    assert match.dice.max_rolls == before_max + 1
-    assert match.dice.dice[0].locked is False
-    assert match.dice.dice[2].locked is False
-    assert match.dice.dice[1].locked is True
-    assert match.dice.dice[3].locked is True
-    assert match.dice.dice[4].locked is True
+    assert match.dice.max_rolls == before_max
+    assert match.dice.rolls_this_turn == before_rolls
+    assert match.toddler_used_this_turn is True
+    # Other dice unchanged.
+    assert match.dice.values[1] == 2
+    assert match.dice.values[3] == 4
+    assert match.dice.values[4] == 5
+    with pytest.raises(WrongPhaseError, match="once per turn"):
+        match.activate_trading_card(CardId.TODDLER, die_indices=[1, 3])
 
 
 def test_psychic_queues_previews():
@@ -151,8 +157,11 @@ def test_psychic_queues_previews():
     match.roll()
     match.activate_trading_card(CardId.PSYCHIC, die_indices=[1, 4])
     assert set(match.psychic_previews) == {1, 4}
+    assert match.psychic_used_this_turn is True
     assert match.dice is not None
     assert set(match.dice.forced_next_values) == {1, 4}
+    with pytest.raises(WrongPhaseError, match="once per turn"):
+        match.activate_trading_card(CardId.PSYCHIC, die_indices=[0, 2])
     # Unlock all so both previews apply on the next roll.
     for i in range(5):
         match.unlock(i)

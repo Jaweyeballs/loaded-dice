@@ -46,7 +46,7 @@ Permanent boosts with drawbacks, picked at the start of a run/match.
 - **Attack**: triggered by casting any negative power card, regardless of whether it has a chosen target or resolves on whoever it happens to hit (e.g. Blue Shell counts as an attack even though the caster doesn't choose the target).
 - **Base slot counts**: power card hand size is **5**; trading card slots is **3**. Both are modifiable by character effects (Quantum Cat, Cyclops, Hoarder).
 - **Dice locking**: standard Yahtzee keep/reroll — players lock dice between rerolls. (Relevant to Already in Jail, below.)
-- **Rolls per turn**: default **3** (initial roll + up to 2 rerolls). Card effects (e.g. The Gambler, The Toddler) may increase this limit for a turn.
+- **Rolls per turn**: default **3** (initial roll + up to 2 rerolls). Card effects (e.g. The Gambler) may increase this limit for a turn.
 - **Scoring hand**: always exactly **5 dice** chosen from whatever dice are in play. Extra dice from card effects (e.g. Benchwarmer, The Coin) are rolled **alongside** normal dice on the same rolls. If more than 5 dice are showing when the player scores, they must **select which 5** to use before picking a category.
 
 ### Rules
@@ -100,10 +100,10 @@ Permanent boosts with drawbacks, picked at the start of a run/match.
 | Name | Effect |
 |---|---|
 | The gecko | +**100** chips to all compensation payouts |
-| The toddler | Choose 2 dice to use in an extra reroll |
+| The toddler | Choose 2 dice to immediately reroll them (once per turn) |
 | The persuader | +3 points on every scored hand |
 | The gambler | Pay **200** chips for an extra reroll; cost increases by **100** chips each time used |
-| The psychic | Choose 2 dice to preview their next rolled value |
+| The psychic | Choose 2 dice to preview their next rolled value (once per turn) |
 | The guardian | Parries a hindrance card of your choice; goes on cooldown for one turn after triggering |
 | The forecaster | Reveals all hindrance cards held by all players, visible only to you, on your turn |
 | The merchant | Earn **200** chips on your turn |

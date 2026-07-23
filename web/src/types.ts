@@ -66,6 +66,8 @@ export type MatchState = {
   /** Live overwrite preview when Do over is usable this turn. */
   do_over_preview?: { category: string; points: number } | null;
   psychic_previews?: Record<string, number>;
+  toddler_used_this_turn?: boolean;
+  psychic_used_this_turn?: boolean;
   forecaster_reveals?: Record<string, string[]> | null;
   /** Newest last — hindrance cast/block killfeed for the History tab. */
   hindrance_feed?: {
