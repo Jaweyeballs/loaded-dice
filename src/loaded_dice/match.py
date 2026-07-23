@@ -28,8 +28,7 @@ from loaded_dice.card_effects.negative_power import (
     validate_hindrance_queue,
 )
 from loaded_dice.card_effects.positive_power import (
-    DO_OVER_PLUS_BONUS,
-    DO_OVER_PLUS_CATEGORIES,
+    compute_do_over_points,
     POSITIVE_POWER_CAST,
     cast_positive_power,
 )
@@ -577,14 +576,12 @@ class Match:
             raise WrongPhaseError("Only the active player can use Do over")
         if category is None:
             raise ValueError("Do over requires a previously scored hand")
-        flat_bonus = (
-            DO_OVER_PLUS_BONUS if category in DO_OVER_PLUS_CATEGORIES else 0
-        )
-        points = player.current_sheet.overwrite(
+        points = compute_do_over_points(values, category, player.turn_effects)
+        player.current_sheet.overwrite(
             values,
             category,
             effects=player.turn_effects,
-            flat_bonus=flat_bonus,
+            points=points,
         )
         player.last_scored_values = list(values)
         player.last_scored_category = category

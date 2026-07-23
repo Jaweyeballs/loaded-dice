@@ -5,13 +5,11 @@ from __future__ import annotations
 from typing import Any
 
 from loaded_dice.cards import CardId
-from loaded_dice.card_effects.positive_power import (
-    DO_OVER_PLUS_BONUS,
-    DO_OVER_PLUS_CATEGORIES,
-)
+from loaded_dice.card_effects.positive_power import compute_do_over_points
 from loaded_dice.match import Match, Player
-from loaded_dice.preview import best_score_hand, preview_scores
+from loaded_dice.preview import SCORING_HAND_SIZE, preview_scores
 from loaded_dice.scoring import Category, YAHTZEE_BONUS_POINTS, is_yahtzee
+from itertools import combinations
 
 
 def serialize_card(card) -> dict[str, Any]:
@@ -123,19 +121,27 @@ def serialize_do_over_preview(match: Match) -> dict[str, Any] | None:
     if not player.inventory.has_power(CardId.DO_OVER):
         return None
     values = match.dice.values
-    if len(values) < 5:
+    if len(values) < SCORING_HAND_SIZE:
         return None
     # Exact 5-die yahtzee: block Do over when Yahtzee box is already filled.
-    if len(values) == 5 and is_yahtzee(values) and not player.current_sheet.is_available(
-        Category.YAHTZEE
+    if len(values) == SCORING_HAND_SIZE and is_yahtzee(values) and not (
+        player.current_sheet.is_available(Category.YAHTZEE)
     ):
         return None
     try:
-        points = best_score_hand(values, category, player.turn_effects)
+        if len(values) == SCORING_HAND_SIZE:
+            points = compute_do_over_points(values, category, player.turn_effects)
+        else:
+            points = max(
+                compute_do_over_points(
+                    [values[i] for i in indices],
+                    category,
+                    player.turn_effects,
+                )
+                for indices in combinations(range(len(values)), SCORING_HAND_SIZE)
+            )
     except ValueError:
         return None
-    if category in DO_OVER_PLUS_CATEGORIES:
-        points += DO_OVER_PLUS_BONUS
     return {"category": category.value, "points": points}
 
 

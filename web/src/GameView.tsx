@@ -906,21 +906,28 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
             {sortedDice.map(({ value, index, locked, kind }) => {
               const psychicFace = match.psychic_previews?.[String(index)];
               const picked = diePick?.picked.includes(index);
+              const kindClass = kind !== "standard" ? `die-${kind}` : "";
               return (
-                <button
-                  key={index}
-                  type="button"
-                  className={`die ${locked ? "locked" : ""} ${
-                    kind !== "standard" ? `die-${kind}` : ""
-                  } ${aiming ? "targetable" : ""} ${picked ? "picked" : ""}`}
-                  disabled={!active}
-                  onClick={() => handleDieClick(index, locked)}
-                >
-                  {value}
+                <div key={index} className="die-slot">
                   {psychicFace != null && (
-                    <span className="psychic-note">→{psychicFace}</span>
+                    <span
+                      className={`die die-psychic-preview ${kindClass}`}
+                      aria-hidden
+                    >
+                      {psychicFace}
+                    </span>
                   )}
-                </button>
+                  <button
+                    type="button"
+                    className={`die ${locked ? "locked" : ""} ${kindClass} ${
+                      aiming ? "targetable" : ""
+                    } ${picked ? "picked" : ""}`}
+                    disabled={!active}
+                    onClick={() => handleDieClick(index, locked)}
+                  >
+                    {value}
+                  </button>
+                </div>
               );
             })}
             <span className="dice-meta">
@@ -1301,7 +1308,7 @@ function ScoreSheetTable({
               <td>{filled == null ? "—" : filled}</td>
               <td
                 className={isDoOverTarget ? "do-over-preview" : "muted"}
-                title={isDoOverTarget ? "use do over?" : undefined}
+                title={isDoOverTarget ? "consumes do over" : undefined}
               >
                 {isDoOverTarget
                   ? doOverPreview.points
@@ -1311,7 +1318,7 @@ function ScoreSheetTable({
               </td>
               <td>
                 {canDoOver && isDoOverTarget && (
-                  <Tip text="use do over?">
+                  <Tip text="consumes do over">
                     <button
                       type="button"
                       className="do-over-btn"

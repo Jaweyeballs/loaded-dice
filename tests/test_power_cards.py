@@ -140,6 +140,45 @@ def test_do_over_plus_five_on_full_house_category():
     assert alice.current_sheet.get_score(Category.FULL_HOUSE) == 30
 
 
+def test_do_over_poker_box_zero_when_hand_does_not_qualify():
+    match = Match(["Alice"])
+    alice = match.players[0]
+    alice.inventory.add_power(card_for_id(CardId.DO_OVER))
+    _begin_active_turn(match)
+    match.roll()
+    assert match.dice is not None
+    for i, face in enumerate([1, 2, 3, 4, 6]):
+        match.dice.dice[i].value = face
+    match.score(Category.SMALL_STRAIGHT)
+    assert alice.current_sheet.get_score(Category.SMALL_STRAIGHT) == 30
+
+    _begin_active_turn(match)
+    match.roll()
+    for i, face in enumerate([1, 1, 3, 5, 6]):
+        match.dice.dice[i].value = face
+    match.do_over()
+    assert alice.current_sheet.get_score(Category.SMALL_STRAIGHT) == 0
+
+
+def test_do_over_small_straight_qualifying_hand_scores_thirty_five():
+    match = Match(["Alice"])
+    alice = match.players[0]
+    alice.inventory.add_power(card_for_id(CardId.DO_OVER))
+    _begin_active_turn(match)
+    match.roll()
+    assert match.dice is not None
+    for i, face in enumerate([1, 2, 3, 4, 6]):
+        match.dice.dice[i].value = face
+    match.score(Category.SMALL_STRAIGHT)
+
+    _begin_active_turn(match)
+    match.roll()
+    for i, face in enumerate([2, 3, 4, 5, 5]):
+        match.dice.dice[i].value = face
+    match.do_over()
+    assert alice.current_sheet.get_score(Category.SMALL_STRAIGHT) == 35
+
+
 def test_do_over_blocked_when_overwriting_yahtzee():
     match = Match(["Alice"])
     alice = match.players[0]

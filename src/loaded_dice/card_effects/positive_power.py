@@ -14,6 +14,7 @@ from loaded_dice.dice import (
 from loaded_dice.scoring import Category
 
 if TYPE_CHECKING:
+    from loaded_dice.effects import TurnEffects
     from loaded_dice.match import Match, Player
 
 # --- Constants (balance here) ---
@@ -30,6 +31,27 @@ DO_OVER_PLUS_CATEGORIES = frozenset(
         Category.SMALL_STRAIGHT,
     }
 )
+
+
+def compute_do_over_points(
+    values: list[int],
+    category: Category,
+    effects: "TurnEffects | None" = None,
+) -> int:
+    """Points written by Do over for *values* into *category*.
+
+    For full house / 4oak / straights: only score (base +5) when the hand
+    itself qualifies for a non-zero score in that box; otherwise 0.
+    """
+    from loaded_dice.scoring import apply_turn_modifiers, score_hand
+
+    base = score_hand(values, category)
+    if category in DO_OVER_PLUS_CATEGORIES:
+        if base == 0:
+            return 0
+        return apply_turn_modifiers(base, category, effects) + DO_OVER_PLUS_BONUS
+    return apply_turn_modifiers(base, category, effects)
+
 
 # --- Cast handlers ---
 

@@ -170,12 +170,14 @@ class ScoreSheet:
         effects: TurnEffects | None = None,
         *,
         flat_bonus: int = 0,
+        points: int | None = None,
     ) -> int:
         """Replace an already-filled category (Do over). Returns new box points."""
         if self.is_available(category):
             raise ValueError(f"{category.value} has not been scored yet")
-        base_points = score_hand(values, category)
-        points = apply_turn_modifiers(base_points, category, effects) + flat_bonus
+        if points is None:
+            base_points = score_hand(values, category)
+            points = apply_turn_modifiers(base_points, category, effects) + flat_bonus
         self._scores[category] = points
         return points
 

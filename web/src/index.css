@@ -499,7 +499,9 @@ select {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 5rem 1rem 15.5rem;
+  /* Push roll + dice cluster lower so Psychic ghost dice clear the roll row. */
+  padding: 7.5rem 1rem 14rem;
+  padding-top: max(7.5rem, 18vh);
   pointer-events: none;
 }
 
@@ -512,7 +514,7 @@ select {
   flex-wrap: wrap;
   gap: 0.55rem;
   justify-content: center;
-  margin-bottom: 1.5rem;
+  margin-bottom: 3.25rem;
 }
 
 .table-hint {
@@ -533,12 +535,21 @@ select {
   display: flex;
   flex-wrap: wrap;
   gap: 0.55rem;
-  align-items: center;
+  align-items: flex-end;
   justify-content: center;
   padding: 0.75rem 1rem;
   background: color-mix(in srgb, var(--felt-deep) 55%, transparent);
   border-radius: 14px;
   border: 1px solid color-mix(in srgb, white 12%, transparent);
+}
+
+.die-slot {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  min-height: 3.1rem;
 }
 
 .die {
@@ -550,6 +561,27 @@ select {
   background: var(--cream);
   color: var(--ink);
   box-shadow: 0 4px 0 #c4b8a6, 0 8px 16px rgba(0, 0, 0, 0.25);
+}
+
+.die.die-psychic-preview {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 0.45rem);
+  transform: translateX(-50%);
+  opacity: 0.42;
+  pointer-events: none;
+  box-shadow: none;
+  border: 1.5px solid color-mix(in srgb, var(--ink) 28%, transparent);
+}
+
+.die.die-psychic-preview.die-benchwarmer {
+  border-color: color-mix(in srgb, #7ec8ff 55%, transparent);
+  color: color-mix(in srgb, #f4faff 70%, transparent);
+}
+
+.die.die-psychic-preview.die-boolean {
+  border-color: color-mix(in srgb, #f0f0f0 35%, transparent);
+  color: color-mix(in srgb, #f0f0f0 70%, transparent);
 }
 
 .die.die-benchwarmer {
