@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { cardBlurb, cardTipLabel } from "./cardCopy";
 import { Tip } from "./Tip";
 import type { CardInfo, MatchState, PlayerState, RoomState } from "./types";
@@ -9,6 +9,28 @@ type Props = {
   onAction: (action: Record<string, unknown>) => void;
   onLeave: () => void;
 };
+
+type DieScatter = { x: number; y: number; rot: number };
+
+type RollAnim = {
+  /** Pre-roll tray order (die indices). */
+  order: number[];
+  /** Indices that leave the tray (were unlocked). */
+  flying: number[];
+  scatter: Record<number, DieScatter>;
+  /** Dice that have snapped home again. */
+  returned: number[];
+  phase: "prep" | "out" | "back";
+};
+
+function randomScatter(): DieScatter {
+  const side = Math.random() < 0.5 ? -1 : 1;
+  return {
+    x: side * (40 + Math.random() * 150) + (Math.random() - 0.5) * 40,
+    y: -(55 + Math.random() * 170),
+    rot: (Math.random() - 0.5) * 640,
+  };
+}
 
 /** Scoresheet row order — includes summary rows that are not scoreable categories. */
 type SheetRow =
@@ -220,6 +242,116 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
   const [diePick, setDiePick] = useState<DiePickMode | null>(null);
   const [blockArming, setBlockArming] = useState<"parry" | "guardian" | null>(null);
   const [playerTarget, setPlayerTarget] = useState<PlayerTargetMode | null>(null);
+  const [rollAnim, setRollAnim] = useState<RollAnim | null>(null);
+  const prevDiceRef = useRef<{
+    rolls: number;
+    order: number[];
+    locked: boolean[];
+  } | null>(null);
+  const rollTimersRef = useRef<number[]>([]);
+
+  // Display faces low→high, but keep each die's original index for lock/Icarus actions.
+  const sortedDice = useMemo(() => {
+    if (!match.dice) return [];
+    return match.dice.values
+      .map((value, index) => ({
+        value,
+        index,
+        locked: match.dice!.locked[index],
+        kind: match.dice!.kinds?.[index] ?? "standard",
+      }))
+      .sort((a, b) => a.value - b.value || a.index - b.index);
+  }, [match.dice]);
+
+  const trayDice = useMemo(() => {
+    if (!match.dice) return [];
+    if (rollAnim) {
+      return rollAnim.order
+        .filter((index) => index < match.dice!.values.length)
+        .map((index) => ({
+          value: match.dice!.values[index],
+          index,
+          locked: match.dice!.locked[index],
+          kind: match.dice!.kinds?.[index] ?? "standard",
+        }));
+    }
+    return sortedDice;
+  }, [match.dice, rollAnim, sortedDice]);
+
+  // Detect a new roll and run scatter → sequential snap-home (low face first).
+  useEffect(() => {
+    if (!match.dice) {
+      prevDiceRef.current = null;
+      setRollAnim(null);
+      return;
+    }
+
+    const rolls = match.dice.rolls_this_turn;
+    const order = sortedDice.map((d) => d.index);
+    const locked = [...match.dice.locked];
+    const prev = prevDiceRef.current;
+
+    if (prev && rolls > prev.rolls) {
+      // Advance immediately so phase updates don't re-trigger this effect.
+      prevDiceRef.current = { rolls, order: prev.order, locked: prev.locked };
+
+      for (const id of rollTimersRef.current) window.clearTimeout(id);
+      rollTimersRef.current = [];
+
+      const flying = prev.order.filter((index) => !(prev.locked[index] ?? false));
+      if (flying.length === 0) {
+        return;
+      }
+      const scatter: Record<number, DieScatter> = {};
+      for (const index of flying) scatter[index] = randomScatter();
+
+      const returnOrder = [...flying].sort(
+        (a, b) =>
+          match.dice!.values[a] - match.dice!.values[b] || a - b,
+      );
+
+      setRollAnim({
+        order: prev.order,
+        flying,
+        scatter,
+        returned: [],
+        phase: "prep",
+      });
+
+      const tOut = window.setTimeout(() => {
+        setRollAnim((cur) => (cur ? { ...cur, phase: "out" } : null));
+      }, 30);
+      const tBack = window.setTimeout(() => {
+        setRollAnim((cur) => (cur ? { ...cur, phase: "back" } : null));
+        returnOrder.forEach((index, i) => {
+          const t = window.setTimeout(() => {
+            setRollAnim((cur) => {
+              if (!cur) return null;
+              if (cur.returned.includes(index)) return cur;
+              return { ...cur, returned: [...cur.returned, index] };
+            });
+          }, i * 130);
+          rollTimersRef.current.push(t);
+        });
+        const tDone = window.setTimeout(() => {
+          setRollAnim(null);
+        }, returnOrder.length * 130 + 320);
+        rollTimersRef.current.push(tDone);
+      }, 520);
+      rollTimersRef.current.push(tOut, tBack);
+      return;
+    }
+
+    if (!rollAnim) {
+      prevDiceRef.current = { rolls, order, locked };
+    }
+  }, [match.dice, sortedDice, rollAnim]);
+
+  useEffect(() => {
+    return () => {
+      for (const id of rollTimersRef.current) window.clearTimeout(id);
+    };
+  }, []);
 
   // Where everyone would sit if the leaderboard re-sorted on current totals right now.
   const predictedOrder = useMemo(
@@ -241,19 +373,6 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
     sheetMode === "current" ? match.active_player : mineSelection;
   const sheetPlayer =
     match.players.find((p) => p.name === sheetPlayerName) ?? match.players[0];
-
-  // Display faces low→high, but keep each die's original index for lock/Icarus actions.
-  const sortedDice = useMemo(() => {
-    if (!match.dice) return [];
-    return match.dice.values
-      .map((value, index) => ({
-        value,
-        index,
-        locked: match.dice!.locked[index],
-        kind: match.dice!.kinds?.[index] ?? "standard",
-      }))
-      .sort((a, b) => a.value - b.value || a.index - b.index);
-  }, [match.dice]);
 
   // Cancel die-targeting / block-arm modes if the turn leaves turn_start/active.
   useEffect(() => {
@@ -814,6 +933,92 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
       </aside>
 
       <main className="hud-table">
+        {match.forecaster_reveals && (
+          <div className="forecaster-panel">
+            <h3>Forecaster</h3>
+            {Object.entries(match.forecaster_reveals).map(([name, cards]) => (
+              <div key={name}>
+                <strong>{name}:</strong>{" "}
+                {cards.length === 0
+                  ? "no hindrances"
+                  : cards.map((id) => label(id)).join(", ")}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {match.dice && (
+          <div
+            className={`dice-tray ${aiming ? "targeting" : ""} ${
+              rollAnim ? "rolling" : ""
+            }`}
+          >
+            {trayDice.map(({ value, index, locked, kind }) => {
+              const psychicFace = match.psychic_previews?.[String(index)];
+              const picked = diePick?.picked.includes(index);
+              const kindClass = kind !== "standard" ? `die-${kind}` : "";
+              const flying =
+                Boolean(rollAnim?.flying.includes(index)) &&
+                !(rollAnim?.returned.includes(index) ?? false);
+              const scatter = rollAnim?.scatter[index];
+              const scattered =
+                flying &&
+                scatter &&
+                rollAnim &&
+                (rollAnim.phase === "out" || rollAnim.phase === "back");
+              const dieStyle =
+                scattered && scatter
+                  ? {
+                      transform: `translate(${scatter.x}px, ${scatter.y}px) rotate(${scatter.rot}deg)`,
+                    }
+                  : undefined;
+              return (
+                <div
+                  key={index}
+                  className={`die-slot ${flying ? "die-slot-flying" : ""}`}
+                >
+                  {psychicFace != null && !rollAnim && (
+                    <span
+                      className={`die die-psychic-preview ${kindClass}`}
+                      aria-hidden
+                    >
+                      {psychicFace}
+                    </span>
+                  )}
+                  <button
+                    type="button"
+                    className={`die ${locked ? "locked" : ""} ${kindClass} ${
+                      aiming ? "targetable" : ""
+                    } ${picked ? "picked" : ""} ${
+                      flying ? "die-fly" : ""
+                    } ${scattered ? "die-scattered" : ""} ${
+                      rollAnim?.returned.includes(index) ? "die-returned" : ""
+                    }`}
+                    style={dieStyle}
+                    disabled={!active || Boolean(rollAnim)}
+                    onClick={() => handleDieClick(index, locked)}
+                  >
+                    {value}
+                  </button>
+                </div>
+              );
+            })}
+            <span className="dice-meta">
+              {diePick?.mode === "score"
+                ? `Pick ${5 - diePick.picked.length} more die(s) to score ${label(diePick.category)}`
+                    : diePick?.mode === "twins"
+                      ? `Pick ${2 - diePick.picked.length} more: 1st is source, 2nd copies it`
+                      : diePick?.mode === "trading"
+                    ? `Pick ${2 - diePick.picked.length} more die(s) for ${label(diePick.cardId)}`
+                    : spaceArming
+                      ? `Click a die to set it to ${spaceFace}`
+                      : icarusArming
+                        ? "Click a die to bump"
+                        : `${match.dice.rolls_this_turn}/${match.dice.max_rolls} rolls`}
+            </span>
+          </div>
+        )}
+
         <div className="table-actions">
           {match.phase === "between_turns" && active && !match.is_over && (
             <button type="button" onClick={() => onAction({ type: "start_turn" })}>
@@ -838,7 +1043,7 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
               <button
                 type="button"
                 onClick={() => onAction({ type: "roll" })}
-                disabled={aiming || !match.dice}
+                disabled={aiming || !match.dice || Boolean(rollAnim)}
               >
                 Roll
               </button>
@@ -897,65 +1102,6 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
             </button>
           )}
         </div>
-
-        {match.forecaster_reveals && (
-          <div className="forecaster-panel">
-            <h3>Forecaster</h3>
-            {Object.entries(match.forecaster_reveals).map(([name, cards]) => (
-              <div key={name}>
-                <strong>{name}:</strong>{" "}
-                {cards.length === 0
-                  ? "no hindrances"
-                  : cards.map((id) => label(id)).join(", ")}
-              </div>
-            ))}
-          </div>
-        )}
-
-        {match.dice && (
-          <div className={`dice-tray ${aiming ? "targeting" : ""}`}>
-            {sortedDice.map(({ value, index, locked, kind }) => {
-              const psychicFace = match.psychic_previews?.[String(index)];
-              const picked = diePick?.picked.includes(index);
-              const kindClass = kind !== "standard" ? `die-${kind}` : "";
-              return (
-                <div key={index} className="die-slot">
-                  {psychicFace != null && (
-                    <span
-                      className={`die die-psychic-preview ${kindClass}`}
-                      aria-hidden
-                    >
-                      {psychicFace}
-                    </span>
-                  )}
-                  <button
-                    type="button"
-                    className={`die ${locked ? "locked" : ""} ${kindClass} ${
-                      aiming ? "targetable" : ""
-                    } ${picked ? "picked" : ""}`}
-                    disabled={!active}
-                    onClick={() => handleDieClick(index, locked)}
-                  >
-                    {value}
-                  </button>
-                </div>
-              );
-            })}
-            <span className="dice-meta">
-              {diePick?.mode === "score"
-                ? `Pick ${5 - diePick.picked.length} more die(s) to score ${label(diePick.category)}`
-                    : diePick?.mode === "twins"
-                      ? `Pick ${2 - diePick.picked.length} more: 1st is source, 2nd copies it`
-                      : diePick?.mode === "trading"
-                    ? `Pick ${2 - diePick.picked.length} more die(s) for ${label(diePick.cardId)}`
-                    : spaceArming
-                      ? `Click a die to set it to ${spaceFace}`
-                      : icarusArming
-                        ? "Click a die to bump"
-                        : `${match.dice.rolls_this_turn}/${match.dice.max_rolls} rolls`}
-            </span>
-          </div>
-        )}
       </main>
 
       <section className={`hud-cards ${cardsOpen ? "open" : "peek"}`}>
