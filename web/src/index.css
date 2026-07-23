@@ -499,9 +499,9 @@ select {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  /* Room above for scatter; actions sit under the dice above the card tray. */
-  padding: 5rem 1rem 15.5rem;
-  padding-top: max(5rem, 12vh);
+  /* Lower the dice + actions so more felt shows above for scatter. */
+  padding: 11rem 1rem 13.5rem;
+  padding-top: max(11rem, 30vh);
   pointer-events: none;
 }
 
@@ -594,7 +594,11 @@ select {
 }
 
 .die.die-returned {
-  transition: transform 0.3s cubic-bezier(0.18, 0.9, 0.28, 1.05);
+  transition: transform 0.32s cubic-bezier(0.18, 0.9, 0.28, 1.05);
+}
+
+.die.die-no-motion {
+  transition: none !important;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -806,30 +810,12 @@ select {
 }
 
 .fan-card.hindrance {
-  margin-left: 0.35rem;
-  width: auto;
-  min-width: 4.5rem;
-  height: auto;
-  min-height: 2.4rem;
-  background: #5a2f38;
+  background: linear-gradient(160deg, #7a3a44, #5a2f38);
   color: #ffe8e4;
 }
 
 .fan-card.hindrance.armed {
   box-shadow: 0 0 0 3px #f0c14a, 0 8px 18px rgba(0, 0, 0, 0.3);
-}
-
-.hindrance-cast {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.35rem;
-  align-items: center;
-  margin-top: 0.35rem;
-}
-
-.hindrance-cast select {
-  width: auto;
-  min-width: 7rem;
 }
 
 .empty-fan {

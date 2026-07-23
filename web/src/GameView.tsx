@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { cardBlurb, cardTipLabel } from "./cardCopy";
 import { Tip } from "./Tip";
 import type { CardInfo, MatchState, PlayerState, RoomState } from "./types";
@@ -13,14 +13,20 @@ type Props = {
 type DieScatter = { x: number; y: number; rot: number };
 
 type RollAnim = {
-  /** Pre-roll tray order (die indices). */
+  /** Current tray DOM order (pre-roll, then sorted for the snap-home). */
   order: number[];
   /** Indices that leave the tray (were unlocked). */
   flying: number[];
   scatter: Record<number, DieScatter>;
-  /** Dice that have snapped home again. */
+  /** FLIP invert transforms so dice stay visually on the felt after reorder. */
+  hold: Record<number, DieScatter>;
+  /** Screen positions measured just before switching to sorted order. */
+  firstRects: Record<number, { left: number; top: number }>;
+  /** Dice that have finished snapping into the sorted tray. */
   returned: number[];
-  phase: "prep" | "out" | "back";
+  phase: "prep" | "out" | "flip" | "back";
+  /** When true, CSS transitions run for the snap-home. */
+  animateHome: boolean;
 };
 
 function randomScatter(): DieScatter {
@@ -116,7 +122,7 @@ type DiePickMode =
   | { mode: "do_over"; picked: number[] };
 /** Armed card waiting for a leaderboard click to pick another player. */
 type PlayerTargetMode =
-  | { kind: "hindrance"; cardId: string }
+  | { kind: "hindrance"; cardId: string; slotIndex: number }
   | { kind: "helping_hand" };
 
 function formatScoreDelta(delta: number): string {
@@ -249,6 +255,9 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
     locked: boolean[];
   } | null>(null);
   const rollTimersRef = useRef<number[]>([]);
+  const rollRafRef = useRef<number[]>([]);
+  const dieElsRef = useRef<Map<number, HTMLButtonElement>>(new Map());
+  const flipHandledRef = useRef(false);
 
   // Display faces low→high, but keep each die's original index for lock/Icarus actions.
   const sortedDice = useMemo(() => {
@@ -278,7 +287,7 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
     return sortedDice;
   }, [match.dice, rollAnim, sortedDice]);
 
-  // Detect a new roll and run scatter → sequential snap-home (low face first).
+  // Detect a new roll: scatter unlocked dice, then FLIP-snap into sorted tray order.
   useEffect(() => {
     if (!match.dice) {
       prevDiceRef.current = null;
@@ -292,11 +301,13 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
     const prev = prevDiceRef.current;
 
     if (prev && rolls > prev.rolls) {
-      // Advance immediately so phase updates don't re-trigger this effect.
       prevDiceRef.current = { rolls, order: prev.order, locked: prev.locked };
 
       for (const id of rollTimersRef.current) window.clearTimeout(id);
       rollTimersRef.current = [];
+      for (const id of rollRafRef.current) window.cancelAnimationFrame(id);
+      rollRafRef.current = [];
+      flipHandledRef.current = false;
 
       const flying = prev.order.filter((index) => !(prev.locked[index] ?? false));
       if (flying.length === 0) {
@@ -305,7 +316,7 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
       const scatter: Record<number, DieScatter> = {};
       for (const index of flying) scatter[index] = randomScatter();
 
-      const returnOrder = [...flying].sort(
+      const sortedOrder = [...match.dice.values.keys()].sort(
         (a, b) =>
           match.dice!.values[a] - match.dice!.values[b] || a - b,
       );
@@ -314,15 +325,81 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
         order: prev.order,
         flying,
         scatter,
+        hold: {},
+        firstRects: {},
         returned: [],
         phase: "prep",
+        animateHome: false,
       });
 
       const tOut = window.setTimeout(() => {
         setRollAnim((cur) => (cur ? { ...cur, phase: "out" } : null));
       }, 30);
-      const tBack = window.setTimeout(() => {
-        setRollAnim((cur) => (cur ? { ...cur, phase: "back" } : null));
+
+      const tFlip = window.setTimeout(() => {
+        const firstRects: Record<number, { left: number; top: number }> = {};
+        for (const index of prev.order) {
+          const el = dieElsRef.current.get(index);
+          if (!el) continue;
+          const rect = el.getBoundingClientRect();
+          firstRects[index] = { left: rect.left, top: rect.top };
+        }
+        setRollAnim((cur) =>
+          cur
+            ? {
+                ...cur,
+                order: sortedOrder,
+                firstRects,
+                hold: {},
+                returned: [],
+                phase: "flip",
+                animateHome: false,
+              }
+            : null,
+        );
+      }, 520);
+
+      rollTimersRef.current.push(tOut, tFlip);
+      return;
+    }
+
+    if (!rollAnim) {
+      prevDiceRef.current = { rolls, order, locked };
+    }
+  }, [match.dice, sortedDice, rollAnim]);
+
+  // After tray reorders to sorted, invert transforms so dice stay on the felt, then snap home L→H.
+  useLayoutEffect(() => {
+    if (!rollAnim || rollAnim.phase !== "flip" || !match.dice) return;
+    if (flipHandledRef.current) return;
+    flipHandledRef.current = true;
+
+    const hold: Record<number, DieScatter> = {};
+    for (const index of rollAnim.order) {
+      const el = dieElsRef.current.get(index);
+      const first = rollAnim.firstRects[index];
+      if (!el || !first) continue;
+      const last = el.getBoundingClientRect();
+      hold[index] = {
+        x: first.left - last.left,
+        y: first.top - last.top,
+        rot: rollAnim.scatter[index]?.rot ?? 0,
+      };
+    }
+
+    const returnOrder = [...rollAnim.order];
+
+    setRollAnim((cur) =>
+      cur && cur.phase === "flip"
+        ? { ...cur, hold, phase: "back", animateHome: false }
+        : cur,
+    );
+
+    const frame = window.requestAnimationFrame(() => {
+      const play = window.requestAnimationFrame(() => {
+        setRollAnim((cur) =>
+          cur && cur.phase === "back" ? { ...cur, animateHome: true } : cur,
+        );
         returnOrder.forEach((index, i) => {
           const t = window.setTimeout(() => {
             setRollAnim((cur) => {
@@ -335,21 +412,18 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
         });
         const tDone = window.setTimeout(() => {
           setRollAnim(null);
-        }, returnOrder.length * 130 + 320);
+        }, returnOrder.length * 130 + 340);
         rollTimersRef.current.push(tDone);
-      }, 520);
-      rollTimersRef.current.push(tOut, tBack);
-      return;
-    }
-
-    if (!rollAnim) {
-      prevDiceRef.current = { rolls, order, locked };
-    }
-  }, [match.dice, sortedDice, rollAnim]);
+      });
+      rollRafRef.current.push(play);
+    });
+    rollRafRef.current.push(frame);
+  }, [rollAnim, match.dice]);
 
   useEffect(() => {
     return () => {
       for (const id of rollTimersRef.current) window.clearTimeout(id);
+      for (const id of rollRafRef.current) window.cancelAnimationFrame(id);
     };
   }, []);
 
@@ -551,10 +625,11 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
     onAction({ type: "cast_power", card_id: card.id });
   }
 
-  function castHindrance(card: CardInfo) {
+  function castHindrance(card: CardInfo, slotIndex: number) {
     if (
       playerTarget?.kind === "hindrance" &&
-      playerTarget.cardId === card.id
+      playerTarget.cardId === card.id &&
+      playerTarget.slotIndex === slotIndex
     ) {
       clearAiming();
       return;
@@ -564,7 +639,7 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
       onAction({ type: "cast_hindrance", card_id: card.id });
       return;
     }
-    armPlayerTarget({ kind: "hindrance", cardId: card.id });
+    armPlayerTarget({ kind: "hindrance", cardId: card.id, slotIndex });
   }
 
   function requestScore(category: string) {
@@ -672,11 +747,9 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
     Boolean(diePick) ||
     Boolean(blockArming) ||
     Boolean(playerTarget);
-  const powerCards = me?.power_cards.filter((c) => !HINDRANCE_IDS.has(c.id)) ?? [];
+  const powerFanCards = me?.power_cards ?? [];
   const showParryReadyChip =
-    Boolean(me?.parry_ready) && !powerCards.some((c) => c.id === "parry");
-  const hindranceCards =
-    me?.power_cards.filter((c) => HINDRANCE_IDS.has(c.id)) ?? [];
+    Boolean(me?.parry_ready) && !powerFanCards.some((c) => c.id === "parry");
   const tradingCards = me?.trading_cards ?? [];
   const myPlace =
     rankedPlayers.findIndex((p) => p.name === playerName) + 1 || null;
@@ -957,25 +1030,30 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
               const psychicFace = match.psychic_previews?.[String(index)];
               const picked = diePick?.picked.includes(index);
               const kindClass = kind !== "standard" ? `die-${kind}` : "";
-              const flying =
-                Boolean(rollAnim?.flying.includes(index)) &&
-                !(rollAnim?.returned.includes(index) ?? false);
+              const isFlying = Boolean(rollAnim?.flying.includes(index));
+              const isReturned = Boolean(rollAnim?.returned.includes(index));
               const scatter = rollAnim?.scatter[index];
-              const scattered =
-                flying &&
-                scatter &&
-                rollAnim &&
-                (rollAnim.phase === "out" || rollAnim.phase === "back");
-              const dieStyle =
-                scattered && scatter
-                  ? {
-                      transform: `translate(${scatter.x}px, ${scatter.y}px) rotate(${scatter.rot}deg)`,
-                    }
-                  : undefined;
+              const hold = rollAnim?.hold[index];
+              const phase = rollAnim?.phase;
+              let pose: DieScatter | null = null;
+              if (rollAnim && !isReturned) {
+                if (phase === "out" && isFlying && scatter) {
+                  pose = scatter;
+                } else if ((phase === "flip" || phase === "back") && hold) {
+                  pose = hold;
+                }
+              }
+              const dieStyle = pose
+                ? {
+                    transform: `translate(${pose.x}px, ${pose.y}px) rotate(${pose.rot}deg)`,
+                  }
+                : undefined;
               return (
                 <div
                   key={index}
-                  className={`die-slot ${flying ? "die-slot-flying" : ""}`}
+                  className={`die-slot ${
+                    isFlying && !isReturned ? "die-slot-flying" : ""
+                  }`}
                 >
                   {psychicFace != null && !rollAnim && (
                     <span
@@ -987,12 +1065,18 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
                   )}
                   <button
                     type="button"
+                    ref={(el) => {
+                      if (el) dieElsRef.current.set(index, el);
+                      else dieElsRef.current.delete(index);
+                    }}
                     className={`die ${locked ? "locked" : ""} ${kindClass} ${
                       aiming ? "targetable" : ""
                     } ${picked ? "picked" : ""} ${
-                      flying ? "die-fly" : ""
-                    } ${scattered ? "die-scattered" : ""} ${
-                      rollAnim?.returned.includes(index) ? "die-returned" : ""
+                      rollAnim ? "die-fly" : ""
+                    } ${pose ? "die-scattered" : ""} ${
+                      isReturned ? "die-returned" : ""
+                    } ${
+                      rollAnim && !rollAnim.animateHome ? "die-no-motion" : ""
                     }`}
                     style={dieStyle}
                     disabled={!active || Boolean(rollAnim)}
@@ -1062,7 +1146,7 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
                   </select>
                 </label>
               )}
-              {(powerCards.some((c) => c.id === "helping_hand") ||
+              {(powerFanCards.some((c) => c.id === "helping_hand") ||
                 playerTarget?.kind === "helping_hand") && (
                 <label className="face-picker">
                   Helping hand
@@ -1159,12 +1243,23 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
           <div className="card-tray power-tray">
             <span className="tray-label">Power</span>
             <div className="fan">
-              {powerCards.length === 0 && (
+              {powerFanCards.length === 0 && !showParryReadyChip && (
                 <span className="empty-fan muted">Empty</span>
               )}
-              {powerCards.map((card, i) => {
+              {powerFanCards.map((card, i) => {
+                const isHindrance = HINDRANCE_IDS.has(card.id);
                 const status = conditionStatus(card.id, me, match.rotation_count);
                 const cd = cooldownTurnsLeft(card.id, me);
+                const armed = isHindrance
+                  ? playerTarget?.kind === "hindrance" &&
+                    playerTarget.cardId === card.id &&
+                    playerTarget.slotIndex === i
+                  : (card.id === "icarus" && icarusArming) ||
+                    (card.id === "space_die" && spaceArming) ||
+                    (card.id === "twins" && diePick?.mode === "twins") ||
+                    (card.id === "parry" && blockArming === "parry") ||
+                    (card.id === "helping_hand" &&
+                      playerTarget?.kind === "helping_hand");
                 return (
                 <Tip
                   key={`p-${card.id}-${i}`}
@@ -1173,34 +1268,30 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
                 >
                   <button
                     type="button"
-                    className={`fan-card power ${
-                      (card.id === "icarus" && icarusArming) ||
-                      (card.id === "space_die" && spaceArming) ||
-                      (card.id === "twins" && diePick?.mode === "twins") ||
-                      (card.id === "parry" && blockArming === "parry") ||
-                      (card.id === "helping_hand" &&
-                        playerTarget?.kind === "helping_hand")
-                        ? "armed"
-                        : ""
+                    className={`fan-card ${isHindrance ? "hindrance" : "power"} ${
+                      armed ? "armed" : ""
                     } ${cd > 0 ? "on-cooldown" : ""} ${
                       status === "DORMANT" ? "dormant" : ""
                     }`}
                     disabled={
                       !active ||
-                      card.id === "do_over" ||
-                      (card.id === "parry"
-                        ? match.phase !== "turn_start" ||
-                          !canArmParry ||
-                          myDebuffs.length === 0
-                        : (card.id === "icarus" ||
-                            card.id === "space_die" ||
-                            card.id === "twins" ||
-                            card.id === "super_serum" ||
-                            card.id === "benchwarmer" ||
-                            card.id === "boolean") &&
-                          !match.dice)
+                      (!isHindrance &&
+                        (card.id === "do_over" ||
+                          (card.id === "parry"
+                            ? match.phase !== "turn_start" ||
+                              !canArmParry ||
+                              myDebuffs.length === 0
+                            : (card.id === "icarus" ||
+                                card.id === "space_die" ||
+                                card.id === "twins" ||
+                                card.id === "super_serum" ||
+                                card.id === "benchwarmer" ||
+                                card.id === "boolean") &&
+                              !match.dice)))
                     }
-                    onClick={() => castPower(card)}
+                    onClick={() =>
+                      isHindrance ? castHindrance(card, i) : castPower(card)
+                    }
                     style={{ zIndex: i + 1 }}
                   >
                     <CardFace
@@ -1226,42 +1317,13 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
                       clearAiming();
                       setBlockArming("parry");
                     }}
-                    style={{ zIndex: powerCards.length + 1 }}
+                    style={{ zIndex: powerFanCards.length + 1 }}
                   >
                     parry
                   </button>
                 </Tip>
               )}
             </div>
-            {active && hindranceCards.length > 0 && (
-              <div className="hindrance-cast">
-                {hindranceCards.map((card, i) => {
-                  const status = conditionStatus(card.id, me, match.rotation_count);
-                  return (
-                  <Tip key={`h-${card.id}-${i}`} text={tipText(card.id, card.transparent)}>
-                    <button
-                      type="button"
-                      className={`fan-card hindrance ${
-                        status === "DORMANT" ? "dormant" : ""
-                      } ${
-                        playerTarget?.kind === "hindrance" &&
-                        playerTarget.cardId === card.id
-                          ? "armed"
-                          : ""
-                      }`}
-                      onClick={() => castHindrance(card)}
-                    >
-                      <CardFace
-                        cardId={card.id}
-                        me={me}
-                        rotationCount={match.rotation_count}
-                      />
-                    </button>
-                  </Tip>
-                  );
-                })}
-              </div>
-            )}
           </div>
 
           <div className="card-tray trading-tray">
