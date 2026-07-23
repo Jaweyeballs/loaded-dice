@@ -10,21 +10,60 @@ type Props = {
   onLeave: () => void;
 };
 
-const CATEGORIES = [
-  "ones",
-  "twos",
-  "threes",
-  "fours",
-  "fives",
-  "sixes",
-  "three_of_a_kind",
-  "four_of_a_kind",
-  "full_house",
-  "small_straight",
-  "large_straight",
-  "yahtzee",
-  "chance",
+/** Scoresheet row order — includes summary rows that are not scoreable categories. */
+type SheetRow =
+  | { kind: "category"; id: string }
+  | { kind: "summary"; id: string };
+
+const SHEET_ROWS: SheetRow[] = [
+  { kind: "category", id: "ones" },
+  { kind: "category", id: "twos" },
+  { kind: "category", id: "threes" },
+  { kind: "category", id: "fours" },
+  { kind: "category", id: "fives" },
+  { kind: "category", id: "sixes" },
+  { kind: "summary", id: "bonus" },
+  { kind: "summary", id: "top_half_total" },
+  { kind: "category", id: "three_of_a_kind" },
+  { kind: "category", id: "four_of_a_kind" },
+  { kind: "category", id: "full_house" },
+  { kind: "category", id: "small_straight" },
+  { kind: "category", id: "large_straight" },
+  { kind: "category", id: "yahtzee" },
+  { kind: "category", id: "chance" },
+  { kind: "summary", id: "yahtzee_bonus" },
+  { kind: "summary", id: "lower_half_total" },
+  { kind: "summary", id: "total" },
 ];
+
+const CATEGORY_HOVER: Record<string, string> = {
+  ones: "count and add only ones",
+  twos: "count and add only twos",
+  threes: "count and add only threes",
+  fours: "count and add only fours",
+  fives: "count and add only fives",
+  sixes: "count and add only sixes",
+  bonus: "if total score is 63 or over; 35 points",
+  top_half_total: "total of top half scores",
+  three_of_a_kind: "add total of all dice",
+  four_of_a_kind: "add total of all dice",
+  full_house: "pair and 3 of a kind; 25 points",
+  small_straight: "4 in a row; 30 points",
+  large_straight: "5 in a row; 40 points",
+  yahtzee: "6 if a kind; score 50",
+  chance: "add total of all dice",
+  yahtzee_bonus: "100 points per extra yahtzee",
+  lower_half_total: "total of lower half scores",
+  total: "total of all scores",
+};
+
+const SUMMARY_LABELS: Record<string, string> = {
+  bonus: "bonus",
+  top_half_total: "top half total",
+  yahtzee_bonus: "yahtzee bonus",
+  lower_half_total: "lower half total",
+  total: "total",
+};
 
 const HINDRANCE_IDS = new Set([
   "glass_half_empty",
@@ -1191,6 +1230,27 @@ function ScoreSheetTable({
   onScore: (category: string) => void;
   onDoOver: () => void;
 }) {
+  function summaryScore(id: string): string {
+    if (id === "bonus") {
+      const bonus = player.upper_bonus ?? 0;
+      return bonus > 0 ? String(bonus) : "—";
+    }
+    if (id === "top_half_total") {
+      return String(player.upper_subtotal ?? 0);
+    }
+    if (id === "lower_half_total") {
+      return String(player.lower_subtotal ?? 0);
+    }
+    if (id === "total") {
+      return String(player.sheet_total ?? player.total_score);
+    }
+    if (id === "yahtzee_bonus") {
+      const count = player.yahtzee_bonus_count ?? 0;
+      return count > 0 ? "X".repeat(count) : "—";
+    }
+    return "—";
+  }
+
   return (
     <table className="sheet">
       <thead>
@@ -1202,23 +1262,45 @@ function ScoreSheetTable({
         </tr>
       </thead>
       <tbody>
-        {CATEGORIES.map((category) => {
+        {SHEET_ROWS.map((row) => {
+          if (row.kind === "summary") {
+            const tip = CATEGORY_HOVER[row.id] ?? "";
+            return (
+              <tr key={row.id} className="sheet-summary-row">
+                <td>
+                  <Tip text={tip}>
+                    <span className="sheet-cat-name">
+                      {SUMMARY_LABELS[row.id] ?? label(row.id)}
+                    </span>
+                  </Tip>
+                </td>
+                <td>{summaryScore(row.id)}</td>
+                <td className="muted" />
+                <td />
+              </tr>
+            );
+          }
+
+          const category = row.id;
           const filled = player.sheet[category];
           const preview = previews?.[category];
           const open = filled == null;
           const isDoOverTarget =
             doOverPreview != null && doOverPreview.category === category;
+          const tip = CATEGORY_HOVER[category] ?? "";
           return (
             <tr
               key={category}
               className={isDoOverTarget ? "do-over-row" : undefined}
             >
-              <td>{label(category)}</td>
+              <td>
+                <Tip text={tip}>
+                  <span className="sheet-cat-name">{label(category)}</span>
+                </Tip>
+              </td>
               <td>{filled == null ? "—" : filled}</td>
               <td
-                className={
-                  isDoOverTarget ? "do-over-preview" : "muted"
-                }
+                className={isDoOverTarget ? "do-over-preview" : "muted"}
                 title={isDoOverTarget ? "use do over?" : undefined}
               >
                 {isDoOverTarget

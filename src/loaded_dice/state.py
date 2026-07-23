@@ -11,7 +11,7 @@ from loaded_dice.card_effects.positive_power import (
 )
 from loaded_dice.match import Match, Player
 from loaded_dice.preview import best_score_hand, preview_scores
-from loaded_dice.scoring import Category, is_yahtzee
+from loaded_dice.scoring import Category, YAHTZEE_BONUS_POINTS, is_yahtzee
 
 
 def serialize_card(card) -> dict[str, Any]:
@@ -39,6 +39,15 @@ def serialize_player(player: Player, match: Match) -> dict[str, Any]:
             if player.last_scored_category is not None
             else None
         ),
+        "upper_subtotal": player.current_sheet.upper_subtotal(),
+        "upper_bonus": player.current_sheet.upper_bonus(),
+        "lower_subtotal": player.current_sheet.lower_subtotal(),
+        "yahtzee_bonus_count": (
+            player.current_sheet.yahtzee_bonuses // YAHTZEE_BONUS_POINTS
+            if player.current_sheet.yahtzee_bonuses
+            else 0
+        ),
+        "sheet_total": player.current_sheet.grand_total(),
         "power_cards": [serialize_card(c) for c in player.inventory.power_cards],
         "trading_cards": [serialize_card(c) for c in player.inventory.trading_cards],
         "queued_hindrances": [

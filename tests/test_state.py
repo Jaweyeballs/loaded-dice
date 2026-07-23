@@ -13,9 +13,39 @@ def test_serialize_match_basic_shape():
     assert len(state["players"]) == 2
     assert state["players"][0]["chips"] == 500
     assert state["players"][0]["score_delta"] == 0
+    assert state["players"][0]["upper_subtotal"] == 0
+    assert state["players"][0]["upper_bonus"] == 0
+    assert state["players"][0]["lower_subtotal"] == 0
+    assert state["players"][0]["yahtzee_bonus_count"] == 0
+    assert state["players"][0]["sheet_total"] == 0
     assert state["leaderboard_order"] == ["Alice", "Bob"]
     assert state["dice"] is None
     assert "shop" in state
+
+
+def test_serialize_sheet_bonus_fields():
+    from loaded_dice.scoring import Category
+
+    match = Match(["Alice"])
+    alice = match.players[0]
+    sheet = alice.current_sheet
+    for category, points in (
+        (Category.ONES, 3),
+        (Category.TWOS, 6),
+        (Category.THREES, 9),
+        (Category.FOURS, 12),
+        (Category.FIVES, 15),
+        (Category.SIXES, 18),
+    ):
+        sheet._scores[category] = points
+    sheet.yahtzee_bonuses = 200
+
+    state = serialize_match(match)
+    player = state["players"][0]
+    assert player["upper_subtotal"] == 63
+    assert player["upper_bonus"] == 35
+    assert player["yahtzee_bonus_count"] == 2
+    assert player["sheet_total"] == 63 + 35 + 200
 
 
 def test_score_delta_and_leaderboard_freeze_mid_rotation():

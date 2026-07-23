@@ -883,6 +883,16 @@ select {
   background: #246859;
 }
 
+.sheet-cat-name {
+  cursor: help;
+  border-bottom: 1px dotted color-mix(in srgb, var(--ink) 35%, transparent);
+}
+
+.sheet tr.sheet-summary-row td {
+  font-weight: 600;
+  color: var(--ink-soft);
+}
+
 .tip-wrap {
   position: relative;
   display: inline-flex;

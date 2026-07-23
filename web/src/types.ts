@@ -14,6 +14,13 @@ export type PlayerState = {
   sheet: Record<string, number | null>;
   /** Last category filled by scoring (for Do over). */
   last_scored_category?: string | null;
+  upper_subtotal?: number;
+  upper_bonus?: number;
+  lower_subtotal?: number;
+  /** Number of +100 Yahtzee bonuses earned on this sheet. */
+  yahtzee_bonus_count?: number;
+  /** Current sheet grand total (upper + bonus + lower + yahtzee bonuses). */
+  sheet_total?: number;
   power_cards: CardInfo[];
   trading_cards: CardInfo[];
   queued_hindrances: { card_id: string; caster_name: string }[];
