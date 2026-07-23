@@ -89,8 +89,10 @@ class DiceSet:
         self.standard_max_rolls = max_rolls
         self.max_rolls = max_rolls
         self.rolls_this_turn = 0
-        # Psychic / Twins: next unlocked roll for these indices uses the queued face.
+        # Psychic: next unlocked roll for these indices uses the queued face.
         self._forced_next_values: dict[int, int] = {}
+        # Twins: follower_index → leader_index; follower copies leader on next roll.
+        self._twins_links: dict[int, int] = {}
 
     def grant_extra_rolls(self, count: int = 1) -> None:
         """Increase the per-turn roll limit (e.g. The Gambler, The Toddler)."""
@@ -111,7 +113,7 @@ class DiceSet:
         return len(self.dice) - 1
 
     def queue_forced_roll(self, index: int, value: int) -> None:
-        """Force the next roll of die *index* to *value* (Psychic / Twins)."""
+        """Force the next roll of die *index* to *value* (Psychic)."""
         if index < 0 or index >= len(self.dice):
             raise IndexError(f"Invalid die index: {index}")
         die = self.dice[index]
@@ -119,9 +121,24 @@ class DiceSet:
             raise ValueError(f"Face {value} not on die faces {die.faces}")
         self._forced_next_values[index] = value
 
+    def queue_twins(self, leader_index: int, follower_index: int) -> None:
+        """On the next roll, *follower* becomes whatever *leader* shows."""
+        size = len(self.dice)
+        if leader_index < 0 or leader_index >= size:
+            raise IndexError(f"Invalid die index: {leader_index}")
+        if follower_index < 0 or follower_index >= size:
+            raise IndexError(f"Invalid die index: {follower_index}")
+        if leader_index == follower_index:
+            raise ValueError("Twins requires two different dice")
+        self._twins_links[follower_index] = leader_index
+
     @property
     def forced_next_values(self) -> dict[int, int]:
         return dict(self._forced_next_values)
+
+    @property
+    def twins_links(self) -> dict[int, int]:
+        return dict(self._twins_links)
 
     def roll(self) -> list[int]:
         """Roll all unlocked dice. Raises TooManyRollsError past the per-turn limit."""
@@ -130,14 +147,29 @@ class DiceSet:
                 f"Already rolled {self.rolls_this_turn} times this turn "
                 f"(max {self.max_rolls})."
             )
+        twins = dict(self._twins_links)
+        self._twins_links.clear()
         for index, die in enumerate(self.dice):
             if die.locked:
+                continue
+            # Twins followers skip their own roll; they copy the leader after.
+            if index in twins:
                 continue
             forced = self._forced_next_values.pop(index, None)
             if forced is not None:
                 die.value = forced
             else:
                 die.roll()
+        for follower_index, leader_index in twins.items():
+            follower = self.dice[follower_index]
+            if follower.locked:
+                continue
+            face = self.dice[leader_index].value
+            if face in follower.faces:
+                follower.value = face
+            else:
+                # Leader face not on follower (e.g. Boolean blanks) — roll normally.
+                follower.roll()
         self.rolls_this_turn += 1
         return self.values
 
@@ -155,6 +187,7 @@ class DiceSet:
         """Unlock every die and reset the roll counter — call at the start of each turn."""
         self.rolls_this_turn = 0
         self._forced_next_values.clear()
+        self._twins_links.clear()
         for die in self.dice:
             die.locked = False
 

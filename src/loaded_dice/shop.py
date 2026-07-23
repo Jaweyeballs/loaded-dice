@@ -48,6 +48,9 @@ DEFAULT_STOCK_IDS: tuple[CardId, ...] = (
     CardId.MERCHANT,
 )
 
+# Temporary testing override: None = entire catalog in stock. Set back to 3 later.
+SHOP_STOCK_SIZE: int | None = None
+
 
 class ShopError(Exception):
     """Raised when a shop action is invalid."""
@@ -59,8 +62,15 @@ class ShopOffer:
     price: int
 
 
+def _offers_for_ids(card_ids: list[CardId] | tuple[CardId, ...]) -> list[ShopOffer]:
+    return [ShopOffer(card_id, CARD_PRICES[card_id]) for card_id in card_ids]
+
+
 def default_stock() -> list[ShopOffer]:
-    return [ShopOffer(card_id, CARD_PRICES[card_id]) for card_id in DEFAULT_STOCK_IDS]
+    """Initial shop stock. Full catalog while SHOP_STOCK_SIZE is None (testing)."""
+    if SHOP_STOCK_SIZE is None:
+        return _offers_for_ids(tuple(CARD_PRICES.keys()))
+    return _offers_for_ids(DEFAULT_STOCK_IDS[:SHOP_STOCK_SIZE])
 
 
 @dataclass
@@ -99,5 +109,8 @@ class Shop:
         player.spend_chips(self.reroll_cost)
         pool = list(CARD_DEFS.keys())
         random.shuffle(pool)
-        self.stock = [ShopOffer(card_id, CARD_PRICES[card_id]) for card_id in pool[:3]]
+        if SHOP_STOCK_SIZE is None:
+            self.stock = _offers_for_ids(pool)
+        else:
+            self.stock = _offers_for_ids(pool[:SHOP_STOCK_SIZE])
         return self.stock

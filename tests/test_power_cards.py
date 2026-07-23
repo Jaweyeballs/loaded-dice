@@ -77,15 +77,23 @@ def test_helping_hand_chips_choice():
     assert bob.turn_effects.score_bonus == 10
 
 
-def test_twins_queue_matching_faces():
+def test_twins_second_copies_first_on_next_roll():
     match = Match(["Alice"])
     match.players[0].inventory.add_power(card_for_id(CardId.TWINS))
     _begin_active_turn(match)
     match.roll()
     match.cast_power_card(CardId.TWINS, die_indices=[0, 1])
     assert match.dice is not None
-    forced = match.dice.forced_next_values
-    assert forced[0] == forced[1]
+    assert match.dice.twins_links == {1: 0}
+    for i in range(5):
+        match.unlock(i)
+    match.dice.dice[0].value = 2
+    # Force leader's next roll so we know the copied face.
+    match.dice.queue_forced_roll(0, 5)
+    match.roll()
+    assert match.dice.values[0] == 5
+    assert match.dice.values[1] == 5
+    assert match.dice.twins_links == {}
 
 
 def test_do_over_overwrites_matching_hand():

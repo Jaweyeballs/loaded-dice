@@ -854,9 +854,9 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
             <span className="dice-meta">
               {diePick?.mode === "score"
                 ? `Pick ${5 - diePick.picked.length} more die(s) to score ${label(diePick.category)}`
-                : diePick?.mode === "twins"
-                  ? `Pick ${2 - diePick.picked.length} more die(s) for twins`
-                  : diePick?.mode === "trading"
+                    : diePick?.mode === "twins"
+                      ? `Pick ${2 - diePick.picked.length} more: 1st is source, 2nd copies it`
+                      : diePick?.mode === "trading"
                     ? `Pick ${2 - diePick.picked.length} more die(s) for ${label(diePick.cardId)}`
                     : spaceArming
                       ? `Click a die to set it to ${spaceFace}`

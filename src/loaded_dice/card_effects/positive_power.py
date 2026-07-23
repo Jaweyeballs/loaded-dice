@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import random
 from typing import TYPE_CHECKING, Callable
 
 from loaded_dice.cards import Card, CardId, CardKind
@@ -94,12 +93,11 @@ def _twins_on_cast(player: Player, match: Match, **kwargs) -> None:
         raise ValueError("Twins die indices must be unique")
     if match.dice is None:
         raise ValueError("No dice set for this turn")
-    face = random.randint(1, 6)
-    for index in indices:
-        try:
-            match.dice.queue_forced_roll(int(index), face)
-        except (IndexError, ValueError) as exc:
-            raise ValueError(str(exc)) from exc
+    leader, follower = int(indices[0]), int(indices[1])
+    try:
+        match.dice.queue_twins(leader, follower)
+    except (IndexError, ValueError) as exc:
+        raise ValueError(str(exc)) from exc
 
 
 def _space_die_on_cast(player: Player, match: Match, **kwargs) -> None:
