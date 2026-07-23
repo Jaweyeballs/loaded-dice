@@ -109,13 +109,28 @@ def _helping_hand_on_cast(player: Player, match: Match, **kwargs) -> None:
 
 
 def _twins_on_cast(player: Player, match: Match, **kwargs) -> None:
+    """Link two dice so the follower copies the source on the next roll involving them.
+
+    Does not consume the card — consumption happens when the link resolves on a roll.
+    Passing no die_indices while a link is active cancels the link.
+    """
     indices = kwargs.get("die_indices")
-    if indices is None or len(indices) != 2:
+    if match.dice is None:
+        raise ValueError("No dice set for this turn")
+    if match.dice.rolls_this_turn < 1:
+        raise ValueError("Roll at least once before using Twins")
+
+    # Cancel existing link (card stays in inventory).
+    if not indices:
+        if not match.dice.twins_links:
+            raise ValueError("Twins requires exactly 2 die_indices")
+        match.dice.clear_twins()
+        return
+
+    if len(indices) != 2:
         raise ValueError("Twins requires exactly 2 die_indices")
     if len(set(indices)) != 2:
         raise ValueError("Twins die indices must be unique")
-    if match.dice is None:
-        raise ValueError("No dice set for this turn")
     leader, follower = int(indices[0]), int(indices[1])
     try:
         match.dice.queue_twins(leader, follower)

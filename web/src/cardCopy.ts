@@ -17,7 +17,7 @@ export const CARD_BLURBS: Record<string, string> = {
   benchwarmer: "Add an extra die (faces 1–3). Pick 5 dice when scoring.",
   helping_hand:
     "Take 400 chips or +10 on this hand; the other goes to a chosen player.",
-  twins: "Choose 2 dice; the second rolls the same value as the first on the next roll.",
+  twins: "Link 2 dice; on the next roll the 2nd copies the 1st. Click again to cancel. Consumed when the link is rolled.",
   space_die: "Set one die to any face it can show.",
   boolean: "Add a 6/blank die for the rest of this turn. Pick 5 when scoring.",
   write_off: "End your turn without scoring.",

@@ -76,7 +76,7 @@ Permanent boosts with drawbacks, picked at the start of a run/match.
 | Negative reinforcement | If you attacked no one last rotation, gain a *transparent* Parry |
 | Benchwarmer | Roll an extra die alongside normal dice this roll (limited to values 1–3); select 5 dice for scoring |
 | Helping hand | Choose: gain **400** chips, or gain 10 points on this hand — whichever you don't pick goes to another player of your choice |
-| Twins | Choose 2 dice; the second rolls the same value as the first on the next roll |
+| Twins | Link 2 dice (1st = source). On the next roll involving that link, the 2nd copies the 1st. Click the card again to cancel. Consumed only when the link resolves on a roll (including Toddler). |
 | Space die | Choose a die and set it to any value it could show |
 | Boolean | Roll an extra die alongside normal dice for the rest of the round (3 six-faces, 3 blank/0 faces); select 5 dice for scoring |
 | Write off | End this turn without scoring a hand |

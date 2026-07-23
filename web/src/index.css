@@ -586,7 +586,7 @@ select {
 }
 
 .die.die-fly {
-  transition: transform 0.48s cubic-bezier(0.22, 0.82, 0.28, 1);
+  transition: transform 0.55s cubic-bezier(0.22, 0.82, 0.28, 1);
 }
 
 .die.die-scattered {
@@ -654,6 +654,23 @@ select {
 .die.picked {
   outline: 3px solid #7ec8ff;
   outline-offset: 1px;
+}
+
+.die.die-twins {
+  outline: 3px solid #3b82f6;
+  outline-offset: 2px;
+  box-shadow: 0 4px 0 #c4b8a6, 0 0 0 1px color-mix(in srgb, #3b82f6 55%, transparent),
+    0 8px 16px rgba(0, 0, 0, 0.25);
+}
+
+.die.die-twins.die-benchwarmer {
+  box-shadow: 0 4px 0 #1e4f86, 0 0 0 1px color-mix(in srgb, #3b82f6 55%, transparent),
+    0 8px 16px rgba(0, 0, 0, 0.28);
+}
+
+.die.die-twins.die-boolean {
+  box-shadow: 0 4px 0 #000000, 0 0 0 1px color-mix(in srgb, #3b82f6 55%, transparent),
+    0 8px 16px rgba(0, 0, 0, 0.4);
 }
 
 .dice-meta {

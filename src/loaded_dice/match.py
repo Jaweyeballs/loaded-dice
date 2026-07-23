@@ -198,7 +198,20 @@ class Match:
 
     @property
     def psychic_previews(self) -> dict[int, int]:
-        return dict(self._psychic_previews)
+        """Psychic ghosts for the HUD, including Twins mirror from source → follower."""
+        previews = dict(self._psychic_previews)
+        if self._dice is None:
+            return previews
+        for follower, leader in self._dice.twins_links.items():
+            if leader in self._psychic_previews:
+                previews[follower] = self._psychic_previews[leader]
+        return previews
+
+    @property
+    def twins_links(self) -> dict[int, int]:
+        if self._dice is None:
+            return {}
+        return self._dice.twins_links
 
     @property
     def toddler_used_this_turn(self) -> bool:
@@ -367,12 +380,16 @@ class Match:
             raise WrongPhaseError(f"Cannot roll during {self.phase.value}")
         if self._dice is None:
             raise WrongPhaseError("No dice set for this turn")
+        had_twins = bool(self._dice.twins_links)
         values = self._dice.roll()
+        # Drop Psychic ghosts for dice that no longer have a pending forced face.
         self._psychic_previews = {
             index: face
             for index, face in self._psychic_previews.items()
             if index in self._dice.forced_next_values
         }
+        if had_twins:
+            self._consume_twins_card()
         return values
 
     def lock(self, index: int) -> None:
@@ -467,9 +484,32 @@ class Match:
         assert self._dice is not None
         if self._dice.rolls_this_turn < 1:
             raise ValueError("Roll at least once before using Toddler")
+
+        twins = dict(self._dice.twins_links)
+        linked = self._dice.linked_twin_indices()
+        resolves_twins = bool(linked.intersection(chosen))
+        followers = set(twins)
+
         for index in chosen:
+            # Follower copies the source after leaders (and non-linked dice) roll.
+            if index in followers and resolves_twins:
+                continue
             self._dice.roll_die_now(index)
             self._psychic_previews.pop(index, None)
+
+        if resolves_twins:
+            for follower, leader in twins.items():
+                face = self._dice.dice[leader].value
+                follower_die = self._dice.dice[follower]
+                if face in follower_die.faces:
+                    follower_die.value = face
+                elif follower in chosen:
+                    self._dice.roll_die_now(follower)
+                self._psychic_previews.pop(follower, None)
+                self._psychic_previews.pop(leader, None)
+            self._dice.clear_twins()
+            self._consume_twins_card()
+
         self._toddler_used_this_turn = True
 
     def _activate_psychic(self, die_indices: list[int] | None) -> None:
@@ -482,11 +522,25 @@ class Match:
             raise ValueError("Roll at least once before using Psychic")
         previews: dict[int, int] = {}
         for index in chosen:
-            face = random.randint(1, 6)
+            die = self._dice.dice[index]
+            face = random.choice(die.faces)
             self._dice.queue_forced_roll(index, face)
             previews[index] = face
         self._psychic_previews.update(previews)
         self._psychic_used_this_turn = True
+
+    def _consume_twins_card(self) -> None:
+        """Spend one Twins after a link resolves on a roll."""
+        try:
+            self.active_player.inventory.consume_power_by_id(CardId.TWINS)
+        except CardNotInInventoryError:
+            # Link can exist only if a card was present when cast; ignore if already gone.
+            pass
+
+    def _clear_twins_without_consuming(self) -> None:
+        """Cancel an unused Twins link (score / end turn / explicit cancel)."""
+        if self._dice is not None:
+            self._dice.clear_twins()
 
     def cast_power_card(self, card_id: CardId, **kwargs) -> None:
         """Play a positive power card from the active player's inventory during rolling."""
@@ -511,6 +565,13 @@ class Match:
             die_indices = kwargs.get("die_indices")
             values = self._select_scoring_values(die_indices)
             self._validate_do_over(player, values)
+
+        # Twins: link or cancel without consuming; card is spent when the link resolves.
+        if card_id == CardId.TWINS:
+            if not player.inventory.has_power(CardId.TWINS):
+                raise WrongPhaseError("No twins in your inventory")
+            cast_positive_power(card_id, player, self, **kwargs)
+            return
 
         try:
             player.inventory.consume_power_by_id(card_id)

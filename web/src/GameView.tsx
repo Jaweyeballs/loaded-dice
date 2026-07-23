@@ -13,20 +13,22 @@ type Props = {
 type DieScatter = { x: number; y: number; rot: number };
 
 type RollAnim = {
-  /** Current tray DOM order (pre-roll, then sorted for the snap-home). */
+  /** Current tray DOM order (pre-toss, then sorted for the snap-home). */
   order: number[];
-  /** Indices that leave the tray (were unlocked). */
+  /** Indices that leave the tray. */
   flying: number[];
   scatter: Record<number, DieScatter>;
   /** FLIP invert transforms so dice stay visually on the felt after reorder. */
   hold: Record<number, DieScatter>;
   /** Screen positions measured just before switching to sorted order. */
   firstRects: Record<number, { left: number; top: number }>;
+  /** Face shown on each die during the toss (old faces, then new). */
+  displayValues: Record<number, number>;
   /** Dice that have finished snapping into the sorted tray. */
   returned: number[];
   phase: "prep" | "out" | "flip" | "back";
-  /** When true, CSS transitions run for the snap-home. */
-  animateHome: boolean;
+  /** Suppress CSS transition only while applying the FLIP invert. */
+  freezeMotion: boolean;
 };
 
 function randomScatter(): DieScatter {
@@ -253,11 +255,13 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
     rolls: number;
     order: number[];
     locked: boolean[];
+    values: number[];
   } | null>(null);
   const rollTimersRef = useRef<number[]>([]);
   const rollRafRef = useRef<number[]>([]);
   const dieElsRef = useRef<Map<number, HTMLButtonElement>>(new Map());
   const flipHandledRef = useRef(false);
+  const tossGenRef = useRef(0);
 
   // Display faces low→high, but keep each die's original index for lock/Icarus actions.
   const sortedDice = useMemo(() => {
@@ -278,7 +282,7 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
       return rollAnim.order
         .filter((index) => index < match.dice!.values.length)
         .map((index) => ({
-          value: match.dice!.values[index],
+          value: rollAnim.displayValues[index] ?? match.dice!.values[index],
           index,
           locked: match.dice!.locked[index],
           kind: match.dice!.kinds?.[index] ?? "standard",
@@ -287,7 +291,94 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
     return sortedDice;
   }, [match.dice, rollAnim, sortedDice]);
 
-  // Detect a new roll: scatter unlocked dice, then FLIP-snap into sorted tray order.
+  function clearTossTimers() {
+    for (const id of rollTimersRef.current) window.clearTimeout(id);
+    rollTimersRef.current = [];
+    for (const id of rollRafRef.current) window.cancelAnimationFrame(id);
+    rollRafRef.current = [];
+  }
+
+  function beginTossAnimation(args: {
+    trayOrder: number[];
+    flying: number[];
+    oldValues: number[];
+    newValues: number[];
+  }) {
+    const { trayOrder, flying, oldValues, newValues } = args;
+    if (flying.length === 0) return;
+
+    clearTossTimers();
+    flipHandledRef.current = false;
+    const gen = ++tossGenRef.current;
+
+    const scatter: Record<number, DieScatter> = {};
+    for (const index of flying) scatter[index] = randomScatter();
+
+    const displayValues: Record<number, number> = {};
+    for (let i = 0; i < oldValues.length; i++) displayValues[i] = oldValues[i];
+
+    const sortedOrder = [...newValues.keys()].sort(
+      (a, b) => newValues[a] - newValues[b] || a - b,
+    );
+
+    setRollAnim({
+      order: trayOrder,
+      flying,
+      scatter,
+      hold: {},
+      firstRects: {},
+      displayValues,
+      returned: [],
+      phase: "prep",
+      freezeMotion: false,
+    });
+
+    // Next frame: scatter out from the tray with CSS transition.
+    const tOut = window.setTimeout(() => {
+      if (tossGenRef.current !== gen) return;
+      setRollAnim((cur) => (cur ? { ...cur, phase: "out" } : null));
+    }, 40);
+
+    // Reveal new faces while dice are on the felt.
+    const tReveal = window.setTimeout(() => {
+      if (tossGenRef.current !== gen) return;
+      const next: Record<number, number> = {};
+      for (let i = 0; i < newValues.length; i++) next[i] = newValues[i];
+      setRollAnim((cur) => (cur ? { ...cur, displayValues: next } : null));
+    }, 320);
+
+    // Reorder tray to sorted slots and FLIP-snap home.
+    const tFlip = window.setTimeout(() => {
+      if (tossGenRef.current !== gen) return;
+      const firstRects: Record<number, { left: number; top: number }> = {};
+      for (const index of trayOrder) {
+        const el = dieElsRef.current.get(index);
+        if (!el) continue;
+        const rect = el.getBoundingClientRect();
+        firstRects[index] = { left: rect.left, top: rect.top };
+      }
+      const finalDisplay: Record<number, number> = {};
+      for (let i = 0; i < newValues.length; i++) finalDisplay[i] = newValues[i];
+      setRollAnim((cur) =>
+        cur
+          ? {
+              ...cur,
+              order: sortedOrder,
+              firstRects,
+              displayValues: finalDisplay,
+              hold: {},
+              returned: [],
+              phase: "flip",
+              freezeMotion: true,
+            }
+          : null,
+      );
+    }, 720);
+
+    rollTimersRef.current.push(tOut, tReveal, tFlip);
+  }
+
+  // Detect a new roll or a multi-die face change (Twins / Toddler) and toss.
   useEffect(() => {
     if (!match.dice) {
       prevDiceRef.current = null;
@@ -298,73 +389,43 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
     const rolls = match.dice.rolls_this_turn;
     const order = sortedDice.map((d) => d.index);
     const locked = [...match.dice.locked];
+    const values = [...match.dice.values];
     const prev = prevDiceRef.current;
 
-    if (prev && rolls > prev.rolls) {
-      prevDiceRef.current = { rolls, order: prev.order, locked: prev.locked };
-
-      for (const id of rollTimersRef.current) window.clearTimeout(id);
-      rollTimersRef.current = [];
-      for (const id of rollRafRef.current) window.cancelAnimationFrame(id);
-      rollRafRef.current = [];
-      flipHandledRef.current = false;
-
-      const flying = prev.order.filter((index) => !(prev.locked[index] ?? false));
-      if (flying.length === 0) {
+    if (prev) {
+      if (rolls > prev.rolls) {
+        prevDiceRef.current = { rolls, order: prev.order, locked: prev.locked, values };
+        const flying = prev.order.filter((index) => !(prev.locked[index] ?? false));
+        beginTossAnimation({
+          trayOrder: prev.order,
+          flying,
+          oldValues: prev.values,
+          newValues: values,
+        });
         return;
       }
-      const scatter: Record<number, DieScatter> = {};
-      for (const index of flying) scatter[index] = randomScatter();
 
-      const sortedOrder = [...match.dice.values.keys()].sort(
-        (a, b) =>
-          match.dice!.values[a] - match.dice!.values[b] || a - b,
-      );
-
-      setRollAnim({
-        order: prev.order,
-        flying,
-        scatter,
-        hold: {},
-        firstRects: {},
-        returned: [],
-        phase: "prep",
-        animateHome: false,
-      });
-
-      const tOut = window.setTimeout(() => {
-        setRollAnim((cur) => (cur ? { ...cur, phase: "out" } : null));
-      }, 30);
-
-      const tFlip = window.setTimeout(() => {
-        const firstRects: Record<number, { left: number; top: number }> = {};
-        for (const index of prev.order) {
-          const el = dieElsRef.current.get(index);
-          if (!el) continue;
-          const rect = el.getBoundingClientRect();
-          firstRects[index] = { left: rect.left, top: rect.top };
+      if (!rollAnim && values.length === prev.values.length) {
+        const changed: number[] = [];
+        for (let i = 0; i < values.length; i++) {
+          if (values[i] !== prev.values[i]) changed.push(i);
         }
-        setRollAnim((cur) =>
-          cur
-            ? {
-                ...cur,
-                order: sortedOrder,
-                firstRects,
-                hold: {},
-                returned: [],
-                phase: "flip",
-                animateHome: false,
-              }
-            : null,
-        );
-      }, 520);
-
-      rollTimersRef.current.push(tOut, tFlip);
-      return;
+        // Twins / Toddler change 2+ faces without consuming a turn roll.
+        if (changed.length >= 2) {
+          prevDiceRef.current = { rolls, order: prev.order, locked, values };
+          beginTossAnimation({
+            trayOrder: prev.order,
+            flying: changed,
+            oldValues: prev.values,
+            newValues: values,
+          });
+          return;
+        }
+      }
     }
 
     if (!rollAnim) {
-      prevDiceRef.current = { rolls, order, locked };
+      prevDiceRef.current = { rolls, order, locked, values };
     }
   }, [match.dice, sortedDice, rollAnim]);
 
@@ -388,20 +449,23 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
     }
 
     const returnOrder = [...rollAnim.order];
+    const gen = tossGenRef.current;
 
     setRollAnim((cur) =>
       cur && cur.phase === "flip"
-        ? { ...cur, hold, phase: "back", animateHome: false }
+        ? { ...cur, hold, phase: "back", freezeMotion: true }
         : cur,
     );
 
     const frame = window.requestAnimationFrame(() => {
       const play = window.requestAnimationFrame(() => {
+        if (tossGenRef.current !== gen) return;
         setRollAnim((cur) =>
-          cur && cur.phase === "back" ? { ...cur, animateHome: true } : cur,
+          cur && cur.phase === "back" ? { ...cur, freezeMotion: false } : cur,
         );
         returnOrder.forEach((index, i) => {
           const t = window.setTimeout(() => {
+            if (tossGenRef.current !== gen) return;
             setRollAnim((cur) => {
               if (!cur) return null;
               if (cur.returned.includes(index)) return cur;
@@ -411,8 +475,9 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
           rollTimersRef.current.push(t);
         });
         const tDone = window.setTimeout(() => {
+          if (tossGenRef.current !== gen) return;
           setRollAnim(null);
-        }, returnOrder.length * 130 + 340);
+        }, returnOrder.length * 130 + 360);
         rollTimersRef.current.push(tDone);
       });
       rollRafRef.current.push(play);
@@ -422,8 +487,7 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
 
   useEffect(() => {
     return () => {
-      for (const id of rollTimersRef.current) window.clearTimeout(id);
-      for (const id of rollRafRef.current) window.cancelAnimationFrame(id);
+      clearTossTimers();
     };
   }, []);
 
@@ -582,6 +646,11 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
       clearAiming();
       return;
     }
+    if (card.id === "twins" && Object.keys(match.twins_links ?? {}).length > 0) {
+      clearAiming();
+      onAction({ type: "cast_power", card_id: "twins" });
+      return;
+    }
     if (card.id === "parry" && blockArming === "parry") {
       clearAiming();
       return;
@@ -611,6 +680,7 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
     }
     if (card.id === "twins") {
       if (!match.dice) return;
+      if ((match.dice.rolls_this_turn ?? 0) < 1) return;
       setDiePick({ mode: "twins", picked: [] });
       return;
     }
@@ -1030,6 +1100,11 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
               const psychicFace = match.psychic_previews?.[String(index)];
               const picked = diePick?.picked.includes(index);
               const kindClass = kind !== "standard" ? `die-${kind}` : "";
+              const twinsLinked = Boolean(
+                match.twins_links &&
+                  (Object.keys(match.twins_links).includes(String(index)) ||
+                    Object.values(match.twins_links).includes(index)),
+              );
               const isFlying = Boolean(rollAnim?.flying.includes(index));
               const isReturned = Boolean(rollAnim?.returned.includes(index));
               const scatter = rollAnim?.scatter[index];
@@ -1072,11 +1147,11 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
                     className={`die ${locked ? "locked" : ""} ${kindClass} ${
                       aiming ? "targetable" : ""
                     } ${picked ? "picked" : ""} ${
-                      rollAnim ? "die-fly" : ""
-                    } ${pose ? "die-scattered" : ""} ${
-                      isReturned ? "die-returned" : ""
-                    } ${
-                      rollAnim && !rollAnim.animateHome ? "die-no-motion" : ""
+                      twinsLinked ? "die-twins" : ""
+                    } ${rollAnim ? "die-fly" : ""} ${
+                      pose ? "die-scattered" : ""
+                    } ${isReturned ? "die-returned" : ""} ${
+                      rollAnim?.freezeMotion ? "die-no-motion" : ""
                     }`}
                     style={dieStyle}
                     disabled={!active || Boolean(rollAnim)}
@@ -1091,7 +1166,7 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
               {diePick?.mode === "score"
                 ? `Pick ${5 - diePick.picked.length} more die(s) to score ${label(diePick.category)}`
                     : diePick?.mode === "twins"
-                      ? `Pick ${2 - diePick.picked.length} more: 1st is source, 2nd copies it`
+                      ? `Pick ${2 - diePick.picked.length} more: 1st is source, 2nd copies it on the next roll`
                       : diePick?.mode === "trading"
                     ? `Pick ${2 - diePick.picked.length} more die(s) for ${label(diePick.cardId)}`
                     : spaceArming
@@ -1256,7 +1331,9 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
                     playerTarget.slotIndex === i
                   : (card.id === "icarus" && icarusArming) ||
                     (card.id === "space_die" && spaceArming) ||
-                    (card.id === "twins" && diePick?.mode === "twins") ||
+                    (card.id === "twins" &&
+                      (diePick?.mode === "twins" ||
+                        Object.keys(match.twins_links ?? {}).length > 0)) ||
                     (card.id === "parry" && blockArming === "parry") ||
                     (card.id === "helping_hand" &&
                       playerTarget?.kind === "helping_hand");

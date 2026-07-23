@@ -77,23 +77,87 @@ def test_helping_hand_chips_choice():
     assert bob.turn_effects.score_bonus == 10
 
 
-def test_twins_second_copies_first_on_next_roll():
+def test_twins_links_for_next_roll_and_consumes_on_roll():
     match = Match(["Alice"])
-    match.players[0].inventory.add_power(card_for_id(CardId.TWINS))
+    alice = match.players[0]
+    alice.inventory.add_power(card_for_id(CardId.TWINS))
     _begin_active_turn(match)
     match.roll()
-    match.cast_power_card(CardId.TWINS, die_indices=[0, 1])
     assert match.dice is not None
+    for i, face in enumerate([1, 2, 3, 4, 5]):
+        match.dice.dice[i].value = face
+    match.cast_power_card(CardId.TWINS, die_indices=[0, 1])
+    assert alice.inventory.has_power(CardId.TWINS)
     assert match.dice.twins_links == {1: 0}
+
     for i in range(5):
         match.unlock(i)
-    match.dice.dice[0].value = 2
-    # Force leader's next roll so we know the copied face.
     match.dice.queue_forced_roll(0, 5)
     match.roll()
     assert match.dice.values[0] == 5
     assert match.dice.values[1] == 5
     assert match.dice.twins_links == {}
+    assert not alice.inventory.has_power(CardId.TWINS)
+
+
+def test_twins_cancel_clears_link_without_consuming():
+    match = Match(["Alice"])
+    alice = match.players[0]
+    alice.inventory.add_power(card_for_id(CardId.TWINS))
+    _begin_active_turn(match)
+    match.roll()
+    match.cast_power_card(CardId.TWINS, die_indices=[2, 4])
+    assert match.dice is not None
+    assert match.dice.twins_links == {4: 2}
+    match.cast_power_card(CardId.TWINS)  # cancel
+    assert match.dice.twins_links == {}
+    assert alice.inventory.has_power(CardId.TWINS)
+
+
+def test_twins_score_without_rolling_keeps_card():
+    match = Match(["Alice"])
+    alice = match.players[0]
+    alice.inventory.add_power(card_for_id(CardId.TWINS))
+    _begin_active_turn(match)
+    match.roll()
+    assert match.dice is not None
+    for i, face in enumerate([1, 2, 3, 4, 5]):
+        match.dice.dice[i].value = face
+    match.cast_power_card(CardId.TWINS, die_indices=[0, 1])
+    match.score(Category.CHANCE)
+    assert alice.inventory.has_power(CardId.TWINS)
+
+
+def test_twins_mirrors_psychic_ghost_from_source():
+    match = Match(["Alice"])
+    alice = match.players[0]
+    alice.inventory.add_power(card_for_id(CardId.TWINS))
+    alice.inventory.add_trading(card_for_id(CardId.PSYCHIC))
+    _begin_active_turn(match)
+    match.roll()
+    match.activate_trading_card(CardId.PSYCHIC, die_indices=[0, 3])
+    source_preview = match.psychic_previews[0]
+    assert 1 not in match.psychic_previews
+    match.cast_power_card(CardId.TWINS, die_indices=[0, 1])
+    assert match.psychic_previews[1] == source_preview
+    match.cast_power_card(CardId.TWINS)  # cancel
+    assert 1 not in match.psychic_previews
+    assert match.psychic_previews[0] == source_preview
+
+
+def test_toddler_on_twins_link_consumes_card():
+    match = Match(["Alice"])
+    alice = match.players[0]
+    alice.inventory.add_power(card_for_id(CardId.TWINS))
+    alice.inventory.add_trading(card_for_id(CardId.TODDLER))
+    _begin_active_turn(match)
+    match.roll()
+    assert match.dice is not None
+    match.cast_power_card(CardId.TWINS, die_indices=[0, 1])
+    match.activate_trading_card(CardId.TODDLER, die_indices=[0, 1])
+    assert match.dice.values[0] == match.dice.values[1]
+    assert match.dice.twins_links == {}
+    assert not alice.inventory.has_power(CardId.TWINS)
 
 
 def test_do_over_overwrites_last_category_without_matching_hand():

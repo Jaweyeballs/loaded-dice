@@ -146,7 +146,7 @@ class DiceSet:
         self._forced_next_values[index] = value
 
     def queue_twins(self, leader_index: int, follower_index: int) -> None:
-        """On the next roll, *follower* becomes whatever *leader* shows."""
+        """On the next roll involving this link, *follower* becomes whatever *leader* shows."""
         size = len(self.dice)
         if leader_index < 0 or leader_index >= size:
             raise IndexError(f"Invalid die index: {leader_index}")
@@ -154,7 +154,20 @@ class DiceSet:
             raise IndexError(f"Invalid die index: {follower_index}")
         if leader_index == follower_index:
             raise ValueError("Twins requires two different dice")
-        self._twins_links[follower_index] = leader_index
+        # Only one active link at a time.
+        self._twins_links = {follower_index: leader_index}
+
+    def clear_twins(self) -> None:
+        """Drop the Twins link without resolving it (cancel / end turn / score)."""
+        self._twins_links.clear()
+
+    def linked_twin_indices(self) -> set[int]:
+        """All die indices currently part of a Twins link."""
+        linked: set[int] = set()
+        for follower, leader in self._twins_links.items():
+            linked.add(follower)
+            linked.add(leader)
+        return linked
 
     @property
     def forced_next_values(self) -> dict[int, int]:
@@ -185,6 +198,7 @@ class DiceSet:
             else:
                 die.roll()
         for follower_index, leader_index in twins.items():
+            self._forced_next_values.pop(follower_index, None)
             follower = self.dice[follower_index]
             if follower.locked:
                 continue
