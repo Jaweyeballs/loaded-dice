@@ -70,7 +70,7 @@ Permanent boosts with drawbacks, picked at the start of a run/match.
 |---|---|
 | Icarus | Choose a die and increase its value, wrapping 6 → 1 |
 | Super serum | Increase entire hand's value by 1 |
-| Do over | If this hand matches your last *scored* hand (and isn't Yahtzee), overwrite that score with this one |
+| Do over | Overwrite your last scored category with this hand’s score in that box (no matching-hand requirement). **+5** if that category was full house, four of a kind, large straight, or small straight. Cannot overwrite a scored Yahtzee. If the current hand is a Yahtzee and Yahtzee is already filled, Do over does nothing — score the extra Yahtzee normally. Use the scoresheet Do over control (not cast-from-card matching). |
 | Parry | Block a single hindrance cast on you this turn |
 | Positive reinforcement | If you attacked no one last rotation, gain 8 points on this scored hand |
 | Negative reinforcement | If you attacked no one last rotation, gain a *transparent* Parry |

@@ -4,9 +4,14 @@ from __future__ import annotations
 
 from typing import Any
 
+from loaded_dice.cards import CardId
+from loaded_dice.card_effects.positive_power import (
+    DO_OVER_PLUS_BONUS,
+    DO_OVER_PLUS_CATEGORIES,
+)
 from loaded_dice.match import Match, Player
-from loaded_dice.preview import preview_scores
-from loaded_dice.scoring import Category
+from loaded_dice.preview import best_score_hand, preview_scores
+from loaded_dice.scoring import Category, is_yahtzee
 
 
 def serialize_card(card) -> dict[str, Any]:
@@ -29,6 +34,11 @@ def serialize_player(player: Player, match: Match) -> dict[str, Any]:
         "score_delta": match.score_delta_this_rotation(player),
         "game_total": player.game_total,
         "sheet": sheet,
+        "last_scored_category": (
+            player.last_scored_category.value
+            if player.last_scored_category is not None
+            else None
+        ),
         "power_cards": [serialize_card(c) for c in player.inventory.power_cards],
         "trading_cards": [serialize_card(c) for c in player.inventory.trading_cards],
         "queued_hindrances": [
@@ -63,6 +73,7 @@ def serialize_dice(match: Match) -> dict[str, Any] | None:
     return {
         "values": dice.values,
         "locked": [die.locked for die in dice.dice],
+        "kinds": [die.kind for die in dice.dice],
         "rolls_this_turn": dice.rolls_this_turn,
         "max_rolls": dice.max_rolls,
     }
@@ -92,6 +103,33 @@ def serialize_previews(match: Match) -> dict[str, int] | None:
     return {category.value: points for category, points in previews.items()}
 
 
+def serialize_do_over_preview(match: Match) -> dict[str, Any] | None:
+    """Preview for overwriting the active player's last scored category via Do over."""
+    if match.dice is None or match.dice.rolls_this_turn < 1:
+        return None
+    player = match.active_player
+    category = player.last_scored_category
+    if category is None or category == Category.YAHTZEE:
+        return None
+    if not player.inventory.has_power(CardId.DO_OVER):
+        return None
+    values = match.dice.values
+    if len(values) < 5:
+        return None
+    # Exact 5-die yahtzee: block Do over when Yahtzee box is already filled.
+    if len(values) == 5 and is_yahtzee(values) and not player.current_sheet.is_available(
+        Category.YAHTZEE
+    ):
+        return None
+    try:
+        points = best_score_hand(values, category, player.turn_effects)
+    except ValueError:
+        return None
+    if category in DO_OVER_PLUS_CATEGORIES:
+        points += DO_OVER_PLUS_BONUS
+    return {"category": category.value, "points": points}
+
+
 def serialize_match(match: Match) -> dict[str, Any]:
     winner = match.winner()
     return {
@@ -105,6 +143,7 @@ def serialize_match(match: Match) -> dict[str, Any]:
         "dice": serialize_dice(match),
         "shop": serialize_shop(match),
         "previews": serialize_previews(match),
+        "do_over_preview": serialize_do_over_preview(match),
         "psychic_previews": {
             str(index): face for index, face in match.psychic_previews.items()
         },

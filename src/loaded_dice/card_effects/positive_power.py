@@ -11,7 +11,7 @@ from loaded_dice.dice import (
     bump_die,
     raise_die_no_wrap,
 )
-from loaded_dice.scoring import Category, is_yahtzee
+from loaded_dice.scoring import Category
 
 if TYPE_CHECKING:
     from loaded_dice.match import Match, Player
@@ -21,6 +21,15 @@ if TYPE_CHECKING:
 POSITIVE_REINFORCEMENT_BONUS = 8
 HELPING_HAND_CHIPS = 400
 HELPING_HAND_POINTS = 10
+DO_OVER_PLUS_BONUS = 5
+DO_OVER_PLUS_CATEGORIES = frozenset(
+    {
+        Category.FULL_HOUSE,
+        Category.FOUR_OF_A_KIND,
+        Category.LARGE_STRAIGHT,
+        Category.SMALL_STRAIGHT,
+    }
+)
 
 # --- Cast handlers ---
 
@@ -46,28 +55,20 @@ def _super_serum_on_cast(player: Player, match: Match, **kwargs) -> None:
 
 
 def _do_over_on_cast(player: Player, match: Match, **kwargs) -> None:
-    """Overwrite the last scored category if current dice match that hand."""
-    if player.last_scored_category is None or player.last_scored_values is None:
-        raise ValueError("Do over requires a previously scored hand")
-    if player.last_scored_category == Category.YAHTZEE:
-        raise ValueError("Do over cannot overwrite a Yahtzee")
-    if match.dice is None or match.dice.rolls_this_turn < 1:
-        raise ValueError("Do over requires rolled dice")
+    """Overwrite the last scored category with this hand's score in that box.
 
+    Card is already consumed by ``cast_power_card``; validation for Do over
+    runs there *before* consume so a blocked second Yahtzee never spends the card.
+    """
     die_indices = kwargs.get("die_indices")
     values = match.select_scoring_values_for_effects(die_indices)
-    if is_yahtzee(values):
-        raise ValueError("Do over cannot be used with a Yahtzee hand")
-    if sorted(values) != sorted(player.last_scored_values):
-        raise ValueError("Current hand must match your last scored hand")
-
     match.apply_do_over(player, values, player.last_scored_category)
 
 
 def _benchwarmer_on_cast(player: Player, match: Match, **kwargs) -> None:
     if match.dice is None:
         raise ValueError("No dice set for this turn")
-    match.dice.add_die(BENCHWARMER_FACES)
+    match.dice.add_die(BENCHWARMER_FACES, kind="benchwarmer")
 
 
 def _helping_hand_on_cast(player: Player, match: Match, **kwargs) -> None:
@@ -120,7 +121,7 @@ def _space_die_on_cast(player: Player, match: Match, **kwargs) -> None:
 def _boolean_on_cast(player: Player, match: Match, **kwargs) -> None:
     if match.dice is None:
         raise ValueError("No dice set for this turn")
-    match.dice.add_die(BOOLEAN_FACES)
+    match.dice.add_die(BOOLEAN_FACES, kind="boolean")
 
 
 def _write_off_on_cast(player: Player, match: Match, **kwargs) -> None:

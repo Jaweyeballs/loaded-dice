@@ -51,7 +51,8 @@ type LeftTab = "history" | "leaderboard";
 type DiePickMode =
   | { mode: "trading"; cardId: "toddler" | "psychic"; picked: number[] }
   | { mode: "twins"; picked: number[] }
-  | { mode: "score"; category: string; picked: number[] };
+  | { mode: "score"; category: string; picked: number[] }
+  | { mode: "do_over"; picked: number[] };
 /** Armed card waiting for a leaderboard click to pick another player. */
 type PlayerTargetMode =
   | { kind: "hindrance"; cardId: string }
@@ -210,8 +211,9 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
         value,
         index,
         locked: match.dice!.locked[index],
+        kind: match.dice!.kinds?.[index] ?? "standard",
       }))
-      .sort((a, b) => a.value - b.value || a.index - b.index); 
+      .sort((a, b) => a.value - b.value || a.index - b.index);
   }, [match.dice]);
 
   // Cancel die-targeting / block-arm modes if the turn leaves turn_start/active.
@@ -301,6 +303,8 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
           });
         } else if (diePick.mode === "twins") {
           onAction({ type: "cast_power", card_id: "twins", die_indices: next });
+        } else if (diePick.mode === "do_over") {
+          onAction({ type: "do_over", die_indices: next });
         } else {
           onAction({
             type: "score",
@@ -382,6 +386,10 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
       armPlayerTarget({ kind: "helping_hand" });
       return;
     }
+    if (card.id === "do_over") {
+      // Do over is used from the scoresheet row, not cast from the fan.
+      return;
+    }
     onAction({ type: "cast_power", card_id: card.id });
   }
 
@@ -410,6 +418,17 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
       return;
     }
     onAction({ type: "score", category });
+  }
+
+  function requestDoOver() {
+    const diceCount = match.dice?.values.length ?? 0;
+    if (diceCount > 5) {
+      setDiePick({ mode: "do_over", picked: [] });
+      setIcarusArming(false);
+      setSpaceArming(false);
+      return;
+    }
+    onAction({ type: "do_over" });
   }
 
   function activateTrading(card: CardInfo) {
@@ -718,6 +737,11 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
             previews={
               sheetPlayer.name === match.active_player ? match.previews : null
             }
+            doOverPreview={
+              sheetPlayer.name === match.active_player
+                ? (match.do_over_preview ?? null)
+                : null
+            }
             canScore={
               active &&
               sheetPlayer.name === playerName &&
@@ -725,7 +749,16 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
               !aiming &&
               Boolean(match.dice && match.dice.rolls_this_turn >= 1)
             }
+            canDoOver={
+              active &&
+              sheetPlayer.name === playerName &&
+              match.phase === "turn_active" &&
+              !aiming &&
+              Boolean(match.do_over_preview) &&
+              Boolean(match.dice && match.dice.rolls_this_turn >= 1)
+            }
             onScore={requestScore}
+            onDoOver={requestDoOver}
           />
         </div>
       </aside>
@@ -831,7 +864,7 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
 
         {match.dice && (
           <div className={`dice-tray ${aiming ? "targeting" : ""}`}>
-            {sortedDice.map(({ value, index, locked }) => {
+            {sortedDice.map(({ value, index, locked, kind }) => {
               const psychicFace = match.psychic_previews?.[String(index)];
               const picked = diePick?.picked.includes(index);
               return (
@@ -839,8 +872,8 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
                   key={index}
                   type="button"
                   className={`die ${locked ? "locked" : ""} ${
-                    aiming ? "targetable" : ""
-                  } ${picked ? "picked" : ""}`}
+                    kind !== "standard" ? `die-${kind}` : ""
+                  } ${aiming ? "targetable" : ""} ${picked ? "picked" : ""}`}
                   disabled={!active}
                   onClick={() => handleDieClick(index, locked)}
                 >
@@ -951,6 +984,7 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
                     }`}
                     disabled={
                       !active ||
+                      card.id === "do_over" ||
                       (card.id === "parry"
                         ? match.phase !== "turn_start" ||
                           !canArmParry ||
@@ -960,8 +994,7 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
                             card.id === "twins" ||
                             card.id === "super_serum" ||
                             card.id === "benchwarmer" ||
-                            card.id === "boolean" ||
-                            card.id === "do_over") &&
+                            card.id === "boolean") &&
                           !match.dice)
                     }
                     onClick={() => castPower(card)}
@@ -1144,13 +1177,19 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
 function ScoreSheetTable({
   player,
   previews,
+  doOverPreview,
   canScore,
+  canDoOver,
   onScore,
+  onDoOver,
 }: {
   player: PlayerState;
   previews: Record<string, number> | null;
+  doOverPreview: { category: string; points: number } | null;
   canScore: boolean;
+  canDoOver: boolean;
   onScore: (category: string) => void;
+  onDoOver: () => void;
 }) {
   return (
     <table className="sheet">
@@ -1167,12 +1206,39 @@ function ScoreSheetTable({
           const filled = player.sheet[category];
           const preview = previews?.[category];
           const open = filled == null;
+          const isDoOverTarget =
+            doOverPreview != null && doOverPreview.category === category;
           return (
-            <tr key={category}>
+            <tr
+              key={category}
+              className={isDoOverTarget ? "do-over-row" : undefined}
+            >
               <td>{label(category)}</td>
               <td>{filled == null ? "—" : filled}</td>
-              <td className="muted">{preview == null ? "" : preview}</td>
+              <td
+                className={
+                  isDoOverTarget ? "do-over-preview" : "muted"
+                }
+                title={isDoOverTarget ? "use do over?" : undefined}
+              >
+                {isDoOverTarget
+                  ? doOverPreview.points
+                  : preview == null
+                    ? ""
+                    : preview}
+              </td>
               <td>
+                {canDoOver && isDoOverTarget && (
+                  <Tip text="use do over?">
+                    <button
+                      type="button"
+                      className="do-over-btn"
+                      onClick={onDoOver}
+                    >
+                      Do over
+                    </button>
+                  </Tip>
+                )}
                 {canScore && open && (
                   <button type="button" onClick={() => onScore(category)}>
                     Score

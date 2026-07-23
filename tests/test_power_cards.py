@@ -96,25 +96,96 @@ def test_twins_second_copies_first_on_next_roll():
     assert match.dice.twins_links == {}
 
 
-def test_do_over_overwrites_matching_hand():
+def test_do_over_overwrites_last_category_without_matching_hand():
     match = Match(["Alice"])
     alice = match.players[0]
     alice.inventory.add_power(card_for_id(CardId.DO_OVER))
     _begin_active_turn(match)
     match.roll()
     assert match.dice is not None
-    # Force a known hand, score chance, then recreate the same faces and do-over.
     for i, face in enumerate([1, 2, 3, 4, 5]):
+        match.dice.dice[i].value = face
+    match.score(Category.CHANCE)
+    assert alice.last_scored_category == Category.CHANCE
+    assert alice.current_sheet.get_score(Category.CHANCE) == 15
+
+    _begin_active_turn(match)
+    match.roll()
+    # Different faces — Do over still overwrites Chance with this hand's Chance score.
+    for i, face in enumerate([6, 6, 6, 1, 2]):
+        match.dice.dice[i].value = face
+    match.do_over()
+    assert alice.current_sheet.get_score(Category.CHANCE) == 21
+    assert not alice.inventory.has_power(CardId.DO_OVER)
+
+
+def test_do_over_plus_five_on_full_house_category():
+    match = Match(["Alice"])
+    alice = match.players[0]
+    alice.inventory.add_power(card_for_id(CardId.DO_OVER))
+    _begin_active_turn(match)
+    match.roll()
+    assert match.dice is not None
+    for i, face in enumerate([2, 2, 3, 3, 3]):
+        match.dice.dice[i].value = face
+    match.score(Category.FULL_HOUSE)
+    assert alice.current_sheet.get_score(Category.FULL_HOUSE) == 25
+
+    _begin_active_turn(match)
+    match.roll()
+    for i, face in enumerate([5, 5, 6, 6, 6]):
+        match.dice.dice[i].value = face
+    match.do_over()
+    # Full house base 25 + Do over +5
+    assert alice.current_sheet.get_score(Category.FULL_HOUSE) == 30
+
+
+def test_do_over_blocked_when_overwriting_yahtzee():
+    match = Match(["Alice"])
+    alice = match.players[0]
+    alice.inventory.add_power(card_for_id(CardId.DO_OVER))
+    _begin_active_turn(match)
+    match.roll()
+    assert match.dice is not None
+    for i, face in enumerate([4, 4, 4, 4, 4]):
+        match.dice.dice[i].value = face
+    match.score(Category.YAHTZEE)
+
+    _begin_active_turn(match)
+    match.roll()
+    for i, face in enumerate([1, 2, 3, 4, 5]):
+        match.dice.dice[i].value = face
+    with pytest.raises(ValueError, match="cannot overwrite a Yahtzee"):
+        match.do_over()
+    assert alice.inventory.has_power(CardId.DO_OVER)
+
+
+def test_do_over_does_not_consume_on_second_yahtzee():
+    match = Match(["Alice"])
+    alice = match.players[0]
+    alice.inventory.add_power(card_for_id(CardId.DO_OVER))
+    _begin_active_turn(match)
+    match.roll()
+    assert match.dice is not None
+    for i, face in enumerate([5, 5, 5, 5, 5]):
+        match.dice.dice[i].value = face
+    match.score(Category.YAHTZEE)
+
+    _begin_active_turn(match)
+    match.roll()
+    for i, face in enumerate([1, 2, 3, 4, 6]):
         match.dice.dice[i].value = face
     match.score(Category.CHANCE)
     assert alice.last_scored_category == Category.CHANCE
 
     _begin_active_turn(match)
     match.roll()
-    for i, face in enumerate([1, 2, 3, 4, 5]):
+    for i, face in enumerate([3, 3, 3, 3, 3]):
         match.dice.dice[i].value = face
-    match.cast_power_card(CardId.DO_OVER)
-    assert alice.current_sheet.get_score(Category.CHANCE) == 15
+    with pytest.raises(ValueError, match="another Yahtzee"):
+        match.do_over()
+    assert alice.inventory.has_power(CardId.DO_OVER)
+    assert alice.current_sheet.get_score(Category.CHANCE) == 16
 
 
 def test_blue_shell_queues_on_leader():

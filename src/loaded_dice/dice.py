@@ -23,12 +23,16 @@ class Die:
         self,
         value: int = 1,
         faces: tuple[int, ...] | list[int] | None = None,
+        *,
+        kind: str = "standard",
     ):
         self.faces = tuple(faces) if faces is not None else STANDARD_FACES
         if not self.faces:
             raise ValueError("Die must have at least one face")
         self.value = value if value in self.faces else self.faces[0]
         self.locked = False
+        # Visual/source tag for HUD tinting (benchwarmer, boolean, …).
+        self.kind = kind
 
     def roll(self) -> int:
         """Roll this die, unless it is locked. Returns the resulting value."""
@@ -105,9 +109,14 @@ class DiceSet:
         *,
         value: int | None = None,
         locked: bool = False,
+        kind: str = "standard",
     ) -> int:
         """Append a die and return its index (Benchwarmer, Boolean, etc.)."""
-        die = Die(value=value if value is not None else faces[0], faces=faces)
+        die = Die(
+            value=value if value is not None else faces[0],
+            faces=faces,
+            kind=kind,
+        )
         die.locked = locked
         self.dice.append(die)
         return len(self.dice) - 1

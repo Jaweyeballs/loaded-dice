@@ -13,7 +13,7 @@ export const CARD_BLURBS: Record<string, string> = {
   icarus: "Bump one die face up by 1 (wraps 6 → 1).",
   super_serum: "Increase every die by 1 (6s stay 6 — no wrap).",
   do_over:
-    "If your dice match your last scored hand (not Yahtzee), overwrite that score.",
+    "Overwrite your last scored category with this hand’s score there (+5 if it was full house, 4oak, or a straight). Use the scoresheet button — cannot overwrite Yahtzee.",
   benchwarmer: "Add an extra die (faces 1–3). Pick 5 dice when scoring.",
   helping_hand:
     "Take 400 chips or +10 on this hand; the other goes to a chosen player.",

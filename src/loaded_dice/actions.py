@@ -31,6 +31,7 @@ TURN_ACTIONS = frozenset(
         "cast_hindrance",
         "activate_trading",
         "score",
+        "do_over",
     }
 )
 
@@ -141,6 +142,13 @@ def _score(match: Match, _actor: Player, action: dict[str, Any]) -> None:
     match.score(category, die_indices=die_indices)
 
 
+def _do_over(match: Match, _actor: Player, action: dict[str, Any]) -> None:
+    die_indices = action.get("die_indices")
+    if die_indices is not None:
+        die_indices = [int(i) for i in die_indices]
+    match.do_over(die_indices=die_indices)
+
+
 def _buy(match: Match, actor: Player, action: dict[str, Any]) -> None:
     match.buy_from_shop(actor, int(_require(action, "stock_index")))
 
@@ -160,6 +168,7 @@ HANDLERS: dict[str, Callable[[Match, Player, dict[str, Any]], None]] = {
     "cast_hindrance": _cast_hindrance,
     "activate_trading": _activate_trading,
     "score": _score,
+    "do_over": _do_over,
     "buy": _buy,
     "reroll_shop": _reroll_shop,
 }

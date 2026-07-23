@@ -552,6 +552,18 @@ select {
   box-shadow: 0 4px 0 #c4b8a6, 0 8px 16px rgba(0, 0, 0, 0.25);
 }
 
+.die.die-benchwarmer {
+  background: linear-gradient(160deg, #7ec8ff, #2f6fb5);
+  color: #f4faff;
+  box-shadow: 0 4px 0 #1e4f86, 0 8px 16px rgba(0, 0, 0, 0.28);
+}
+
+.die.die-boolean {
+  background: linear-gradient(160deg, #3a3a3a, #111111);
+  color: #f0f0f0;
+  box-shadow: 0 4px 0 #000000, 0 8px 16px rgba(0, 0, 0, 0.4);
+}
+
 .die.locked {
   outline: 3px solid #f0c14a;
   outline-offset: 1px;
@@ -848,6 +860,27 @@ select {
 .sheet button {
   padding: 0.2rem 0.45rem;
   font-size: 0.75rem;
+}
+
+.sheet tr.do-over-row td {
+  background: color-mix(in srgb, #2a7a6a 14%, transparent);
+}
+
+.sheet .do-over-preview {
+  color: #1f6b5c;
+  font-weight: 700;
+}
+
+.sheet button.do-over-btn {
+  background: #2a7a6a;
+  color: #f4faf8;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.sheet button.do-over-btn:hover {
+  background: #246859;
 }
 
 .tip-wrap {

@@ -27,7 +27,12 @@ from loaded_dice.card_effects.negative_power import (
     resolve_hindrance,
     validate_hindrance_queue,
 )
-from loaded_dice.card_effects.positive_power import POSITIVE_POWER_CAST, cast_positive_power
+from loaded_dice.card_effects.positive_power import (
+    DO_OVER_PLUS_BONUS,
+    DO_OVER_PLUS_CATEGORIES,
+    POSITIVE_POWER_CAST,
+    cast_positive_power,
+)
 from loaded_dice.card_effects.trading import (
     ACTIVATABLE_TRADING_IDS,
     GAMBLER_BASE_COST,
@@ -39,7 +44,7 @@ from loaded_dice.card_effects.trading import (
     gecko_compensation_bonus,
 )
 from loaded_dice.effects import TurnEffects
-from loaded_dice.scoring import Category, ScoreSheet
+from loaded_dice.scoring import Category, ScoreSheet, is_yahtzee
 from loaded_dice.shop import Shop, ShopError
 from loaded_dice.turn_effects import apply_turn_start_passives, resolve_turn_effects
 
@@ -483,6 +488,12 @@ class Match:
             if target is player:
                 raise ValueError(f"{card_id.value} must target another player")
 
+        # Do over: validate before consume so a second Yahtzee never spends the card.
+        if card_id == CardId.DO_OVER:
+            die_indices = kwargs.get("die_indices")
+            values = self._select_scoring_values(die_indices)
+            self._validate_do_over(player, values)
+
         try:
             player.inventory.consume_power_by_id(card_id)
         except CardNotInInventoryError as exc:
@@ -539,25 +550,63 @@ class Match:
         """Expose scoring-hand selection for card effects (Do over)."""
         return self._select_scoring_values(die_indices)
 
+    def _validate_do_over(self, player: Player, values: list[int]) -> Category:
+        """Raise if Do over cannot be used; return the category that would be overwritten."""
+        if player.last_scored_category is None:
+            raise ValueError("Do over requires a previously scored hand")
+        category = player.last_scored_category
+        if category == Category.YAHTZEE:
+            raise ValueError("Do over cannot overwrite a Yahtzee")
+        if self._dice is None or self._dice.rolls_this_turn < 1:
+            raise ValueError("Do over requires rolled dice")
+        # Another Yahtzee after Yahtzee is filled: score normally (bonus/joker), no Do over.
+        if is_yahtzee(values) and not player.current_sheet.is_available(Category.YAHTZEE):
+            raise ValueError(
+                "Do over cannot be used when rolling another Yahtzee after Yahtzee is scored"
+            )
+        return category
+
     def apply_do_over(
         self,
         player: Player,
         values: list[int],
-        category: Category,
+        category: Category | None,
     ) -> int:
-        """Overwrite last scored category and end the turn."""
+        """Overwrite last scored category with this hand's score and end the turn."""
         if player is not self.active_player:
             raise WrongPhaseError("Only the active player can use Do over")
+        if category is None:
+            raise ValueError("Do over requires a previously scored hand")
+        flat_bonus = (
+            DO_OVER_PLUS_BONUS if category in DO_OVER_PLUS_CATEGORIES else 0
+        )
         points = player.current_sheet.overwrite(
             values,
             category,
             effects=player.turn_effects,
+            flat_bonus=flat_bonus,
         )
         player.last_scored_values = list(values)
         player.last_scored_category = category
         self._award_scoring_income(player)
         self._end_turn()
         return points
+
+    def do_over(self, die_indices: list[int] | None = None) -> int:
+        """Consume Do over and overwrite the last scored category with this hand."""
+        self._ensure_not_over()
+        if self.phase != TurnPhase.TURN_ACTIVE:
+            raise WrongPhaseError(f"Cannot use Do over during {self.phase.value}")
+        player = self.active_player
+        if not player.inventory.has_power(CardId.DO_OVER):
+            raise WrongPhaseError("Do over is not in your inventory")
+        values = self._select_scoring_values(die_indices)
+        category = self._validate_do_over(player, values)
+        try:
+            player.inventory.consume_power_by_id(CardId.DO_OVER)
+        except CardNotInInventoryError as exc:
+            raise WrongPhaseError(str(exc)) from exc
+        return self.apply_do_over(player, values, category)
 
     def score(
         self,

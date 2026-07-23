@@ -12,6 +12,8 @@ export type PlayerState = {
   score_delta: number;
   game_total: number;
   sheet: Record<string, number | null>;
+  /** Last category filled by scoring (for Do over). */
+  last_scored_category?: string | null;
   power_cards: CardInfo[];
   trading_cards: CardInfo[];
   queued_hindrances: { card_id: string; caster_name: string }[];
@@ -44,6 +46,8 @@ export type MatchState = {
   dice: {
     values: number[];
     locked: boolean[];
+    /** Parallel to values — standard | benchwarmer | boolean | … */
+    kinds?: string[];
     rolls_this_turn: number;
     max_rolls: number;
   } | null;
@@ -52,6 +56,8 @@ export type MatchState = {
     reroll_cost: number;
   };
   previews: Record<string, number> | null;
+  /** Live overwrite preview when Do over is usable this turn. */
+  do_over_preview?: { category: string; points: number } | null;
   psychic_previews?: Record<string, number>;
   forecaster_reveals?: Record<string, string[]> | null;
   /** Newest last — hindrance cast/block killfeed for the History tab. */
