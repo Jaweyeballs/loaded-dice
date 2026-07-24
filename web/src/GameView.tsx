@@ -192,6 +192,7 @@ function conditionStatus(
   cardId: string,
   me: PlayerState | undefined,
   rotationCount: number,
+  players?: PlayerState[],
 ): "ACTIVE" | "DORMANT" | null {
   if (REINFORCEMENT_IDS.has(cardId)) {
     if (rotationCount <= 0) return "DORMANT";
@@ -199,7 +200,11 @@ function conditionStatus(
   }
   if (PUNISHMENT_IDS.has(cardId)) {
     if (rotationCount <= 0) return "DORMANT";
-    return (me?.attacked_by_last_rotation?.length ?? 0) > 0 ? "ACTIVE" : "DORMANT";
+    // Active if someone else attacked last rotation (a valid punish target may exist).
+    const someoneElseAttacked = (players ?? []).some(
+      (p) => p.name !== me?.name && p.attacked_last_rotation,
+    );
+    return someoneElseAttacked ? "ACTIVE" : "DORMANT";
   }
   return null;
 }
@@ -214,14 +219,16 @@ function CardFace({
   cardId,
   me,
   rotationCount,
+  players,
   title,
 }: {
   cardId: string;
   me: PlayerState | undefined;
   rotationCount: number;
+  players?: PlayerState[];
   title?: string;
 }) {
-  const status = conditionStatus(cardId, me, rotationCount);
+  const status = conditionStatus(cardId, me, rotationCount, players);
   const cd = cooldownTurnsLeft(cardId, me);
   return (
     <>
@@ -854,7 +861,17 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
 
   function handleDieClick(index: number, locked: boolean) {
     if (!active) return;
+    const jailed = match.dice?.jail_locked_index === index;
     if (diePick) {
+      // Jail die face cannot change — exclude from Toddler / Psychic / Twins picks.
+      if (
+        jailed &&
+        (diePick.mode === "twins" ||
+          (diePick.mode === "trading" &&
+            (diePick.cardId === "toddler" || diePick.cardId === "psychic")))
+      ) {
+        return;
+      }
       const need = diePick.mode === "score" ? 5 : 2;
       const already = diePick.picked.includes(index);
       const next = already
@@ -894,6 +911,7 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
       return;
     }
     if (spaceArming) {
+      if (jailed) return;
       onAction({
         type: "cast_power",
         card_id: "space_die",
@@ -904,6 +922,7 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
       return;
     }
     if (icarusArming) {
+      if (jailed) return;
       onAction({ type: "cast_power", card_id: "icarus", die_index: index });
       setIcarusArming(false);
       return;
@@ -1455,7 +1474,12 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
               )}
               {powerFanCards.map((card, i) => {
                 const isHindrance = HINDRANCE_IDS.has(card.id);
-                const status = conditionStatus(card.id, me, match.rotation_count);
+                const status = conditionStatus(
+                  card.id,
+                  me,
+                  match.rotation_count,
+                  match.players,
+                );
                 const cd = cooldownTurnsLeft(card.id, me);
                 const expanded =
                   cardExpand?.tray === "power" && cardExpand.index === i;
@@ -1493,6 +1517,7 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
                           cardId={card.id}
                           me={me}
                           rotationCount={match.rotation_count}
+                          players={match.players}
                         />
                       </button>
                     </Tip>
@@ -1605,6 +1630,7 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
                           cardId={card.id}
                           me={me}
                           rotationCount={match.rotation_count}
+                          players={match.players}
                           title={tradingLabel(card)}
                         />
                       </button>

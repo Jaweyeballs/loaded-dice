@@ -59,7 +59,7 @@ Permanent boosts with drawbacks, picked at the start of a run/match.
 
 ### Turn flow
 1. **Start turn (active player)** — Clicking **Start Turn** pays interest/compensation, then resolves **ready** queued hindrances for this trigger (Glass half, Blue Shell, and punishments whose attack condition is met). Play goes straight to the active/rolling phase. Unresolved hindrances (e.g. Already in Jail, or punishments waiting on their condition) stay queued across turns. Players may **block** any still-queued hindrance on themselves (Parry, Guardian) at any time before that card resolves.
-2. **Active phase** — Standard Yahtzee: roll, lock, reroll, score. Extra dice from active effects roll with the normal dice. When scoring, if more than 5 dice are in play, the player is prompted to select 5 for their scoring hand, then pick a category. The active player may play positive power cards and cast hindrances on chosen targets at any point. Only the active player may cast cards. **Already in Jail** resolves on the first lock of a turn (one queued copy per lock) and can still be blocked before that lock.
+2. **Active phase** — Standard Yahtzee: roll, lock, reroll, score. Extra dice from active effects roll with the normal dice. When scoring, if more than 5 dice are in play, the player is prompted to select 5 for their scoring hand, then pick a category. The active player may play positive power cards and cast hindrances on chosen targets at any point. Only the active player may cast cards. **Already in Jail** resolves on the first lock of a turn (one queued copy per lock) and can still be blocked before that lock. Once jailed, that die’s face is immutable for the rest of the turn.
 3. **End turn** — Clicking **End Turn** passes play. The player who just finished may now open the shop (browse, buy, reroll stock) and spectate until their next turn. Shop access closes when they click **Start Turn** and reopens on their next **End Turn**. Players cannot cast cards when it is not their turn.
 
 ---
@@ -85,10 +85,10 @@ Permanent boosts with drawbacks, picked at the start of a run/match.
 ### Negative (hinder another player)
 | Name | Effect |
 |---|---|
-| Positive punishment | If the target attacked you last rotation, arm −5 that applies on their **next scored hand** (survives Write Off). If the attack condition is not met at Start Turn, the card stays queued. |
-| Negative punishment | If the target attacked you last rotation, they lose **200** chips at Start Turn. If not, the card stays queued until a later Start Turn where the condition is true. |
+| Positive punishment | If the target attacked **anyone** last rotation, arm −5 that applies on their **next scored hand** (survives Write Off). If the attack condition is not met at Start Turn, the card stays queued. |
+| Negative punishment | If the target attacked **anyone** last rotation, they lose **200** chips at Start Turn. If not, the card stays queued until a later Start Turn where the condition is true. |
 | Blue shell | Queued on whoever is in **1st at cast time**; that player loses 10 points on their next Start Turn (does not retarget if standings change). |
-| Already in jail | Stays queued until the target’s **first lock** on a turn (or blocked). That die cannot be unlocked for the rest of the turn. Each lock consumes one queued copy. |
+| Already in jail | Stays queued until the target’s **first lock** on a turn (or blocked). That die cannot be unlocked for the rest of the turn, and its face value cannot change under any effect (Icarus, Super Serum, Space Die, Toddler, Psychic, Twins, etc.). Each lock consumes one queued copy. |
 | Glass half empty | At Start Turn: any lower-section hand scored this turn is 0 (resolves for the turn regardless of which half they score). |
 | Glass half full | At Start Turn: any upper-section hand scored this turn is 0 (resolves for the turn regardless of which half they score). |
 

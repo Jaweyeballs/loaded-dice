@@ -100,7 +100,7 @@ def test_negative_reinforcement_grants_transparent_parry():
     assert not match.players[0].inventory.has_power(CardId.NEGATIVE_REINFORCEMENT)
 
 
-def test_positive_punishment_penalizes_scoring_when_target_attacked_caster():
+def test_positive_punishment_penalizes_scoring_when_target_attacked_anyone():
     match = Match(["Alice", "Bob"])
     alice = match.players[0]
     bob = match.players[1]
@@ -130,7 +130,36 @@ def test_positive_punishment_penalizes_scoring_when_target_attacked_caster():
     assert points == 9 - POSITIVE_PUNISHMENT_POINT_LOSS
 
 
-def test_positive_punishment_no_effect_if_target_did_not_attack_caster():
+def test_positive_punishment_applies_when_target_attacked_someone_else():
+    match = Match(["Alice", "Bob", "Carol"])
+    alice, bob, carol = match.players
+    _begin_active_turn(match)
+    _end_turn_quickly(match)
+    _begin_active_turn(match)  # Bob
+    bob.inventory.add_power(Card(CardId.GLASS_HALF_FULL, CardKind.POWER))
+    match.roll()
+    match.cast_hindrance(CardId.GLASS_HALF_FULL, carol)  # Bob attacks Carol, not Alice
+    _end_turn_quickly(match)
+    _end_turn_quickly(match)  # Carol
+    assert match.rotation_count == 1
+    assert match.active_player.name == "Alice"
+
+    alice.inventory.add_power(Card(CardId.POSITIVE_PUNISHMENT, CardKind.POWER))
+    _begin_active_turn(match)
+    match.roll()
+    match.cast_hindrance(CardId.POSITIVE_PUNISHMENT, bob)
+    _end_turn_quickly(match)
+
+    match.start_turn()  # Bob
+    assert bob.pending_score_penalty == POSITIVE_PUNISHMENT_POINT_LOSS
+    match.roll()
+    for die, value in zip(match.dice.dice, [3, 3, 3, 1, 2]):
+        die.value = value
+    points = match.score(Category.THREES)
+    assert points == 9 - POSITIVE_PUNISHMENT_POINT_LOSS
+
+
+def test_positive_punishment_no_effect_if_target_did_not_attack_anyone():
     match = Match(["Alice", "Bob"])
     _complete_rotation(match)
     alice = match.active_player

@@ -62,6 +62,7 @@ def _icarus_on_cast(player: Player, match: Match, **kwargs) -> None:
         raise ValueError("Icarus requires die_index")
     if match.dice is None:
         raise ValueError("No dice set for this turn")
+    match.ensure_die_mutable(int(die_index))
     try:
         die = match.dice.dice[die_index]
     except IndexError as exc:
@@ -72,7 +73,9 @@ def _icarus_on_cast(player: Player, match: Match, **kwargs) -> None:
 def _super_serum_on_cast(player: Player, match: Match, **kwargs) -> None:
     if match.dice is None:
         raise ValueError("No dice set for this turn")
-    for die in match.dice.dice:
+    for index, die in enumerate(match.dice.dice):
+        if match.die_is_jailed(index):
+            continue
         raise_die_no_wrap(die)
 
 
@@ -134,6 +137,8 @@ def _twins_on_cast(player: Player, match: Match, **kwargs) -> None:
     if len(set(indices)) != 2:
         raise ValueError("Twins die indices must be unique")
     leader, follower = int(indices[0]), int(indices[1])
+    match.ensure_die_mutable(leader)
+    match.ensure_die_mutable(follower)
     try:
         match.dice.queue_twins(leader, follower)
     except (IndexError, ValueError) as exc:
@@ -147,6 +152,7 @@ def _space_die_on_cast(player: Player, match: Match, **kwargs) -> None:
         raise ValueError("Space die requires die_index and face_value")
     if match.dice is None:
         raise ValueError("No dice set for this turn")
+    match.ensure_die_mutable(int(die_index))
     try:
         die = match.dice.dice[int(die_index)]
     except IndexError as exc:

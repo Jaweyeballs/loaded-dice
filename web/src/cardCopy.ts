@@ -30,12 +30,12 @@ export const CARD_BLURBS: Record<string, string> = {
   negative_reinforcement:
     "If you attacked no one last rotation, gain a transparent Parry when you score (auto).",
   positive_punishment:
-    "If the target attacked you last rotation, −5 on their next scored hand (stays until they score).",
+    "If the target attacked anyone last rotation, −5 on their next scored hand (stays until they score).",
   negative_punishment:
-    "If the target attacked you last rotation, they lose 200 chips at their Start Turn (else keeps waiting).",
+    "If the target attacked anyone last rotation, they lose 200 chips at their Start Turn (else keeps waiting).",
   blue_shell: "Queued on current 1st place; they lose 10 points on their Start Turn.",
   already_in_jail:
-    "Stays until the target’s first lock; that die cannot be unlocked (blockable until then).",
+    "Stays until the target’s first lock; that die cannot be unlocked or have its face changed (blockable until then).",
 };
 
 export function cardBlurb(cardId: string): string {

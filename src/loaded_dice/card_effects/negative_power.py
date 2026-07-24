@@ -89,10 +89,13 @@ def validate_hindrance_queue(target: Player, card_id: CardId) -> None:
 
 
 def punishment_condition_met(target: Player, caster: Player, match: Match) -> bool:
-    """Whether positive/negative punishment may resolve this start turn."""
+    """Whether positive/negative punishment may resolve this start turn.
+
+    Condition: the target cast a hindrance on anyone during the previous rotation.
+    """
     if match.rotation_count == 0:
         return False
-    return match.player_attacked_player_last_rotation(target, caster)
+    return match.player_attacked_last_rotation(target)
 
 
 def resolve_hindrance(

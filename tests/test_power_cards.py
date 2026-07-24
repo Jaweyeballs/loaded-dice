@@ -364,6 +364,45 @@ def test_already_in_jail_stacks_one_per_lock():
         match.unlock(1)
 
 
+def test_already_in_jail_blocks_face_changing_effects():
+    match = Match(["Alice", "Bob"])
+    alice, bob = match.players
+    alice.inventory.add_power(card_for_id(CardId.ALREADY_IN_JAIL))
+    _begin_active_turn(match)
+    match.roll()
+    match.cast_hindrance(CardId.ALREADY_IN_JAIL, bob)
+    match.end_turn_without_scoring()
+    match.start_turn()
+    match.roll()
+    match.lock(2)
+    assert bob.jail_locked_index == 2
+    face = match.dice.dice[2].value
+
+    bob.inventory.add_power(card_for_id(CardId.ICARUS))
+    with pytest.raises(WrongPhaseError, match="jail"):
+        match.cast_power_card(CardId.ICARUS, die_index=2)
+    assert match.dice.dice[2].value == face
+
+    bob.inventory.add_power(card_for_id(CardId.SPACE_DIE))
+    with pytest.raises(WrongPhaseError, match="jail"):
+        match.cast_power_card(CardId.SPACE_DIE, die_index=2, face_value=6)
+    assert match.dice.dice[2].value == face
+
+    bob.inventory.add_power(card_for_id(CardId.SUPER_SERUM))
+    match.cast_power_card(CardId.SUPER_SERUM)
+    assert match.dice.dice[2].value == face
+
+    bob.inventory.add_trading(card_for_id(CardId.TODDLER))
+    with pytest.raises(WrongPhaseError, match="jail"):
+        match.activate_trading_card(CardId.TODDLER, die_indices=[2, 0])
+    assert match.dice.dice[2].value == face
+
+    bob.inventory.add_trading(card_for_id(CardId.PSYCHIC))
+    with pytest.raises(WrongPhaseError, match="jail"):
+        match.activate_trading_card(CardId.PSYCHIC, die_indices=[2, 0])
+    assert match.dice.dice[2].value == face
+
+
 def test_already_in_jail_persists_if_turn_ends_without_lock():
     match = Match(["Alice", "Bob"])
     alice, bob = match.players

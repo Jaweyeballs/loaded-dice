@@ -410,14 +410,26 @@ class Match:
         if player.jail_locked_index is None:
             if self._consume_queued_hindrance(player, CardId.ALREADY_IN_JAIL):
                 player.jail_locked_index = index
+                # Pending Psychic faces must not rewrite this die later.
+                self._psychic_previews.pop(index, None)
+                self._dice.clear_forced_roll(index)
 
     def unlock(self, index: int) -> None:
         self._require_active_dice()
         assert self._dice is not None
         player = self.active_player
         if player.jail_locked_index == index:
-            raise WrongPhaseError("Already in jail: that die cannot be unlocked")
+            raise WrongPhaseError("You are already in jail!")
         self._dice.unlock(index)
+
+    def die_is_jailed(self, index: int) -> bool:
+        """True if *index* is the Already in Jail die for the active player."""
+        return self.active_player.jail_locked_index == index
+
+    def ensure_die_mutable(self, index: int) -> None:
+        """Raise if *index* is jailed (face value cannot change)."""
+        if self.die_is_jailed(index):
+            raise WrongPhaseError("You are already in jail!")
 
     def grant_extra_rolls(self, count: int = 1) -> None:
         """Pass-through for card effects (e.g. The Gambler) on the active turn."""
@@ -494,6 +506,8 @@ class Match:
         assert self._dice is not None
         if self._dice.rolls_this_turn < 1:
             raise ValueError("Roll at least once before using Toddler")
+        for index in chosen:
+            self.ensure_die_mutable(index)
 
         twins = dict(self._dice.twins_links)
         linked = self._dice.linked_twin_indices()
@@ -509,6 +523,8 @@ class Match:
 
         if resolves_twins:
             for follower, leader in twins.items():
+                if self.die_is_jailed(follower):
+                    continue
                 face = self._dice.dice[leader].value
                 follower_die = self._dice.dice[follower]
                 if face in follower_die.faces:
@@ -530,6 +546,8 @@ class Match:
         assert self._dice is not None
         if self._dice.rolls_this_turn < 1:
             raise ValueError("Roll at least once before using Psychic")
+        for index in chosen:
+            self.ensure_die_mutable(index)
         previews: dict[int, int] = {}
         for index in chosen:
             die = self._dice.dice[index]

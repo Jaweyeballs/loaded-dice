@@ -145,6 +145,10 @@ class DiceSet:
             raise ValueError(f"Face {value} not on die faces {die.faces}")
         self._forced_next_values[index] = value
 
+    def clear_forced_roll(self, index: int) -> None:
+        """Drop a queued Psychic force for *index*, if any."""
+        self._forced_next_values.pop(index, None)
+
     def queue_twins(self, leader_index: int, follower_index: int) -> None:
         """On the next roll involving this link, *follower* becomes whatever *leader* shows."""
         size = len(self.dice)
