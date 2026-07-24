@@ -56,12 +56,18 @@ def compute_do_over_points(
 # --- Cast handlers ---
 
 
+def _require_rolled_before_face_change(match: Match) -> None:
+    """Face-changing powers are pointless before the first roll of the turn."""
+    if match.dice is None or match.dice.rolls_this_turn < 1:
+        raise ValueError("Roll at least once before changing dice faces")
+
+
 def _icarus_on_cast(player: Player, match: Match, **kwargs) -> None:
     die_index = kwargs.get("die_index")
     if die_index is None:
         raise ValueError("Icarus requires die_index")
-    if match.dice is None:
-        raise ValueError("No dice set for this turn")
+    _require_rolled_before_face_change(match)
+    assert match.dice is not None
     match.ensure_die_mutable(int(die_index))
     try:
         die = match.dice.dice[die_index]
@@ -71,8 +77,8 @@ def _icarus_on_cast(player: Player, match: Match, **kwargs) -> None:
 
 
 def _super_serum_on_cast(player: Player, match: Match, **kwargs) -> None:
-    if match.dice is None:
-        raise ValueError("No dice set for this turn")
+    _require_rolled_before_face_change(match)
+    assert match.dice is not None
     for index, die in enumerate(match.dice.dice):
         if match.die_is_jailed(index):
             continue
@@ -150,8 +156,8 @@ def _space_die_on_cast(player: Player, match: Match, **kwargs) -> None:
     face_value = kwargs.get("face_value")
     if die_index is None or face_value is None:
         raise ValueError("Space die requires die_index and face_value")
-    if match.dice is None:
-        raise ValueError("No dice set for this turn")
+    _require_rolled_before_face_change(match)
+    assert match.dice is not None
     match.ensure_die_mutable(int(die_index))
     try:
         die = match.dice.dice[int(die_index)]

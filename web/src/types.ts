@@ -59,11 +59,13 @@ export type MatchState = {
   /** Placement names frozen at rotation start (server authority). */
   leaderboard_order: string[];
   players: PlayerState[];
-  dice: {
+    dice: {
     values: number[];
     locked: boolean[];
     /** Parallel to values — standard | benchwarmer | boolean | … */
     kinds?: string[];
+    /** Parallel to values — legal faces for that die (Space Die, etc.). */
+    faces?: number[][];
     rolls_this_turn: number;
     max_rolls: number;
     /** Die index locked by Already in Jail this turn, if any. */

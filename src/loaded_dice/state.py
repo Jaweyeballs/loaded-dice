@@ -166,6 +166,8 @@ def serialize_dice(match: Match) -> dict[str, Any] | None:
         "values": dice.values,
         "locked": [die.locked for die in dice.dice],
         "kinds": [die.kind for die in dice.dice],
+        # Parallel to values — legal faces for Space Die / UI (may be non-1–6).
+        "faces": [list(die.faces) for die in dice.dice],
         "rolls_this_turn": dice.rolls_this_turn,
         "max_rolls": dice.max_rolls,
         "jail_locked_index": match.active_player.jail_locked_index,

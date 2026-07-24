@@ -594,6 +594,28 @@ class Match:
             values = self._select_scoring_values(die_indices)
             self._validate_do_over(player, values)
 
+        # Face-changing powers: require a roll (and Space Die a legal face) before spend.
+        if card_id in (
+            CardId.ICARUS,
+            CardId.SUPER_SERUM,
+            CardId.SPACE_DIE,
+        ):
+            if self._dice is None or self._dice.rolls_this_turn < 1:
+                raise ValueError("Roll at least once before changing dice faces")
+        if card_id == CardId.SPACE_DIE:
+            die_index = kwargs.get("die_index")
+            face_value = kwargs.get("face_value")
+            if die_index is None or face_value is None:
+                raise ValueError("Space die requires die_index and face_value")
+            assert self._dice is not None
+            try:
+                die = self._dice.dice[int(die_index)]
+            except (IndexError, TypeError, ValueError) as exc:
+                raise ValueError(f"Invalid die index: {die_index}") from exc
+            if int(face_value) not in die.faces:
+                raise ValueError(f"Face {face_value} not allowed on that die")
+            self.ensure_die_mutable(int(die_index))
+
         # Twins: link or cancel without consuming; card is spent when the link resolves.
         if card_id == CardId.TWINS:
             if not player.inventory.has_power(CardId.TWINS):

@@ -1156,6 +1156,22 @@ select {
   min-width: 4rem;
 }
 
+.space-face-picker .face-option {
+  min-width: 2.25rem;
+  padding: 0.35rem 0.55rem;
+  border-radius: 0.35rem;
+  border: 1px solid color-mix(in srgb, var(--cream) 35%, transparent);
+  background: color-mix(in srgb, var(--felt-deep) 70%, black);
+  color: var(--cream);
+  font: inherit;
+  cursor: pointer;
+}
+
+.space-face-picker .face-option:hover {
+  border-color: var(--cream);
+  background: color-mix(in srgb, var(--felt-deep) 40%, black);
+}
+
 @media (max-width: 800px) {
   .hud-left,
   .hud-sheet {

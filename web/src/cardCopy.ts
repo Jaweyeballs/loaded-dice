@@ -10,8 +10,8 @@ export const CARD_BLURBS: Record<string, string> = {
   psychic: "Pick 2 dice to preview their next rolled faces (once per turn).",
   guardian: "Block a queued hindrance anytime before it resolves (1-turn cooldown).",
   forecaster: "On your turn, see hindrance cards held by other players (passive).",
-  icarus: "Bump one die face up by 1 (wraps 6 → 1).",
-  super_serum: "Increase every die by 1 (6s stay 6 — no wrap).",
+  icarus: "After rolling: bump one die up within its faces (standard wraps 6 → 1).",
+  super_serum: "After rolling: raise every die by 1 within its faces (no wrap).",
   do_over:
     "Overwrite your last scored category with this hand’s score there. Full house / 4oak / straights: +5 only if this hand also qualifies (else 0). Use the scoresheet button — cannot overwrite Yahtzee.",
   benchwarmer: "Add an extra die (faces 1–3). Pick 5 dice when scoring.",
@@ -19,7 +19,7 @@ export const CARD_BLURBS: Record<string, string> = {
     "Take 400 chips or +10 on this hand; the other goes to a chosen player.",
   twins:
     "Link 2 dice; on the next roll the 2nd copies the 1st. Click again to cancel. Consumed when the link is rolled.",
-  space_die: "Set one die to any face it can show.",
+  space_die: "After rolling: pick a die, then set it to any face it can show.",
   boolean: "Add a 6/blank die for the rest of this turn. Pick 5 when scoring.",
   write_off: "End your turn without scoring.",
   parry: "Block a single queued hindrance anytime before it resolves (consumable).",

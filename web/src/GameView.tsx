@@ -40,6 +40,22 @@ function randomScatter(): DieScatter {
   };
 }
 
+function faceLabel(face: number): string {
+  return face === 0 ? "blank" : String(face);
+}
+
+function spaceFaceOptions(
+  dice: NonNullable<MatchState["dice"]>,
+  dieIndex: number,
+): number[] {
+  const faces = dice.faces?.[dieIndex];
+  if (faces && faces.length > 0) {
+    return [...new Set(faces)].sort((a, b) => a - b);
+  }
+  // Fallback for older clients / missing faces payload.
+  return [1, 2, 3, 4, 5, 6];
+}
+
 /** Scoresheet row order — includes summary rows that are not scoreable categories. */
 type SheetRow =
   | { kind: "category"; id: string }
@@ -263,8 +279,10 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
   const [cardsOpen, setCardsOpen] = useState(true);
   const [shopOpen, setShopOpen] = useState(false);
   const [icarusArming, setIcarusArming] = useState(false);
-  const [spaceArming, setSpaceArming] = useState(false);
-  const [spaceFace, setSpaceFace] = useState(6);
+  /** Space Die: null = idle; dieIndex null = pick die; number = pick face for that die. */
+  const [spacePick, setSpacePick] = useState<{ dieIndex: number | null } | null>(
+    null
+  );
   const [helpingChoice, setHelpingChoice] = useState<"chips" | "points">("chips");
   const [diePick, setDiePick] = useState<DiePickMode | null>(null);
   const [blockArming, setBlockArming] = useState<"parry" | "guardian" | null>(null);
@@ -581,7 +599,7 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
   useEffect(() => {
     if (!active || match.phase !== "turn_active") {
       setIcarusArming(false);
-      setSpaceArming(false);
+      setSpacePick(null);
       setDiePick(null);
       setPlayerTarget(null);
     }
@@ -604,7 +622,7 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
 
   function clearAiming() {
     setIcarusArming(false);
-    setSpaceArming(false);
+    setSpacePick(null);
     setDiePick(null);
     setBlockArming(null);
     setPlayerTarget(null);
@@ -626,7 +644,7 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
       return;
     }
     setIcarusArming(false);
-    setSpaceArming(false);
+    setSpacePick(null);
     setDiePick(null);
     setBlockArming(null);
     setPlayerTarget(null);
@@ -670,7 +688,15 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
       card.id === "boolean"
     ) {
       if (!active || match.phase !== "turn_active" || !match.dice) return false;
-      if (card.id === "twins" && (match.dice.rolls_this_turn ?? 0) < 1) return false;
+      if (
+        (card.id === "icarus" ||
+          card.id === "space_die" ||
+          card.id === "super_serum" ||
+          card.id === "twins") &&
+        (match.dice.rolls_this_turn ?? 0) < 1
+      ) {
+        return false;
+      }
       return true;
     }
     return active && match.phase === "turn_active";
@@ -713,7 +739,7 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
       clearAiming();
       return;
     }
-    if (card.id === "space_die" && spaceArming) {
+    if (card.id === "space_die" && spacePick) {
       clearAiming();
       return;
     }
@@ -736,13 +762,13 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
     }
     clearAiming();
     if (card.id === "icarus") {
-      if (!match.dice) return;
+      if (!match.dice || (match.dice.rolls_this_turn ?? 0) < 1) return;
       setIcarusArming(true);
       return;
     }
     if (card.id === "space_die") {
-      if (!match.dice) return;
-      setSpaceArming(true);
+      if (!match.dice || (match.dice.rolls_this_turn ?? 0) < 1) return;
+      setSpacePick({ dieIndex: null });
       return;
     }
     if (card.id === "twins") {
@@ -813,7 +839,7 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
     if (diceCount > 5) {
       setDiePick({ mode: "score", category, picked: [] });
       setIcarusArming(false);
-      setSpaceArming(false);
+      setSpacePick(null);
       return;
     }
     onAction({ type: "score", category });
@@ -824,7 +850,7 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
     if (diceCount > 5) {
       setDiePick({ mode: "do_over", picked: [] });
       setIcarusArming(false);
-      setSpaceArming(false);
+      setSpacePick(null);
       return;
     }
     onAction({ type: "do_over" });
@@ -910,15 +936,11 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
       setDiePick({ ...diePick, picked: next });
       return;
     }
-    if (spaceArming) {
+    if (spacePick) {
       if (jailed) return;
-      onAction({
-        type: "cast_power",
-        card_id: "space_die",
-        die_index: index,
-        face_value: spaceFace,
-      });
-      setSpaceArming(false);
+      // Already choosing a face — allow re-picking a different die.
+      if (spacePick.dieIndex !== null && spacePick.dieIndex === index) return;
+      setSpacePick({ dieIndex: index });
       return;
     }
     if (icarusArming) {
@@ -944,7 +966,7 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
 
   const aiming =
     icarusArming ||
-    spaceArming ||
+    Boolean(spacePick) ||
     Boolean(diePick) ||
     Boolean(blockArming) ||
     Boolean(playerTarget);
@@ -1255,7 +1277,9 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
           >
             {trayDice.map(({ value, index, locked, kind }) => {
               const psychicFace = match.psychic_previews?.[String(index)];
-              const picked = diePick?.picked.includes(index);
+              const picked =
+                diePick?.picked.includes(index) ||
+                spacePick?.dieIndex === index;
               const kindClass = kind !== "standard" ? `die-${kind}` : "";
               const twinsLinked = Boolean(
                 match.twins_links &&
@@ -1327,8 +1351,10 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
                       ? `Pick ${2 - diePick.picked.length} more: 1st is source, 2nd copies it on the next roll`
                       : diePick?.mode === "trading"
                     ? `Pick ${2 - diePick.picked.length} more die(s) for ${label(diePick.cardId)}`
-                    : spaceArming
-                      ? `Click a die to set it to ${spaceFace}`
+                    : spacePick
+                      ? spacePick.dieIndex === null
+                        ? "Click a die to choose its face"
+                        : "Choose a face for the selected die"
                       : icarusArming
                         ? "Click a die to bump"
                         : `${match.dice.rolls_this_turn}/${match.dice.max_rolls} rolls`}
@@ -1357,20 +1383,28 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
               >
                 Roll
               </button>
-              {spaceArming && (
-                <label className="face-picker">
-                  Face
-                  <select
-                    value={spaceFace}
-                    onChange={(e) => setSpaceFace(Number(e.target.value))}
-                  >
-                    {[1, 2, 3, 4, 5, 6].map((n) => (
-                      <option key={n} value={n}>
-                        {n}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+              {spacePick?.dieIndex != null && match.dice && (
+                <div className="face-picker space-face-picker">
+                  <span>Face</span>
+                  {spaceFaceOptions(match.dice, spacePick.dieIndex).map((face) => (
+                    <button
+                      key={face}
+                      type="button"
+                      className="face-option"
+                      onClick={() => {
+                        onAction({
+                          type: "cast_power",
+                          card_id: "space_die",
+                          die_index: spacePick.dieIndex,
+                          face_value: face,
+                        });
+                        setSpacePick(null);
+                      }}
+                    >
+                      {faceLabel(face)}
+                    </button>
+                  ))}
+                </div>
               )}
               {(powerFanCards.some((c) => c.id === "helping_hand") ||
                 playerTarget?.kind === "helping_hand") && (
@@ -1490,7 +1524,7 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
                     playerTarget.cardId === card.id &&
                     playerTarget.slotIndex === i
                   : (card.id === "icarus" && icarusArming) ||
-                    (card.id === "space_die" && spaceArming) ||
+                    (card.id === "space_die" && spacePick) ||
                     (card.id === "twins" &&
                       (diePick?.mode === "twins" ||
                         Object.keys(match.twins_links ?? {}).length > 0)) ||

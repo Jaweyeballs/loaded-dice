@@ -34,6 +34,41 @@ def test_space_die_sets_face():
     assert match.dice.values[0] == 6
 
 
+def test_space_die_respects_special_die_faces():
+    match = Match(["Alice"])
+    player = match.players[0]
+    player.inventory.add_power(card_for_id(CardId.BOOLEAN))
+    player.inventory.add_power(card_for_id(CardId.SPACE_DIE))
+    player.inventory.add_power(card_for_id(CardId.SPACE_DIE))
+    _begin_active_turn(match)
+    match.roll()
+    match.cast_power_card(CardId.BOOLEAN)
+    assert match.dice is not None
+    bool_index = len(match.dice.dice) - 1
+    match.cast_power_card(CardId.SPACE_DIE, die_index=bool_index, face_value=0)
+    assert match.dice.values[bool_index] == 0
+    match.cast_power_card(CardId.SPACE_DIE, die_index=bool_index, face_value=6)
+    assert match.dice.values[bool_index] == 6
+    player.inventory.add_power(card_for_id(CardId.SPACE_DIE))
+    with pytest.raises(ValueError, match="not allowed"):
+        match.cast_power_card(CardId.SPACE_DIE, die_index=bool_index, face_value=3)
+
+
+def test_face_changing_powers_require_first_roll():
+    match = Match(["Alice"])
+    player = match.players[0]
+    player.inventory.add_power(card_for_id(CardId.SPACE_DIE))
+    player.inventory.add_power(card_for_id(CardId.ICARUS))
+    player.inventory.add_power(card_for_id(CardId.SUPER_SERUM))
+    _begin_active_turn(match)
+    with pytest.raises(ValueError, match="Roll at least once"):
+        match.cast_power_card(CardId.SPACE_DIE, die_index=0, face_value=6)
+    with pytest.raises(ValueError, match="Roll at least once"):
+        match.cast_power_card(CardId.ICARUS, die_index=0)
+    with pytest.raises(ValueError, match="Roll at least once"):
+        match.cast_power_card(CardId.SUPER_SERUM)
+
+
 def test_write_off_ends_turn():
     match = Match(["Alice", "Bob"])
     match.players[0].inventory.add_power(card_for_id(CardId.WRITE_OFF))
