@@ -358,6 +358,30 @@ select {
   font-weight: 600;
 }
 
+.sheet-score-breakdown {
+  margin: 0.55rem 0 0;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--ink-soft);
+}
+
+.sheet-score-breakdown ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.sheet-score-breakdown li {
+  margin: 0.15rem 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.sheet-score-net {
+  margin: 0.4rem 0 0;
+  font-weight: 800;
+  color: var(--ink);
+}
+
 .plain-list,
 .leaderboard {
   list-style: none;
@@ -643,6 +667,11 @@ select {
 
 .die.locked {
   outline: 3px solid #f0c14a;
+  outline-offset: 1px;
+}
+
+.die.die-jail {
+  outline: 3px solid #8b5cf6;
   outline-offset: 1px;
 }
 

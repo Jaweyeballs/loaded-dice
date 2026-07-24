@@ -9,7 +9,8 @@ from loaded_dice.card_effects.positive_power import (
     POSITIVE_REINFORCEMENT_BONUS,
     compute_do_over_points,
 )
-from loaded_dice.match import Match, Player
+from loaded_dice.card_effects.trading import PERSUADER_SCORE_BONUS
+from loaded_dice.match import Match, Player, TurnPhase
 from loaded_dice.preview import SCORING_HAND_SIZE, preview_scores
 from loaded_dice.scoring import Category, YAHTZEE_BONUS_POINTS, is_yahtzee
 from loaded_dice.effects import TurnEffects
@@ -42,6 +43,61 @@ def serialize_card(card) -> dict[str, Any]:
         "transparent": card.transparent,
         "sell_price": sell_price_for_card(card),
     }
+
+
+def serialize_score_breakdown(player: Player, match: Match) -> dict[str, Any] | None:
+    """Signed score modifiers for the scoresheet HUD (cleared after they score)."""
+    lines: list[dict[str, Any]] = []
+    hh = player.turn_effects.helping_hand_bonus
+    if hh > 0:
+        lines.append({"label": "helping hand", "amount": hh})
+    if player.pending_score_penalty > 0:
+        lines.append(
+            {
+                "label": "positive punishment",
+                "amount": -player.pending_score_penalty,
+            }
+        )
+
+    active_hand = (
+        match.phase == TurnPhase.TURN_ACTIVE and player is match.active_player
+    )
+    if active_hand:
+        if player.inventory.has_trading(CardId.PERSUADER):
+            lines.append({"label": "persuader", "amount": PERSUADER_SCORE_BONUS})
+        if (
+            match.rotation_count > 0
+            and not match.player_attacked_last_rotation(player)
+            and player.inventory.has_power(CardId.POSITIVE_REINFORCEMENT)
+        ):
+            lines.append(
+                {
+                    "label": "positive reinforcement",
+                    "amount": POSITIVE_REINFORCEMENT_BONUS,
+                }
+            )
+        # Any remaining turn penalty beyond pending (rare).
+        if player.turn_effects.score_penalty > 0:
+            lines.append(
+                {
+                    "label": "score penalty",
+                    "amount": -player.turn_effects.score_penalty,
+                }
+            )
+        remaining_bonus = (
+            player.turn_effects.score_bonus - hh - (
+                PERSUADER_SCORE_BONUS
+                if player.inventory.has_trading(CardId.PERSUADER)
+                else 0
+            )
+        )
+        if remaining_bonus > 0:
+            lines.append({"label": "score bonus", "amount": remaining_bonus})
+
+    if not lines:
+        return None
+    net = sum(int(line["amount"]) for line in lines)
+    return {"lines": lines, "net": net}
 
 
 def serialize_player(player: Player, match: Match) -> dict[str, Any]:
@@ -86,8 +142,10 @@ def serialize_player(player: Player, match: Match) -> dict[str, Any]:
             "score_penalty": (
                 player.turn_effects.score_penalty + player.pending_score_penalty
             ),
+            "helping_hand_bonus": player.turn_effects.helping_hand_bonus,
         },
         "pending_score_penalty": player.pending_score_penalty,
+        "score_breakdown": serialize_score_breakdown(player, match),
         "parry_ready": player.parry_ready,
         "can_use_shop": match.can_use_shop(player),
         "gambler_cost": player.gambler_next_cost,
@@ -110,6 +168,7 @@ def serialize_dice(match: Match) -> dict[str, Any] | None:
         "kinds": [die.kind for die in dice.dice],
         "rolls_this_turn": dice.rolls_this_turn,
         "max_rolls": dice.max_rolls,
+        "jail_locked_index": match.active_player.jail_locked_index,
     }
 
 

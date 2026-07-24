@@ -74,6 +74,7 @@ def test_helping_hand_chips_choice():
     match.cast_power_card(CardId.HELPING_HAND, choice="chips", target=bob)
     assert alice.chips == before + 400
     assert bob.turn_effects.score_bonus == 10
+    assert bob.turn_effects.helping_hand_bonus == 10
 
 
 def test_twins_links_for_next_roll_and_consumes_on_roll():

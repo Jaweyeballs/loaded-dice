@@ -908,6 +908,8 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
       setIcarusArming(false);
       return;
     }
+    // No locking before the first roll of the turn.
+    if (!locked && (match.dice?.rolls_this_turn ?? 0) < 1) return;
     onAction({ type: locked ? "unlock" : "lock", index });
   }
 
@@ -927,6 +929,20 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
     Boolean(diePick) ||
     Boolean(blockArming) ||
     Boolean(playerTarget);
+  const allDiceLocked = Boolean(
+    match.dice &&
+      match.dice.locked.length > 0 &&
+      match.dice.locked.every(Boolean),
+  );
+  const outOfRolls = Boolean(
+    match.dice && match.dice.rolls_this_turn >= match.dice.max_rolls,
+  );
+  const canRoll =
+    Boolean(match.dice) &&
+    !aiming &&
+    !rollAnim &&
+    !allDiceLocked &&
+    !outOfRolls;
   const powerFanCards = me?.power_cards ?? [];
   const showParryReadyChip =
     Boolean(me?.parry_ready) && !powerFanCards.some((c) => c.id === "parry");
@@ -936,16 +952,11 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
   const sheetPlace =
     rankedPlayers.findIndex((p) => p.name === sheetPlayer.name) + 1 || null;
   const myDebuffs = me?.queued_hindrances ?? [];
+  const scoreBreakdown = sheetPlayer.score_breakdown ?? null;
   const activeEffects = me
     ? [
         me.turn_effects.zero_upper ? "Glass half full (upper = 0)" : null,
         me.turn_effects.zero_lower ? "Glass half empty (lower = 0)" : null,
-        me.turn_effects.score_bonus
-          ? `+${me.turn_effects.score_bonus} score bonus`
-          : null,
-        me.turn_effects.score_penalty
-          ? `−${me.turn_effects.score_penalty} score penalty`
-          : null,
       ].filter(Boolean)
     : [];
 
@@ -1182,6 +1193,23 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
             onScore={requestScore}
             onDoOver={requestDoOver}
           />
+          {scoreBreakdown && scoreBreakdown.lines.length > 0 && (
+            <div className="sheet-score-breakdown">
+              <ul>
+                {scoreBreakdown.lines.map((line) => (
+                  <li key={`${line.label}-${line.amount}`}>
+                    {line.amount > 0 ? `+${line.amount}` : String(line.amount)} (
+                    {line.label})
+                  </li>
+                ))}
+              </ul>
+              <p className="sheet-score-net">
+                {scoreBreakdown.net >= 0
+                  ? `Net: +${scoreBreakdown.net} score bonus`
+                  : `Net: ${scoreBreakdown.net} score deduction`}
+              </p>
+            </div>
+          )}
         </div>
       </aside>
 
@@ -1215,6 +1243,7 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
                   (Object.keys(match.twins_links).includes(String(index)) ||
                     Object.values(match.twins_links).includes(index)),
               );
+              const jailLocked = match.dice?.jail_locked_index === index;
               const isFlying = Boolean(rollAnim?.flying.includes(index));
               const isReturned = Boolean(rollAnim?.returned.includes(index));
               const scatter = rollAnim?.scatter[index];
@@ -1254,15 +1283,15 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
                       if (el) dieElsRef.current.set(index, el);
                       else dieElsRef.current.delete(index);
                     }}
-                    className={`die ${locked ? "locked" : ""} ${kindClass} ${
-                      aiming ? "targetable" : ""
-                    } ${picked ? "picked" : ""} ${
-                      twinsLinked ? "die-twins" : ""
-                    } ${rollAnim ? "die-fly" : ""} ${
-                      pose ? "die-scattered" : ""
-                    } ${isReturned ? "die-returned" : ""} ${
-                      rollAnim?.freezeMotion ? "die-no-motion" : ""
-                    }`}
+                    className={`die ${locked ? "locked" : ""} ${
+                      jailLocked ? "die-jail" : ""
+                    } ${kindClass} ${aiming ? "targetable" : ""} ${
+                      picked ? "picked" : ""
+                    } ${twinsLinked ? "die-twins" : ""} ${
+                      rollAnim ? "die-fly" : ""
+                    } ${pose ? "die-scattered" : ""} ${
+                      isReturned ? "die-returned" : ""
+                    } ${rollAnim?.freezeMotion ? "die-no-motion" : ""}`}
                     style={dieStyle}
                     disabled={!active || Boolean(rollAnim)}
                     onClick={() => handleDieClick(index, locked)}
@@ -1305,7 +1334,7 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
               <button
                 type="button"
                 onClick={() => onAction({ type: "roll" })}
-                disabled={aiming || !match.dice || Boolean(rollAnim)}
+                disabled={!canRoll}
               >
                 Roll
               </button>

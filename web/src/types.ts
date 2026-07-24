@@ -27,11 +27,17 @@ export type PlayerState = {
   trading_cards: CardInfo[];
   queued_hindrances: { card_id: string; caster_name: string }[];
   pending_score_penalty?: number;
+  /** Signed modifiers shown under the scoresheet (null when none). */
+  score_breakdown?: {
+    lines: { label: string; amount: number }[];
+    net: number;
+  } | null;
   turn_effects: {
     zero_upper: boolean;
     zero_lower: boolean;
     score_bonus: number;
     score_penalty: number;
+    helping_hand_bonus?: number;
   };
   parry_ready: boolean;
   can_use_shop: boolean;
@@ -60,6 +66,8 @@ export type MatchState = {
     kinds?: string[];
     rolls_this_turn: number;
     max_rolls: number;
+    /** Die index locked by Already in Jail this turn, if any. */
+    jail_locked_index?: number | null;
   } | null;
   shop: {
     stock: { index: number; card_id: string; price: number }[];

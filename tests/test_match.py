@@ -99,6 +99,25 @@ def test_lock_and_unlock_during_turn():
     assert match.dice.dice[0].value == locked
 
 
+def test_cannot_lock_before_first_roll():
+    match = Match(["Alice"])
+    _begin_active_turn(match)
+    match.lock(0)
+    assert match.dice.dice[0].locked is False
+
+
+def test_cannot_roll_when_all_dice_locked():
+    match = Match(["Alice"])
+    _begin_active_turn(match)
+    match.roll()
+    for i in range(5):
+        match.lock(i)
+    rolls_before = match.dice.rolls_this_turn
+    with pytest.raises(WrongPhaseError, match="locked"):
+        match.roll()
+    assert match.dice.rolls_this_turn == rolls_before
+
+
 def test_score_with_selected_dice_when_more_than_five():
     match = Match(["Alice"], config=MatchConfig(dice_size=6))
     _begin_active_turn(match)

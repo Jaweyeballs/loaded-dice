@@ -13,3 +13,5 @@ class TurnEffects:
     zero_lower: bool = False
     score_bonus: int = 0
     score_penalty: int = 0
+    # Portion of score_bonus from Helping Hand (for HUD labeling).
+    helping_hand_bonus: int = 0

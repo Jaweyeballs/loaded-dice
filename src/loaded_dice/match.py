@@ -386,6 +386,8 @@ class Match:
             raise WrongPhaseError(f"Cannot roll during {self.phase.value}")
         if self._dice is None:
             raise WrongPhaseError("No dice set for this turn")
+        if all(die.locked for die in self._dice.dice):
+            raise WrongPhaseError("All dice are locked")
         had_twins = bool(self._dice.twins_links)
         values = self._dice.roll()
         # Drop Psychic ghosts for dice that no longer have a pending forced face.
@@ -401,6 +403,8 @@ class Match:
     def lock(self, index: int) -> None:
         self._require_active_dice()
         assert self._dice is not None
+        if self._dice.rolls_this_turn < 1:
+            return
         player = self.active_player
         self._dice.lock(index)
         if player.jail_locked_index is None:
@@ -672,6 +676,7 @@ class Match:
         )
         player.last_scored_values = list(values)
         player.last_scored_category = category
+        self._clear_scored_turn_modifiers(player)
         self._award_scoring_income(player)
         self._end_turn()
         return points
@@ -716,6 +721,7 @@ class Match:
         )
         self.active_player.last_scored_values = list(values)
         self.active_player.last_scored_category = category
+        self._clear_scored_turn_modifiers(self.active_player)
         self._award_scoring_income(self.active_player)
         self._on_sheet_completed(self.active_player)
         self._end_turn()
@@ -891,6 +897,15 @@ class Match:
         if player.pending_score_penalty <= 0:
             return
         player.turn_effects.score_penalty += player.pending_score_penalty
+        player.pending_score_penalty = 0
+
+    def _clear_scored_turn_modifiers(self, player: Player) -> None:
+        """Drop one-shot score HUD modifiers after they have been applied to a hand."""
+        hh = player.turn_effects.helping_hand_bonus
+        if hh > 0:
+            player.turn_effects.helping_hand_bonus = 0
+            player.turn_effects.score_bonus = max(0, player.turn_effects.score_bonus - hh)
+        player.turn_effects.score_penalty = 0
         player.pending_score_penalty = 0
 
     def _end_turn(self) -> None:
