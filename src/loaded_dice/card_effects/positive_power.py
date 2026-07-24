@@ -166,28 +166,28 @@ def _write_off_on_cast(player: Player, match: Match, **kwargs) -> None:
 
 
 def _parry_on_cast(player: Player, match: Match, **kwargs) -> None:
-    # Parry blocks via Match.block_hindrance anytime before a queued hindrance
-    # resolves. Cast marks readiness for a later block click.
+    # Legacy cast path: Prefer UI Use → arm → block_hindrance (consumes from inventory).
     player.parry_ready = True
 
 
-def _positive_reinforcement_on_cast(player: Player, match: Match, **kwargs) -> None:
+def try_apply_reinforcements_on_score(player: Player, match: Match) -> None:
+    """Consume Positive/Negative Reinforcement when scoring as a pacifist last rotation."""
     if match.rotation_count == 0:
         return
     if match.player_attacked_last_rotation(player):
         return
-    player.turn_effects.score_bonus += POSITIVE_REINFORCEMENT_BONUS
 
+    if player.inventory.has_power(CardId.POSITIVE_REINFORCEMENT):
+        player.turn_effects.score_bonus += POSITIVE_REINFORCEMENT_BONUS
+        player.inventory.consume_power_by_id(CardId.POSITIVE_REINFORCEMENT)
 
-def _negative_reinforcement_on_cast(player: Player, match: Match, **kwargs) -> None:
-    if match.rotation_count == 0:
-        return
-    if match.player_attacked_last_rotation(player):
-        return
-    player.inventory.add_power(Card(CardId.PARRY, CardKind.POWER, transparent=True))
+    if player.inventory.has_power(CardId.NEGATIVE_REINFORCEMENT):
+        player.inventory.consume_power_by_id(CardId.NEGATIVE_REINFORCEMENT)
+        player.inventory.add_power(Card(CardId.PARRY, CardKind.POWER, transparent=True))
 
 
 # Registry: CardId → handler. Handlers receive (player, match, **kwargs).
+# Reinforcements are not cast — they auto-apply on score via try_apply_reinforcements_on_score.
 POSITIVE_POWER_CAST: dict[CardId, Callable[..., None]] = {
     CardId.ICARUS: _icarus_on_cast,
     CardId.SUPER_SERUM: _super_serum_on_cast,
@@ -199,8 +199,6 @@ POSITIVE_POWER_CAST: dict[CardId, Callable[..., None]] = {
     CardId.BOOLEAN: _boolean_on_cast,
     CardId.WRITE_OFF: _write_off_on_cast,
     CardId.PARRY: _parry_on_cast,
-    CardId.POSITIVE_REINFORCEMENT: _positive_reinforcement_on_cast,
-    CardId.NEGATIVE_REINFORCEMENT: _negative_reinforcement_on_cast,
 }
 
 

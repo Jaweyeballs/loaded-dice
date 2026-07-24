@@ -160,6 +160,14 @@ def _reroll_shop(match: Match, actor: Player, _action: dict[str, Any]) -> None:
     match.reroll_shop(actor)
 
 
+def _sell_card(match: Match, actor: Player, action: dict[str, Any]) -> None:
+    match.sell_card(
+        actor,
+        kind=str(_require(action, "kind")),
+        index=int(_require(action, "index")),
+    )
+
+
 HANDLERS: dict[str, Callable[[Match, Player, dict[str, Any]], None]] = {
     "start_turn": _start_turn,
     "begin_rolling": _begin_rolling,
@@ -174,6 +182,7 @@ HANDLERS: dict[str, Callable[[Match, Player, dict[str, Any]], None]] = {
     "do_over": _do_over,
     "buy": _buy,
     "reroll_shop": _reroll_shop,
+    "sell_card": _sell_card,
 }
 
 

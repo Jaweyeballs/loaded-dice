@@ -41,11 +41,11 @@ def test_positive_reinforcement_bonus_when_pacifist_last_rotation():
     alice.inventory.add_power(Card(CardId.POSITIVE_REINFORCEMENT, CardKind.POWER))
     _begin_active_turn(match)
     match.roll()
-    match.cast_power_card(CardId.POSITIVE_REINFORCEMENT)
     for die, value in zip(match.dice.dice, [3, 3, 3, 1, 2]):
         die.value = value
     points = match.score(Category.THREES)
     assert points == 9 + POSITIVE_REINFORCEMENT_BONUS
+    assert not alice.inventory.has_power(CardId.POSITIVE_REINFORCEMENT)
 
 
 def test_positive_reinforcement_no_bonus_if_attacked_last_rotation():
@@ -60,11 +60,22 @@ def test_positive_reinforcement_no_bonus_if_attacked_last_rotation():
     alice.inventory.add_power(Card(CardId.POSITIVE_REINFORCEMENT, CardKind.POWER))
     _begin_active_turn(match)
     match.roll()
-    match.cast_power_card(CardId.POSITIVE_REINFORCEMENT)
     for die, value in zip(match.dice.dice, [3, 3, 3, 1, 2]):
         die.value = value
     points = match.score(Category.THREES)
     assert points == 9
+    assert alice.inventory.has_power(CardId.POSITIVE_REINFORCEMENT)
+
+
+def test_positive_reinforcement_kept_on_write_off():
+    match = Match(["Alice", "Bob"])
+    _complete_rotation(match)
+    alice = match.active_player
+    alice.inventory.add_power(Card(CardId.POSITIVE_REINFORCEMENT, CardKind.POWER))
+    _begin_active_turn(match)
+    match.roll()
+    match.end_turn_without_scoring()
+    assert alice.inventory.has_power(CardId.POSITIVE_REINFORCEMENT)
 
 
 def test_negative_reinforcement_grants_transparent_parry():
@@ -75,15 +86,18 @@ def test_negative_reinforcement_grants_transparent_parry():
     )
     _begin_active_turn(match)
     match.roll()
-    match.cast_power_card(CardId.NEGATIVE_REINFORCEMENT)
+    for die, value in zip(match.dice.dice, [3, 3, 3, 1, 2]):
+        die.value = value
+    match.score(Category.THREES)
     parry_cards = [
         card
-        for card in match.active_player.inventory.power_cards
+        for card in match.players[0].inventory.power_cards
         if card.id == CardId.PARRY
     ]
     assert len(parry_cards) == 1
     assert parry_cards[0].transparent is True
-    assert match.active_player.inventory.power_slots_used() == 0
+    assert match.players[0].inventory.power_slots_used() == 0
+    assert not match.players[0].inventory.has_power(CardId.NEGATIVE_REINFORCEMENT)
 
 
 def test_positive_punishment_penalizes_scoring_when_target_attacked_caster():

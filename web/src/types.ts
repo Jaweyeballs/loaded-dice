@@ -2,6 +2,8 @@ export type CardInfo = {
   id: string;
   kind: string;
   transparent: boolean;
+  /** Chips gained if sold from inventory. */
+  sell_price?: number;
 };
 
 export type PlayerState = {

@@ -5,29 +5,42 @@ from __future__ import annotations
 from typing import Any
 
 from loaded_dice.cards import CardId
-from loaded_dice.card_effects.positive_power import compute_do_over_points
+from loaded_dice.card_effects.positive_power import (
+    POSITIVE_REINFORCEMENT_BONUS,
+    compute_do_over_points,
+)
 from loaded_dice.match import Match, Player
 from loaded_dice.preview import SCORING_HAND_SIZE, preview_scores
 from loaded_dice.scoring import Category, YAHTZEE_BONUS_POINTS, is_yahtzee
 from loaded_dice.effects import TurnEffects
+from loaded_dice.shop import sell_price_for_card
 from itertools import combinations
 from dataclasses import replace
 
 
-def effective_turn_effects(player: Player) -> TurnEffects:
-    """Turn effects including armed positive-punishment pending until score."""
-    if player.pending_score_penalty <= 0:
-        return player.turn_effects
-    return replace(
-        player.turn_effects,
-        score_penalty=player.turn_effects.score_penalty + player.pending_score_penalty,
-    )
+def effective_turn_effects(player: Player, match: Match | None = None) -> TurnEffects:
+    """Turn effects including pending punishment and held Positive Reinforcement."""
+    effects = player.turn_effects
+    score_penalty = effects.score_penalty + player.pending_score_penalty
+    score_bonus = effects.score_bonus
+    if (
+        match is not None
+        and match.rotation_count > 0
+        and not match.player_attacked_last_rotation(player)
+        and player.inventory.has_power(CardId.POSITIVE_REINFORCEMENT)
+    ):
+        score_bonus += POSITIVE_REINFORCEMENT_BONUS
+    if score_penalty == effects.score_penalty and score_bonus == effects.score_bonus:
+        return effects
+    return replace(effects, score_penalty=score_penalty, score_bonus=score_bonus)
+
 
 def serialize_card(card) -> dict[str, Any]:
     return {
         "id": card.id.value,
         "kind": card.kind.value,
         "transparent": card.transparent,
+        "sell_price": sell_price_for_card(card),
     }
 
 
@@ -117,7 +130,7 @@ def serialize_previews(match: Match) -> dict[str, int] | None:
         previews = preview_scores(
             match.dice.values,
             match.active_player.current_sheet,
-            effective_turn_effects(match.active_player),
+            effective_turn_effects(match.active_player, match),
         )
     except ValueError:
         return None
@@ -143,7 +156,7 @@ def serialize_do_over_preview(match: Match) -> dict[str, Any] | None:
     ):
         return None
     try:
-        effects = effective_turn_effects(player)
+        effects = effective_turn_effects(player, match)
         if len(values) == SCORING_HAND_SIZE:
             points = compute_do_over_points(values, category, effects)
         else:

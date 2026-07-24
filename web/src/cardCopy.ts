@@ -17,7 +17,8 @@ export const CARD_BLURBS: Record<string, string> = {
   benchwarmer: "Add an extra die (faces 1–3). Pick 5 dice when scoring.",
   helping_hand:
     "Take 400 chips or +10 on this hand; the other goes to a chosen player.",
-  twins: "Link 2 dice; on the next roll the 2nd copies the 1st. Click again to cancel. Consumed when the link is rolled.",
+  twins:
+    "Link 2 dice; on the next roll the 2nd copies the 1st. Click again to cancel. Consumed when the link is rolled.",
   space_die: "Set one die to any face it can show.",
   boolean: "Add a 6/blank die for the rest of this turn. Pick 5 when scoring.",
   write_off: "End your turn without scoring.",
@@ -25,9 +26,9 @@ export const CARD_BLURBS: Record<string, string> = {
   glass_half_full: "Target’s upper-section score is 0 this turn.",
   glass_half_empty: "Target’s lower-section score is 0 this turn.",
   positive_reinforcement:
-    "If you attacked no one last rotation, +8 on this scored hand.",
+    "If you attacked no one last rotation, +8 when you score (auto; not consumed on Write Off).",
   negative_reinforcement:
-    "If you attacked no one last rotation, gain a transparent Parry.",
+    "If you attacked no one last rotation, gain a transparent Parry when you score (auto).",
   positive_punishment:
     "If the target attacked you last rotation, −5 on their next scored hand (stays until they score).",
   negative_punishment:

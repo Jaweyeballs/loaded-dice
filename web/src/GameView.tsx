@@ -109,12 +109,24 @@ const UNTARGETED_HINDRANCES = new Set(["blue_shell"]);
 /** Trading cards clicked to activate (stay in party). Others are passives / turn-start. */
 const ACTIVATABLE_TRADING = new Set(["gambler", "lawyer", "toddler", "psychic"]);
 
+/** Cards that only offer Sell (no Use) — passives, auto-reinforcements, Do over. */
+const NO_USE_CARD_IDS = new Set([
+  "do_over",
+  "positive_reinforcement",
+  "negative_reinforcement",
+  "merchant",
+  "persuader",
+  "gecko",
+  "forecaster",
+]);
+
 const REINFORCEMENT_IDS = new Set([
   "positive_reinforcement",
   "negative_reinforcement",
 ]);
 const PUNISHMENT_IDS = new Set(["positive_punishment", "negative_punishment"]);
 
+type CardExpand = { tray: "power" | "trading"; index: number };
 type SheetMode = "mine" | "current";
 type LeftTab = "history" | "leaderboard";
 type DiePickMode =
@@ -250,6 +262,7 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
   const [diePick, setDiePick] = useState<DiePickMode | null>(null);
   const [blockArming, setBlockArming] = useState<"parry" | "guardian" | null>(null);
   const [playerTarget, setPlayerTarget] = useState<PlayerTargetMode | null>(null);
+  const [cardExpand, setCardExpand] = useState<CardExpand | null>(null);
   const [rollAnim, setRollAnim] = useState<RollAnim | null>(null);
   const prevDiceRef = useRef<{
     rolls: number;
@@ -588,6 +601,226 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
     setDiePick(null);
     setBlockArming(null);
     setPlayerTarget(null);
+    setCardExpand(null);
+  }
+
+  function toggleCardExpand(tray: "power" | "trading", index: number, card: CardInfo) {
+    if (
+      tray === "power" &&
+      card.id === "twins" &&
+      Object.keys(match.twins_links ?? {}).length > 0
+    ) {
+      clearAiming();
+      onAction({ type: "cast_power", card_id: "twins" });
+      return;
+    }
+    if (cardExpand?.tray === tray && cardExpand.index === index) {
+      setCardExpand(null);
+      return;
+    }
+    setIcarusArming(false);
+    setSpaceArming(false);
+    setDiePick(null);
+    setBlockArming(null);
+    setPlayerTarget(null);
+    setCardExpand({ tray, index });
+  }
+
+  function sellInventoryCard(kind: "power" | "trading", index: number) {
+    setCardExpand(null);
+    onAction({ type: "sell_card", kind, index });
+  }
+
+  function cardOffersUse(cardId: string): boolean {
+    return !NO_USE_CARD_IDS.has(cardId);
+  }
+
+  function canUsePowerCard(card: CardInfo): boolean {
+    if (!cardOffersUse(card.id)) return false;
+    if (Boolean(rollAnim)) return false;
+    if (HINDRANCE_IDS.has(card.id)) {
+      return active && match.phase === "turn_active";
+    }
+    if (card.id === "parry") {
+      return (
+        (me?.queued_hindrances.length ?? 0) > 0 &&
+        (Boolean(me?.parry_ready) ||
+          Boolean(me?.power_cards.some((c) => c.id === "parry")))
+      );
+    }
+    if (card.id === "write_off") {
+      return active && match.phase === "turn_active";
+    }
+    if (card.id === "helping_hand") {
+      return active && match.phase === "turn_active";
+    }
+    if (
+      card.id === "icarus" ||
+      card.id === "space_die" ||
+      card.id === "twins" ||
+      card.id === "super_serum" ||
+      card.id === "benchwarmer" ||
+      card.id === "boolean"
+    ) {
+      if (!active || match.phase !== "turn_active" || !match.dice) return false;
+      if (card.id === "twins" && (match.dice.rolls_this_turn ?? 0) < 1) return false;
+      return true;
+    }
+    return active && match.phase === "turn_active";
+  }
+
+  function canUseTradingCard(card: CardInfo): boolean {
+    if (!cardOffersUse(card.id)) return false;
+    if (Boolean(rollAnim)) return false;
+    if (card.id === "guardian") {
+      return (
+        (me?.guardian_cooldown ?? 0) === 0 &&
+        (me?.queued_hindrances.length ?? 0) > 0
+      );
+    }
+    if (!active || match.phase !== "turn_active") return false;
+    if (card.id === "gambler") {
+      const cost = me?.gambler_cost ?? 200;
+      return Boolean(match.dice) && (me?.chips ?? 0) >= cost;
+    }
+    if (card.id === "lawyer") {
+      return (me?.lawyer_cooldown ?? 0) === 0;
+    }
+    if (card.id === "toddler" || card.id === "psychic") {
+      const used =
+        card.id === "toddler"
+          ? Boolean(match.toddler_used_this_turn)
+          : Boolean(match.psychic_used_this_turn);
+      return (
+        Boolean(match.dice) &&
+        !used &&
+        (match.dice?.rolls_this_turn ?? 0) >= 1
+      );
+    }
+    return false;
+  }
+
+  function beginUsePower(card: CardInfo) {
+    setCardExpand(null);
+    if (card.id === "icarus" && icarusArming) {
+      clearAiming();
+      return;
+    }
+    if (card.id === "space_die" && spaceArming) {
+      clearAiming();
+      return;
+    }
+    if (card.id === "twins" && diePick?.mode === "twins") {
+      clearAiming();
+      return;
+    }
+    if (card.id === "parry" && blockArming === "parry") {
+      clearAiming();
+      return;
+    }
+    if (card.id === "helping_hand" && playerTarget?.kind === "helping_hand") {
+      clearAiming();
+      return;
+    }
+    if (card.id === "parry") {
+      clearAiming();
+      setBlockArming("parry");
+      return;
+    }
+    clearAiming();
+    if (card.id === "icarus") {
+      if (!match.dice) return;
+      setIcarusArming(true);
+      return;
+    }
+    if (card.id === "space_die") {
+      if (!match.dice) return;
+      setSpaceArming(true);
+      return;
+    }
+    if (card.id === "twins") {
+      if (!match.dice) return;
+      if ((match.dice.rolls_this_turn ?? 0) < 1) return;
+      setDiePick({ mode: "twins", picked: [] });
+      return;
+    }
+    if (card.id === "helping_hand") {
+      armPlayerTarget({ kind: "helping_hand" });
+      return;
+    }
+    onAction({ type: "cast_power", card_id: card.id });
+  }
+
+  function beginUseHindrance(card: CardInfo, slotIndex: number) {
+    setCardExpand(null);
+    if (
+      playerTarget?.kind === "hindrance" &&
+      playerTarget.cardId === card.id &&
+      playerTarget.slotIndex === slotIndex
+    ) {
+      clearAiming();
+      return;
+    }
+    if (UNTARGETED_HINDRANCES.has(card.id)) {
+      clearAiming();
+      onAction({ type: "cast_hindrance", card_id: card.id });
+      return;
+    }
+    armPlayerTarget({ kind: "hindrance", cardId: card.id, slotIndex });
+  }
+
+  function beginUseTrading(card: CardInfo) {
+    setCardExpand(null);
+    if (card.id === "guardian") {
+      if (blockArming === "guardian") {
+        clearAiming();
+        return;
+      }
+      clearAiming();
+      setBlockArming("guardian");
+      return;
+    }
+    if (!ACTIVATABLE_TRADING.has(card.id)) return;
+    if (diePick?.mode === "trading" && diePick.cardId === card.id) {
+      clearAiming();
+      return;
+    }
+    clearAiming();
+    if (card.id === "toddler" || card.id === "psychic") {
+      if (!match.dice) return;
+      if (card.id === "toddler" && match.toddler_used_this_turn) return;
+      if (card.id === "psychic" && match.psychic_used_this_turn) return;
+      if ((match.dice.rolls_this_turn ?? 0) < 1) return;
+      setDiePick({
+        mode: "trading",
+        cardId: card.id,
+        picked: [],
+      });
+      return;
+    }
+    onAction({ type: "activate_trading", card_id: card.id });
+  }
+
+  function requestScore(category: string) {
+    const diceCount = match.dice?.values.length ?? 0;
+    if (diceCount > 5) {
+      setDiePick({ mode: "score", category, picked: [] });
+      setIcarusArming(false);
+      setSpaceArming(false);
+      return;
+    }
+    onAction({ type: "score", category });
+  }
+
+  function requestDoOver() {
+    const diceCount = match.dice?.values.length ?? 0;
+    if (diceCount > 5) {
+      setDiePick({ mode: "do_over", picked: [] });
+      setIcarusArming(false);
+      setSpaceArming(false);
+      return;
+    }
+    onAction({ type: "do_over" });
   }
 
   function armPlayerTarget(mode: PlayerTargetMode) {
@@ -678,175 +911,6 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
     onAction({ type: locked ? "unlock" : "lock", index });
   }
 
-  function castPower(card: CardInfo) {
-    // Clicking an already-armed card cancels targeting (e.g. accidental Icarus).
-    if (card.id === "icarus" && icarusArming) {
-      clearAiming();
-      return;
-    }
-    if (card.id === "space_die" && spaceArming) {
-      clearAiming();
-      return;
-    }
-    if (card.id === "twins" && diePick?.mode === "twins") {
-      clearAiming();
-      return;
-    }
-    if (card.id === "twins" && Object.keys(match.twins_links ?? {}).length > 0) {
-      clearAiming();
-      onAction({ type: "cast_power", card_id: "twins" });
-      return;
-    }
-    if (card.id === "parry" && blockArming === "parry") {
-      clearAiming();
-      return;
-    }
-    if (card.id === "helping_hand" && playerTarget?.kind === "helping_hand") {
-      clearAiming();
-      return;
-    }
-    if (
-      card.id === "parry" &&
-      myDebuffs.length > 0 &&
-      canArmParry
-    ) {
-      clearAiming();
-      setBlockArming("parry");
-      return;
-    }
-    clearAiming();
-    if (!match.dice && card.id !== "write_off" && card.id !== "parry") {
-      // most powers need dice; write_off/parry edge cases handled below
-    }
-    if (card.id === "icarus") {
-      if (!match.dice) return;
-      setIcarusArming(true);
-      return;
-    }
-    if (card.id === "space_die") {
-      if (!match.dice) return;
-      setSpaceArming(true);
-      return;
-    }
-    if (card.id === "twins") {
-      if (!match.dice) return;
-      if ((match.dice.rolls_this_turn ?? 0) < 1) return;
-      setDiePick({ mode: "twins", picked: [] });
-      return;
-    }
-    if (card.id === "helping_hand") {
-      armPlayerTarget({ kind: "helping_hand" });
-      return;
-    }
-    if (card.id === "do_over") {
-      // Do over is used from the scoresheet row, not cast from the fan.
-      return;
-    }
-    onAction({ type: "cast_power", card_id: card.id });
-  }
-
-  function castHindrance(card: CardInfo, slotIndex: number) {
-    if (
-      playerTarget?.kind === "hindrance" &&
-      playerTarget.cardId === card.id &&
-      playerTarget.slotIndex === slotIndex
-    ) {
-      clearAiming();
-      return;
-    }
-    if (UNTARGETED_HINDRANCES.has(card.id)) {
-      clearAiming();
-      onAction({ type: "cast_hindrance", card_id: card.id });
-      return;
-    }
-    armPlayerTarget({ kind: "hindrance", cardId: card.id, slotIndex });
-  }
-
-  function requestScore(category: string) {
-    const diceCount = match.dice?.values.length ?? 0;
-    if (diceCount > 5) {
-      setDiePick({ mode: "score", category, picked: [] });
-      setIcarusArming(false);
-      setSpaceArming(false);
-      return;
-    }
-    onAction({ type: "score", category });
-  }
-
-  function requestDoOver() {
-    const diceCount = match.dice?.values.length ?? 0;
-    if (diceCount > 5) {
-      setDiePick({ mode: "do_over", picked: [] });
-      setIcarusArming(false);
-      setSpaceArming(false);
-      return;
-    }
-    onAction({ type: "do_over" });
-  }
-
-  function activateTrading(card: CardInfo) {
-    if (card.id === "guardian") {
-      if ((me?.guardian_cooldown ?? 0) > 0) return;
-      if ((me?.queued_hindrances.length ?? 0) === 0) return;
-      if (blockArming === "guardian") {
-        clearAiming();
-        return;
-      }
-      clearAiming();
-      setBlockArming("guardian");
-      return;
-    }
-    if (!ACTIVATABLE_TRADING.has(card.id)) return;
-    if (diePick?.mode === "trading" && diePick.cardId === card.id) {
-      clearAiming();
-      return;
-    }
-    clearAiming();
-    if (card.id === "toddler" || card.id === "psychic") {
-      if (!match.dice) return;
-      if (card.id === "toddler" && match.toddler_used_this_turn) return;
-      if (card.id === "psychic" && match.psychic_used_this_turn) return;
-      if ((match.dice.rolls_this_turn ?? 0) < 1) return;
-      setDiePick({
-        mode: "trading",
-        cardId: card.id,
-        picked: [],
-      });
-      return;
-    }
-    onAction({ type: "activate_trading", card_id: card.id });
-  }
-
-  function tradingDisabled(card: CardInfo): boolean {
-    if (card.id === "guardian") {
-      return (
-        (me?.guardian_cooldown ?? 0) > 0 ||
-        (me?.queued_hindrances.length ?? 0) === 0
-      );
-    }
-    if (!active || match.phase !== "turn_active") return true;
-    if (card.id === "gambler") {
-      const cost = me?.gambler_cost ?? 200;
-      return !match.dice || (me?.chips ?? 0) < cost;
-    }
-    if (card.id === "lawyer") {
-      return (me?.lawyer_cooldown ?? 0) > 0;
-    }
-    if (card.id === "toddler" || card.id === "psychic") {
-      const used =
-        card.id === "toddler"
-          ? Boolean(match.toddler_used_this_turn)
-          : Boolean(match.psychic_used_this_turn);
-      return (
-        !match.dice ||
-        used ||
-        Boolean(rollAnim) ||
-        (match.dice.rolls_this_turn ?? 0) < 1
-      );
-    }
-    return true;
-  }
-
   function tradingLabel(card: CardInfo): string {
     if (card.id === "gambler") {
       return `${label(card.id)} (${me?.gambler_cost ?? 200})`;
@@ -857,9 +921,6 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
     return label(card.id);
   }
 
-  const canArmParry =
-    Boolean(me?.parry_ready) ||
-    Boolean(me?.power_cards.some((c) => c.id === "parry"));
   const aiming =
     icarusArming ||
     spaceArming ||
@@ -1367,6 +1428,10 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
                 const isHindrance = HINDRANCE_IDS.has(card.id);
                 const status = conditionStatus(card.id, me, match.rotation_count);
                 const cd = cooldownTurnsLeft(card.id, me);
+                const expanded =
+                  cardExpand?.tray === "power" && cardExpand.index === i;
+                const showUse = cardOffersUse(card.id);
+                const useEnabled = canUsePowerCard(card);
                 const armed = isHindrance
                   ? playerTarget?.kind === "hindrance" &&
                     playerTarget.cardId === card.id &&
@@ -1380,49 +1445,58 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
                     (card.id === "helping_hand" &&
                       playerTarget?.kind === "helping_hand");
                 return (
-                <Tip
-                  key={`p-${card.id}-${i}`}
-                  text={tipText(card.id, card.transparent)}
-                  tipAlign="start"
-                >
-                  <button
-                    type="button"
-                    className={`fan-card ${isHindrance ? "hindrance" : "power"} ${
-                      armed ? "armed" : ""
-                    } ${cd > 0 ? "on-cooldown" : ""} ${
-                      status === "DORMANT" ? "dormant" : ""
-                    }`}
-                    disabled={
-                      card.id === "parry"
-                        ? !(
-                            (myDebuffs.length > 0 && canArmParry) ||
-                            (active &&
-                              match.phase === "turn_active" &&
-                              canArmParry)
-                          )
-                        : !active ||
-                          (!isHindrance &&
-                            (card.id === "do_over" ||
-                              ((card.id === "icarus" ||
-                                card.id === "space_die" ||
-                                card.id === "twins" ||
-                                card.id === "super_serum" ||
-                                card.id === "benchwarmer" ||
-                                card.id === "boolean") &&
-                                !match.dice)))
-                    }
-                    onClick={() =>
-                      isHindrance ? castHindrance(card, i) : castPower(card)
-                    }
-                    style={{ zIndex: i + 1 }}
+                  <div
+                    key={`p-${card.id}-${i}`}
+                    className={`fan-card-slot ${expanded ? "expanded" : ""}`}
+                    style={{ zIndex: expanded ? 40 : i + 1 }}
                   >
-                    <CardFace
-                      cardId={card.id}
-                      me={me}
-                      rotationCount={match.rotation_count}
-                    />
-                  </button>
-                </Tip>
+                    <Tip text={tipText(card.id, card.transparent)} tipAlign="start">
+                      <button
+                        type="button"
+                        className={`fan-card ${isHindrance ? "hindrance" : "power"} ${
+                          armed || expanded ? "armed" : ""
+                        } ${cd > 0 ? "on-cooldown" : ""} ${
+                          status === "DORMANT" ? "dormant" : ""
+                        }`}
+                        onClick={() => toggleCardExpand("power", i, card)}
+                      >
+                        <CardFace
+                          cardId={card.id}
+                          me={me}
+                          rotationCount={match.rotation_count}
+                        />
+                      </button>
+                    </Tip>
+                    {expanded && (
+                      <div className="card-actions">
+                        {showUse && (
+                          <button
+                            type="button"
+                            className="card-action use"
+                            disabled={!useEnabled}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (!useEnabled) return;
+                              if (isHindrance) beginUseHindrance(card, i);
+                              else beginUsePower(card);
+                            }}
+                          >
+                            Use
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          className="card-action sell"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            sellInventoryCard("power", i);
+                          }}
+                        >
+                          Sell {card.sell_price ?? 0}
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 );
               })}
               {showParryReadyChip && myDebuffs.length > 0 && (
@@ -1454,70 +1528,95 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
               {tradingCards.length === 0 && (
                 <span className="empty-fan muted">Empty</span>
               )}
-              {tradingCards.map((card, i) =>
-                ACTIVATABLE_TRADING.has(card.id) || card.id === "guardian" ? (
-                  <Tip
+              {tradingCards.map((card, i) => {
+                const expanded =
+                  cardExpand?.tray === "trading" && cardExpand.index === i;
+                const showUse = cardOffersUse(card.id);
+                const useEnabled = canUseTradingCard(card);
+                const armed =
+                  (diePick?.mode === "trading" && diePick.cardId === card.id) ||
+                  (card.id === "guardian" && blockArming === "guardian");
+                return (
+                  <div
                     key={`t-${card.id}-${i}`}
-                    tipAlign="end"
-                    text={tipText(
-                      card.id,
-                      false,
-                      card.id === "gambler"
-                        ? `Cost ${me?.gambler_cost ?? 200} chips.`
-                        : card.id === "lawyer" && (me?.lawyer_cooldown ?? 0) > 0
-                          ? `Cooldown: ${me?.lawyer_cooldown} turns.`
-                          : card.id === "guardian" && (me?.guardian_cooldown ?? 0) > 0
-                            ? `Cooldown: ${me?.guardian_cooldown} turns.`
-                            : card.id === "toddler" && match.toddler_used_this_turn
-                              ? "Already used this turn."
-                              : card.id === "psychic" && match.psychic_used_this_turn
-                                ? "Already used this turn."
-                                : undefined,
-                    )}
+                    className={`fan-card-slot ${expanded ? "expanded" : ""}`}
+                    style={{ zIndex: expanded ? 40 : i + 1 }}
                   >
-                    <button
-                      type="button"
-                      className={`fan-card trading ${
-                        (diePick?.mode === "trading" && diePick.cardId === card.id) ||
-                        (card.id === "guardian" && blockArming === "guardian")
-                          ? "armed"
-                          : ""
-                      } ${cooldownTurnsLeft(card.id, me) > 0 ? "on-cooldown" : ""}`}
-                      style={{ zIndex: i + 1 }}
-                      disabled={tradingDisabled(card)}
-                      onClick={() => activateTrading(card)}
+                    <Tip
+                      tipAlign="end"
+                      text={tipText(
+                        card.id,
+                        false,
+                        card.id === "gambler"
+                          ? `Cost ${me?.gambler_cost ?? 200} chips.`
+                          : card.id === "lawyer" && (me?.lawyer_cooldown ?? 0) > 0
+                            ? `Cooldown: ${me?.lawyer_cooldown} turns.`
+                            : card.id === "guardian" &&
+                                (me?.guardian_cooldown ?? 0) > 0
+                              ? `Cooldown: ${me?.guardian_cooldown} turns.`
+                              : card.id === "toddler" &&
+                                  match.toddler_used_this_turn
+                                ? "Already used this turn."
+                                : card.id === "psychic" &&
+                                    match.psychic_used_this_turn
+                                  ? "Already used this turn."
+                                  : undefined,
+                      )}
                     >
-                      <CardFace
-                        cardId={card.id}
-                        me={me}
-                        rotationCount={match.rotation_count}
-                        title={tradingLabel(card)}
-                      />
-                    </button>
-                  </Tip>
-                ) : (
-                  <Tip key={`t-${card.id}-${i}`} tipAlign="end" text={tipText(card.id)}>
-                    <div
-                      className="fan-card trading passive"
-                      style={{ zIndex: i + 1 }}
-                    >
-                      <CardFace
-                        cardId={card.id}
-                        me={me}
-                        rotationCount={match.rotation_count}
-                        title={tradingLabel(card)}
-                      />
-                    </div>
-                  </Tip>
-                ),
-              )}
+                      <button
+                        type="button"
+                        className={`fan-card trading ${
+                          !showUse ? "passive" : ""
+                        } ${armed || expanded ? "armed" : ""} ${
+                          cooldownTurnsLeft(card.id, me) > 0 ? "on-cooldown" : ""
+                        }`}
+                        onClick={() => toggleCardExpand("trading", i, card)}
+                      >
+                        <CardFace
+                          cardId={card.id}
+                          me={me}
+                          rotationCount={match.rotation_count}
+                          title={tradingLabel(card)}
+                        />
+                      </button>
+                    </Tip>
+                    {expanded && (
+                      <div className="card-actions">
+                        {showUse && (
+                          <button
+                            type="button"
+                            className="card-action use"
+                            disabled={!useEnabled}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (!useEnabled) return;
+                              beginUseTrading(card);
+                            }}
+                          >
+                            Use
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          className="card-action sell"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            sellInventoryCard("trading", i);
+                          }}
+                        >
+                          Sell {card.sell_price ?? 0}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </div>
         </div>
       </section>
 
-      {canShop && (
-        <button
+      {canShop && (        <button
           type="button"
           className={`shop-sign ${shopOpen ? "open" : ""}`}
           onClick={() => setShopOpen((v) => !v)}

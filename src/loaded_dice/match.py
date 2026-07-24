@@ -32,6 +32,7 @@ from loaded_dice.card_effects.positive_power import (
     compute_do_over_points,
     POSITIVE_POWER_CAST,
     cast_positive_power,
+    try_apply_reinforcements_on_score,
 )
 from loaded_dice.card_effects.trading import (
     ACTIVATABLE_TRADING_IDS,
@@ -45,7 +46,7 @@ from loaded_dice.card_effects.trading import (
 )
 from loaded_dice.effects import TurnEffects
 from loaded_dice.scoring import Category, ScoreSheet, is_yahtzee
-from loaded_dice.shop import Shop, ShopError
+from loaded_dice.shop import Shop, ShopError, sell_price_for_card
 from loaded_dice.turn_effects import apply_turn_start_passives, resolve_turn_effects
 
 
@@ -707,6 +708,7 @@ class Match:
 
         values = self._select_scoring_values(die_indices)
         self._fold_pending_score_penalty(self.active_player)
+        try_apply_reinforcements_on_score(self.active_player, self)
         points = self.active_player.current_sheet.record(
             values,
             category,
@@ -718,6 +720,29 @@ class Match:
         self._on_sheet_completed(self.active_player)
         self._end_turn()
         return points
+
+    def sell_card(self, player: Player, *, kind: str, index: int) -> int:
+        """Remove a held card and pay its sell price. Allowed anytime during a match."""
+        self._ensure_not_over()
+        if kind == "power":
+            cards = player.inventory.power_cards
+        elif kind == "trading":
+            cards = player.inventory.trading_cards
+        else:
+            raise ValueError(f"Unknown card kind: {kind}")
+        if index < 0 or index >= len(cards):
+            raise ValueError(f"Invalid {kind} card index: {index}")
+
+        card = cards.pop(index)
+        if (
+            card.id == CardId.TWINS
+            and player is self.active_player
+            and self._dice is not None
+        ):
+            self._clear_twins_without_consuming()
+        payout = sell_price_for_card(card)
+        player.earn_chips(payout)
+        return payout
 
     def end_turn_without_scoring(self) -> None:
         """End the turn without filling a category (Lawyer / Write off only)."""

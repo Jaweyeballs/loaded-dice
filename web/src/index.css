@@ -770,6 +770,65 @@ select {
   margin-left: 0;
 }
 
+.fan-card-slot {
+  position: relative;
+  margin-left: -1.65rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.fan-card-slot:first-child {
+  margin-left: 0;
+}
+
+.fan-card-slot .fan-card {
+  margin-left: 0;
+}
+
+.fan-card-slot.expanded {
+  z-index: 40;
+}
+
+.card-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.28rem;
+  margin-top: 0.35rem;
+  width: 6.55rem;
+}
+
+.card-action {
+  border: none;
+  border-radius: 7px;
+  padding: 0.35rem 0.4rem;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  cursor: pointer;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.25);
+}
+
+.card-action.use {
+  background: #1f9d55;
+  color: #f3fff6;
+}
+
+.card-action.sell {
+  background: #c62828;
+  color: #fff5f5;
+}
+
+.card-action:disabled,
+.card-action.use:disabled {
+  background: #6b7280;
+  color: #d1d5db;
+  cursor: default;
+  opacity: 0.75;
+  box-shadow: none;
+}
+
 .fan-card:hover:not(:disabled),
 .fan-card.armed {
   transform: translateY(-14px);

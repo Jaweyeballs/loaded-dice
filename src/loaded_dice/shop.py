@@ -51,6 +51,20 @@ DEFAULT_STOCK_IDS: tuple[CardId, ...] = (
 # Temporary testing override: None = entire catalog in stock. Set back to 3 later.
 SHOP_STOCK_SIZE: int | None = None
 
+SELL_PRICE_DISCOUNT = 100
+
+
+def sell_price_for_card(card: Card) -> int:
+    """Chips gained when selling *card* from inventory.
+
+    Normal cards sell for shop price − 100 (floored at 0).
+    Transparent cards sell for double the shop price.
+    """
+    shop_price = CARD_PRICES.get(card.id, 0)
+    if card.transparent:
+        return shop_price * 2
+    return max(0, shop_price - SELL_PRICE_DISCOUNT)
+
 
 class ShopError(Exception):
     """Raised when a shop action is invalid."""

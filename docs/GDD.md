@@ -54,7 +54,8 @@ Permanent boosts with drawbacks, picked at the start of a run/match.
   - **Positive** power cards take effect **immediately**.
   - **Negative** power cards take effect **on the target's turn**.
 - **Trading cards** = persistent modifiers that stay in effect as long as they're in your party.
-- **Transparent power cards**: trait of power cards, makes them not take up a slot in inventory. can be randomly spawned or given (e.g. Negative Reinforcement). Do **not** consume a power card slot.
+- **Transparent power cards**: trait of power cards, makes them not take up a slot in inventory. can be randomly spawned or given (e.g. Negative Reinforcement). Do **not** consume a power card slot. Selling a transparent card yields **double** its shop price.
+- **Inventory Use / Sell**: Clicking a held card opens **Use** (green) and/or **Sell** (red). Sell is always available and pays shop price − **100** (floor **0**), or 2× shop price if transparent. Use appears only on manually played cards; it is grayed out when the card cannot be used right now. Do over uses the scoresheet control instead of Use. Passives and reinforcements have Sell only.
 
 ### Turn flow
 1. **Start turn (active player)** — Clicking **Start Turn** pays interest/compensation, then resolves **ready** queued hindrances for this trigger (Glass half, Blue Shell, and punishments whose attack condition is met). Play goes straight to the active/rolling phase. Unresolved hindrances (e.g. Already in Jail, or punishments waiting on their condition) stay queued across turns. Players may **block** any still-queued hindrance on themselves (Parry, Guardian) at any time before that card resolves.
@@ -70,10 +71,10 @@ Permanent boosts with drawbacks, picked at the start of a run/match.
 |---|---|
 | Icarus | Choose a die and increase its value, wrapping 6 → 1 |
 | Super serum | Increase entire hand's value by 1 |
-| Do over | Overwrite your last scored category with this hand’s score in that box. For full house / four of a kind / large or small straight: **+5** only if this hand also qualifies for a non-zero score in that box; otherwise the overwrite is **0**. Cannot overwrite a scored Yahtzee. If the current hand is a Yahtzee and Yahtzee is already filled, Do over does nothing — score the extra Yahtzee normally. Use the scoresheet Do over control. |
+| Do over | Overwrite your last scored category with this hand’s score in that box. For full house / four of a kind / large or small straight: **+5** only if this hand also qualifies for a non-zero score in that box; otherwise the overwrite is **0**. Cannot overwrite a scored Yahtzee. If the current hand is a Yahtzee and Yahtzee is already filled, Do over does nothing — score the extra Yahtzee normally. Use the scoresheet Do over control (no Use button on the card). |
 | Parry | Block a single unresolved hindrance queued on you (any time before it resolves) |
-| Positive reinforcement | If you attacked no one last rotation, gain 8 points on this scored hand |
-| Negative reinforcement | If you attacked no one last rotation, gain a *transparent* Parry |
+| Positive reinforcement | If you attacked no one last rotation, gain 8 points when you **score** a hand (consumed on that score; kept if you Write Off / end without scoring). No Use button. |
+| Negative reinforcement | If you attacked no one last rotation, gain a *transparent* Parry when you **score** a hand (consumed on that score). No Use button. |
 | Benchwarmer | Roll an extra die alongside normal dice this roll (limited to values 1–3); select 5 dice for scoring |
 | Helping hand | Choose: gain **400** chips, or gain 10 points on this hand — whichever you don't pick goes to another player of your choice |
 | Twins | Link 2 dice (1st = source). On the next roll involving that link, the 2nd copies the 1st. Click the card again to cancel. Consumed only when the link resolves on a roll (including Toddler). |
