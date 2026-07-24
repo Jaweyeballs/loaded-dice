@@ -11,7 +11,6 @@ from loaded_dice.shop import SHOP_REROLL_COST, Shop, ShopError
 
 def _begin_active_turn(match: Match) -> None:
     match.start_turn()
-    match.begin_rolling()
 
 
 def test_shop_buy_adds_trading_card():

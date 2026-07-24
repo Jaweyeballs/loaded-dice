@@ -512,26 +512,18 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
   const sheetPlayer =
     match.players.find((p) => p.name === sheetPlayerName) ?? match.players[0];
 
-  // Cancel die-targeting / block-arm modes if the turn leaves turn_start/active.
+  // Cancel die-targeting when leaving the active turn; keep block-arm while debuffs remain.
   useEffect(() => {
-    if (!active || (match.phase !== "turn_active" && match.phase !== "turn_start")) {
-      setIcarusArming(false);
-      setSpaceArming(false);
-      setDiePick(null);
-      setBlockArming(null);
-      setPlayerTarget(null);
-      return;
-    }
-    if (match.phase !== "turn_active" || !match.dice) {
+    if (!active || match.phase !== "turn_active") {
       setIcarusArming(false);
       setSpaceArming(false);
       setDiePick(null);
       setPlayerTarget(null);
     }
-    if (match.phase !== "turn_start") {
+    if ((me?.queued_hindrances.length ?? 0) === 0) {
       setBlockArming(null);
     }
-  }, [active, match.phase, match.dice]);
+  }, [active, match.phase, match.dice, me?.queued_hindrances.length]);
 
   // Shop sign is off-turn only — close the panel when shopping becomes unavailable.
   useEffect(() => {
@@ -659,7 +651,11 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
       clearAiming();
       return;
     }
-    if (card.id === "parry" && match.phase === "turn_start" && active) {
+    if (
+      card.id === "parry" &&
+      myDebuffs.length > 0 &&
+      canArmParry
+    ) {
       clearAiming();
       setBlockArming("parry");
       return;
@@ -736,8 +732,8 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
 
   function activateTrading(card: CardInfo) {
     if (card.id === "guardian") {
-      if (!active || match.phase !== "turn_start") return;
       if ((me?.guardian_cooldown ?? 0) > 0) return;
+      if ((me?.queued_hindrances.length ?? 0) === 0) return;
       if (blockArming === "guardian") {
         clearAiming();
         return;
@@ -770,8 +766,6 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
   function tradingDisabled(card: CardInfo): boolean {
     if (card.id === "guardian") {
       return (
-        !active ||
-        match.phase !== "turn_start" ||
         (me?.guardian_cooldown ?? 0) > 0 ||
         (me?.queued_hindrances.length ?? 0) === 0
       );
@@ -1184,18 +1178,11 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
               Start turn
             </button>
           )}
-          {match.phase === "turn_start" && active && (
-            <>
-              <button type="button" onClick={() => onAction({ type: "begin_rolling" })}>
-                Begin rolling
-              </button>
-              {blockArming && (
-                <p className="hint table-hint">
-                  Click a purple debuff to block with {label(blockArming)} (or click the
-                  card again to cancel)
-                </p>
-              )}
-            </>
+          {blockArming && (
+            <p className="hint table-hint">
+              Click a purple debuff to block with {label(blockArming)} (or click the
+              card again to cancel)
+            </p>
           )}
           {match.phase === "turn_active" && active && (
             <>
@@ -1351,20 +1338,23 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
                       status === "DORMANT" ? "dormant" : ""
                     }`}
                     disabled={
-                      !active ||
-                      (!isHindrance &&
-                        (card.id === "do_over" ||
-                          (card.id === "parry"
-                            ? match.phase !== "turn_start" ||
-                              !canArmParry ||
-                              myDebuffs.length === 0
-                            : (card.id === "icarus" ||
+                      card.id === "parry"
+                        ? !(
+                            (myDebuffs.length > 0 && canArmParry) ||
+                            (active &&
+                              match.phase === "turn_active" &&
+                              canArmParry)
+                          )
+                        : !active ||
+                          (!isHindrance &&
+                            (card.id === "do_over" ||
+                              ((card.id === "icarus" ||
                                 card.id === "space_die" ||
                                 card.id === "twins" ||
                                 card.id === "super_serum" ||
                                 card.id === "benchwarmer" ||
                                 card.id === "boolean") &&
-                              !match.dice)))
+                                !match.dice)))
                     }
                     onClick={() =>
                       isHindrance ? castHindrance(card, i) : castPower(card)
@@ -1380,7 +1370,7 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
                 </Tip>
                 );
               })}
-              {showParryReadyChip && match.phase === "turn_start" && active && (
+              {showParryReadyChip && myDebuffs.length > 0 && (
                 <Tip text={tipText("parry")} tipAlign="start">
                   <button
                     type="button"

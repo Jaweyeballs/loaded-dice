@@ -17,7 +17,6 @@ from loaded_dice.scoring import Category
 
 def _begin_active_turn(match: Match) -> None:
     match.start_turn()
-    match.begin_rolling()
 
 
 def test_persuader_adds_score_bonus():
@@ -183,14 +182,16 @@ def test_guardian_blocks_hindrance_with_cooldown():
     match.cast_hindrance(CardId.GLASS_HALF_FULL, bob)
     match.end_turn_without_scoring()
 
-    match.start_turn()  # Bob
+    # Bob's turn — block before Start Turn resolves the queue.
+    assert match.active_player.name == "Bob"
     assert len(bob.queued_hindrances) == 1
     match.block_hindrance(0, CardId.GUARDIAN)
     assert bob.queued_hindrances == []
     assert bob.guardian_cooldown_turns == 2
     assert match.hindrance_feed[-1].blocked is True
     assert match.hindrance_feed[-1].blocker_card_id == CardId.GUARDIAN
-
+    match.start_turn()
+    assert bob.turn_effects.zero_upper is False
 
 def test_forecaster_reveals_only_to_active_holder():
     from loaded_dice.rooms import Room

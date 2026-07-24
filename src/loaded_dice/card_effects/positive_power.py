@@ -166,8 +166,8 @@ def _write_off_on_cast(player: Player, match: Match, **kwargs) -> None:
 
 
 def _parry_on_cast(player: Player, match: Match, **kwargs) -> None:
-    # Parry is resolved during TURN_START when the player picks which queued
-    # hindrance to block via Match.block_hindrance. Cast marks readiness.
+    # Parry blocks via Match.block_hindrance anytime before a queued hindrance
+    # resolves. Cast marks readiness for a later block click.
     player.parry_ready = True
 
 

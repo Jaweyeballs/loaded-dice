@@ -24,6 +24,7 @@ export type PlayerState = {
   power_cards: CardInfo[];
   trading_cards: CardInfo[];
   queued_hindrances: { card_id: string; caster_name: string }[];
+  pending_score_penalty?: number;
   turn_effects: {
     zero_upper: boolean;
     zero_lower: boolean;

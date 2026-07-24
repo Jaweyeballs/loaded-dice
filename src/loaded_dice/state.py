@@ -9,8 +9,19 @@ from loaded_dice.card_effects.positive_power import compute_do_over_points
 from loaded_dice.match import Match, Player
 from loaded_dice.preview import SCORING_HAND_SIZE, preview_scores
 from loaded_dice.scoring import Category, YAHTZEE_BONUS_POINTS, is_yahtzee
+from loaded_dice.effects import TurnEffects
 from itertools import combinations
+from dataclasses import replace
 
+
+def effective_turn_effects(player: Player) -> TurnEffects:
+    """Turn effects including armed positive-punishment pending until score."""
+    if player.pending_score_penalty <= 0:
+        return player.turn_effects
+    return replace(
+        player.turn_effects,
+        score_penalty=player.turn_effects.score_penalty + player.pending_score_penalty,
+    )
 
 def serialize_card(card) -> dict[str, Any]:
     return {
@@ -59,8 +70,11 @@ def serialize_player(player: Player, match: Match) -> dict[str, Any]:
             "zero_upper": player.turn_effects.zero_upper,
             "zero_lower": player.turn_effects.zero_lower,
             "score_bonus": player.turn_effects.score_bonus,
-            "score_penalty": player.turn_effects.score_penalty,
+            "score_penalty": (
+                player.turn_effects.score_penalty + player.pending_score_penalty
+            ),
         },
+        "pending_score_penalty": player.pending_score_penalty,
         "parry_ready": player.parry_ready,
         "can_use_shop": match.can_use_shop(player),
         "gambler_cost": player.gambler_next_cost,
@@ -103,7 +117,7 @@ def serialize_previews(match: Match) -> dict[str, int] | None:
         previews = preview_scores(
             match.dice.values,
             match.active_player.current_sheet,
-            match.active_player.turn_effects,
+            effective_turn_effects(match.active_player),
         )
     except ValueError:
         return None
@@ -129,14 +143,15 @@ def serialize_do_over_preview(match: Match) -> dict[str, Any] | None:
     ):
         return None
     try:
+        effects = effective_turn_effects(player)
         if len(values) == SCORING_HAND_SIZE:
-            points = compute_do_over_points(values, category, player.turn_effects)
+            points = compute_do_over_points(values, category, effects)
         else:
             points = max(
                 compute_do_over_points(
                     [values[i] for i in indices],
                     category,
-                    player.turn_effects,
+                    effects,
                 )
                 for indices in combinations(range(len(values)), SCORING_HAND_SIZE)
             )

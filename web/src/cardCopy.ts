@@ -8,7 +8,7 @@ export const CARD_BLURBS: Record<string, string> = {
   lawyer: "End your turn without scoring (2-turn cooldown).",
   toddler: "Pick 2 dice to immediately reroll them (once per turn).",
   psychic: "Pick 2 dice to preview their next rolled faces (once per turn).",
-  guardian: "Block a queued hindrance at turn start (1-turn cooldown).",
+  guardian: "Block a queued hindrance anytime before it resolves (1-turn cooldown).",
   forecaster: "On your turn, see hindrance cards held by other players (passive).",
   icarus: "Bump one die face up by 1 (wraps 6 → 1).",
   super_serum: "Increase every die by 1 (6s stay 6 — no wrap).",
@@ -21,7 +21,7 @@ export const CARD_BLURBS: Record<string, string> = {
   space_die: "Set one die to any face it can show.",
   boolean: "Add a 6/blank die for the rest of this turn. Pick 5 when scoring.",
   write_off: "End your turn without scoring.",
-  parry: "Block a single queued hindrance at turn start (consumable).",
+  parry: "Block a single queued hindrance anytime before it resolves (consumable).",
   glass_half_full: "Target’s upper-section score is 0 this turn.",
   glass_half_empty: "Target’s lower-section score is 0 this turn.",
   positive_reinforcement:
@@ -29,12 +29,12 @@ export const CARD_BLURBS: Record<string, string> = {
   negative_reinforcement:
     "If you attacked no one last rotation, gain a transparent Parry.",
   positive_punishment:
-    "If the target attacked you last rotation, −5 on their next scored hand.",
+    "If the target attacked you last rotation, −5 on their next scored hand (stays until they score).",
   negative_punishment:
-    "If the target attacked you last rotation, they lose 200 chips.",
-  blue_shell: "The player currently in 1st place loses 10 points (auto-target).",
+    "If the target attacked you last rotation, they lose 200 chips at their Start Turn (else keeps waiting).",
+  blue_shell: "Queued on current 1st place; they lose 10 points on their Start Turn.",
   already_in_jail:
-    "The first die the target locks this turn cannot be unlocked.",
+    "Stays until the target’s first lock; that die cannot be unlocked (blockable until then).",
 };
 
 export function cardBlurb(cardId: string): string {

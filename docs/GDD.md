@@ -57,8 +57,8 @@ Permanent boosts with drawbacks, picked at the start of a run/match.
 - **Transparent power cards**: trait of power cards, makes them not take up a slot in inventory. can be randomly spawned or given (e.g. Negative Reinforcement). Do **not** consume a power card slot.
 
 ### Turn flow
-1. **Turn start (active player)** — Queued hindrances are shown with their caster. Effects are displayed but do **not** resolve yet; the player may respond first (e.g. Parry, Guardian). Clicking **Start Turn** resolves them — targeted hindrances apply as specified; untargeted ones (e.g. Blue Shell) take effect at this moment (e.g. −10 points).
-2. **Active phase** — Standard Yahtzee: roll, lock, reroll, score. Extra dice from active effects roll with the normal dice. When scoring, if more than 5 dice are in play, the player is prompted to select 5 for their scoring hand, then pick a category. The active player may play positive power cards and cast hindrances on chosen targets at any point. Only the active player may cast cards.
+1. **Start turn (active player)** — Clicking **Start Turn** pays interest/compensation, then resolves **ready** queued hindrances for this trigger (Glass half, Blue Shell, and punishments whose attack condition is met). Play goes straight to the active/rolling phase. Unresolved hindrances (e.g. Already in Jail, or punishments waiting on their condition) stay queued across turns. Players may **block** any still-queued hindrance on themselves (Parry, Guardian) at any time before that card resolves.
+2. **Active phase** — Standard Yahtzee: roll, lock, reroll, score. Extra dice from active effects roll with the normal dice. When scoring, if more than 5 dice are in play, the player is prompted to select 5 for their scoring hand, then pick a category. The active player may play positive power cards and cast hindrances on chosen targets at any point. Only the active player may cast cards. **Already in Jail** resolves on the first lock of a turn (one queued copy per lock) and can still be blocked before that lock.
 3. **End turn** — Clicking **End Turn** passes play. The player who just finished may now open the shop (browse, buy, reroll stock) and spectate until their next turn. Shop access closes when they click **Start Turn** and reopens on their next **End Turn**. Players cannot cast cards when it is not their turn.
 
 ---
@@ -71,7 +71,7 @@ Permanent boosts with drawbacks, picked at the start of a run/match.
 | Icarus | Choose a die and increase its value, wrapping 6 → 1 |
 | Super serum | Increase entire hand's value by 1 |
 | Do over | Overwrite your last scored category with this hand’s score in that box. For full house / four of a kind / large or small straight: **+5** only if this hand also qualifies for a non-zero score in that box; otherwise the overwrite is **0**. Cannot overwrite a scored Yahtzee. If the current hand is a Yahtzee and Yahtzee is already filled, Do over does nothing — score the extra Yahtzee normally. Use the scoresheet Do over control. |
-| Parry | Block a single hindrance cast on you this turn |
+| Parry | Block a single unresolved hindrance queued on you (any time before it resolves) |
 | Positive reinforcement | If you attacked no one last rotation, gain 8 points on this scored hand |
 | Negative reinforcement | If you attacked no one last rotation, gain a *transparent* Parry |
 | Benchwarmer | Roll an extra die alongside normal dice this roll (limited to values 1–3); select 5 dice for scoring |
@@ -84,12 +84,12 @@ Permanent boosts with drawbacks, picked at the start of a run/match.
 ### Negative (hinder another player)
 | Name | Effect |
 |---|---|
-| Positive punishment | If the target attacked you last round, they lose 5 points on their next scored hand |
-| Negative punishment | If the target attacked you last round, they lose **200** chips |
-| Blue shell | The player in 1st place loses 10 points |
-| Already in jail | The first die the target locks on their turn cannot be unlocked for the rest of their turn |
-| Glass half empty | Any lower-section hand picked this round scores 0 |
-| Glass half full | Any upper-section hand picked this round scores 0 |
+| Positive punishment | If the target attacked you last rotation, arm −5 that applies on their **next scored hand** (survives Write Off). If the attack condition is not met at Start Turn, the card stays queued. |
+| Negative punishment | If the target attacked you last rotation, they lose **200** chips at Start Turn. If not, the card stays queued until a later Start Turn where the condition is true. |
+| Blue shell | Queued on whoever is in **1st at cast time**; that player loses 10 points on their next Start Turn (does not retarget if standings change). |
+| Already in jail | Stays queued until the target’s **first lock** on a turn (or blocked). That die cannot be unlocked for the rest of the turn. Each lock consumes one queued copy. |
+| Glass half empty | At Start Turn: any lower-section hand scored this turn is 0 (resolves for the turn regardless of which half they score). |
+| Glass half full | At Start Turn: any upper-section hand scored this turn is 0 (resolves for the turn regardless of which half they score). |
 
 - **Glass half empty** and **Glass half full** cannot both be active on the same player at the same time.
 
@@ -104,7 +104,7 @@ Permanent boosts with drawbacks, picked at the start of a run/match.
 | The persuader | +3 points on every scored hand |
 | The gambler | Pay **200** chips for an extra reroll; cost increases by **100** chips each time used |
 | The psychic | Choose 2 dice to preview their next rolled value (once per turn) |
-| The guardian | Parries a hindrance card of your choice; goes on cooldown for one turn after triggering |
+| The guardian | Block an unresolved queued hindrance of your choice; goes on cooldown for one turn after triggering |
 | The forecaster | Reveals all hindrance cards held by all players, visible only to you, on your turn |
 | The merchant | Earn **200** chips on your turn |
 | The lawyer | End your turn without scoring a hand (2-turn cooldown) |

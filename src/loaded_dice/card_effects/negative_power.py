@@ -1,4 +1,4 @@
-"""Negative power card effects — hindrances queued on a target's turn."""
+"""Negative power card effects — hindrances queued until their resolve trigger."""
 
 from __future__ import annotations
 
@@ -15,7 +15,21 @@ BLUE_SHELL_POINT_LOSS = 10
 POSITIVE_PUNISHMENT_POINT_LOSS = 5
 NEGATIVE_PUNISHMENT_CHIP_LOSS = 200
 
-# --- Hindrance resolvers (run once when target clicks Start Turn) ---
+# Resolve on the target's Start Turn (if any condition is met).
+START_TURN_HINDRANCES = frozenset(
+    {
+        CardId.GLASS_HALF_FULL,
+        CardId.GLASS_HALF_EMPTY,
+        CardId.BLUE_SHELL,
+        CardId.POSITIVE_PUNISHMENT,
+        CardId.NEGATIVE_PUNISHMENT,
+    }
+)
+
+# Resolve when the target locks a die (one card per lock).
+FIRST_LOCK_HINDRANCES = frozenset({CardId.ALREADY_IN_JAIL})
+
+# --- Hindrance resolvers ---
 
 
 def _glass_half_full_on_resolve(target: Player, caster: Player, match: Match) -> None:
@@ -31,23 +45,16 @@ def _blue_shell_on_resolve(target: Player, caster: Player, match: Match) -> None
 
 
 def _already_in_jail_on_resolve(target: Player, caster: Player, match: Match) -> None:
-    target.jail_armed = True
-    target.jail_locked_index = None
+    # Match.lock applies the locked-die restriction when this card is consumed.
+    return
 
 
 def _positive_punishment_on_resolve(target: Player, caster: Player, match: Match) -> None:
-    if match.rotation_count == 0:
-        return
-    if not match.player_attacked_player_last_rotation(target, caster):
-        return
-    target.turn_effects.score_penalty += POSITIVE_PUNISHMENT_POINT_LOSS
+    # Armed as pending_score_penalty; applied on the next scored hand.
+    target.pending_score_penalty += POSITIVE_PUNISHMENT_POINT_LOSS
 
 
 def _negative_punishment_on_resolve(target: Player, caster: Player, match: Match) -> None:
-    if match.rotation_count == 0:
-        return
-    if not match.player_attacked_player_last_rotation(target, caster):
-        return
     target.lose_chips(NEGATIVE_PUNISHMENT_CHIP_LOSS)
 
 
@@ -81,14 +88,39 @@ def validate_hindrance_queue(target: Player, card_id: CardId) -> None:
         )
 
 
+def punishment_condition_met(target: Player, caster: Player, match: Match) -> bool:
+    """Whether positive/negative punishment may resolve this start turn."""
+    if match.rotation_count == 0:
+        return False
+    return match.player_attacked_player_last_rotation(target, caster)
+
+
 def resolve_hindrance(
     card_id: CardId,
     target: Player,
     caster: Player,
     match: Match,
 ) -> None:
-    """Apply a queued hindrance to *target* at turn start."""
+    """Apply a hindrance effect (caller has already decided it should resolve)."""
     handler = HINDRANCE_RESOLVERS.get(card_id)
     if handler is None:
         raise ValueError(f"No hindrance handler for {card_id.value}")
     handler(target, caster, match)
+
+
+def try_resolve_hindrance_at_start_turn(
+    card_id: CardId,
+    target: Player,
+    caster: Player,
+    match: Match,
+) -> bool:
+    """Resolve a start-turn hindrance if ready. Returns True if consumed from queue."""
+    if card_id in FIRST_LOCK_HINDRANCES:
+        return False
+    if card_id not in START_TURN_HINDRANCES:
+        return False
+    if card_id in (CardId.POSITIVE_PUNISHMENT, CardId.NEGATIVE_PUNISHMENT):
+        if not punishment_condition_met(target, caster, match):
+            return False
+    resolve_hindrance(card_id, target, caster, match)
+    return True

@@ -10,7 +10,6 @@ from loaded_dice.scoring import Category
 
 def _begin_active_turn(match: Match) -> None:
     match.start_turn()
-    match.begin_rolling()
 
 
 def test_super_serum_bumps_all_dice():
@@ -315,12 +314,68 @@ def test_already_in_jail_locks_first_die():
     match.cast_hindrance(CardId.ALREADY_IN_JAIL, bob)
     match.end_turn_without_scoring()
     match.start_turn()
-    match.begin_rolling()
+    assert len(bob.queued_hindrances) == 1
+    assert bob.queued_hindrances[0].card_id == CardId.ALREADY_IN_JAIL
     match.roll()
     match.lock(2)
+    assert bob.queued_hindrances == []
     assert bob.jail_locked_index == 2
     with pytest.raises(WrongPhaseError, match="jail"):
         match.unlock(2)
+
+
+def test_already_in_jail_can_be_blocked_after_start_turn():
+    match = Match(["Alice", "Bob"])
+    alice, bob = match.players
+    alice.inventory.add_power(card_for_id(CardId.ALREADY_IN_JAIL))
+    bob.inventory.add_power(card_for_id(CardId.PARRY))
+    _begin_active_turn(match)
+    match.roll()
+    match.cast_hindrance(CardId.ALREADY_IN_JAIL, bob)
+    match.end_turn_without_scoring()
+    match.start_turn()
+    assert len(bob.queued_hindrances) == 1
+    match.block_hindrance(0)
+    assert bob.queued_hindrances == []
+    match.roll()
+    match.lock(0)
+    assert bob.jail_locked_index is None
+    match.unlock(0)
+
+
+def test_already_in_jail_stacks_one_per_lock():
+    match = Match(["Alice", "Bob"])
+    alice, bob = match.players
+    alice.inventory.add_power(card_for_id(CardId.ALREADY_IN_JAIL))
+    alice.inventory.add_power(card_for_id(CardId.ALREADY_IN_JAIL))
+    _begin_active_turn(match)
+    match.roll()
+    match.cast_hindrance(CardId.ALREADY_IN_JAIL, bob)
+    match.cast_hindrance(CardId.ALREADY_IN_JAIL, bob)
+    match.end_turn_without_scoring()
+    match.start_turn()
+    assert len(bob.queued_hindrances) == 2
+    match.roll()
+    match.lock(1)
+    assert bob.jail_locked_index == 1
+    assert len(bob.queued_hindrances) == 1
+    with pytest.raises(WrongPhaseError, match="jail"):
+        match.unlock(1)
+
+
+def test_already_in_jail_persists_if_turn_ends_without_lock():
+    match = Match(["Alice", "Bob"])
+    alice, bob = match.players
+    alice.inventory.add_power(card_for_id(CardId.ALREADY_IN_JAIL))
+    _begin_active_turn(match)
+    match.roll()
+    match.cast_hindrance(CardId.ALREADY_IN_JAIL, bob)
+    match.end_turn_without_scoring()
+    match.start_turn()
+    match.roll()
+    match.end_turn_without_scoring()
+    assert len(bob.queued_hindrances) == 1
+    assert bob.queued_hindrances[0].card_id == CardId.ALREADY_IN_JAIL
 
 
 def test_score_with_extra_die_requires_selection():

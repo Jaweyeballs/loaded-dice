@@ -23,7 +23,6 @@ TURN_ACTIONS = frozenset(
     {
         "start_turn",
         "begin_rolling",
-        "block_hindrance",
         "roll",
         "lock",
         "unlock",
@@ -79,10 +78,14 @@ def _begin_rolling(match: Match, _actor: Player, _action: dict[str, Any]) -> Non
     match.begin_rolling()
 
 
-def _block_hindrance(match: Match, _actor: Player, action: dict[str, Any]) -> None:
+def _block_hindrance(match: Match, actor: Player, action: dict[str, Any]) -> None:
     blocker = action.get("blocker_card_id")
     blocker_id = _parse_card_id(str(blocker)) if blocker is not None else None
-    match.block_hindrance(int(_require(action, "hindrance_index")), blocker_id)
+    match.block_hindrance(
+        int(_require(action, "hindrance_index")),
+        blocker_id,
+        player=actor,
+    )
 
 
 def _roll(match: Match, _actor: Player, _action: dict[str, Any]) -> None:

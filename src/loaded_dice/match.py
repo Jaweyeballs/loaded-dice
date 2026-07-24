@@ -25,6 +25,7 @@ from loaded_dice.cards import (
 from loaded_dice.card_effects.negative_power import (
     HindranceConflictError,
     resolve_hindrance,
+    try_resolve_hindrance_at_start_turn,
     validate_hindrance_queue,
 )
 from loaded_dice.card_effects.positive_power import (
@@ -50,7 +51,7 @@ from loaded_dice.turn_effects import apply_turn_start_passives, resolve_turn_eff
 
 class TurnPhase(Enum):
     BETWEEN_TURNS = "between_turns"
-    TURN_START = "turn_start"  # hindrances shown; resolved before rolling (GDD)
+    TURN_START = "turn_start"  # legacy; start_turn now goes straight to TURN_ACTIVE
     TURN_ACTIVE = "turn_active"
 
 
@@ -134,7 +135,8 @@ class Player:
     guardian_cooldown_turns: int = 0
     last_scored_values: list[int] | None = None
     last_scored_category: Category | None = None
-    jail_armed: bool = False
+    # Positive punishment armed at start turn; applied on the next scored hand.
+    pending_score_penalty: int = 0
     jail_locked_index: int | None = None
 
     def total_score(self) -> int:
@@ -249,7 +251,7 @@ class Match:
         return all(player.is_out_of_match(self.config) for player in self.players)
 
     def start_turn(self) -> None:
-        """Begin the active player's turn (GDD: show hindrances in TURN_START)."""
+        """Begin the active player's turn; resolve remaining queued hindrances."""
         self._ensure_not_over()
         if self.phase != TurnPhase.BETWEEN_TURNS:
             raise WrongPhaseError(f"Cannot start turn during {self.phase.value}")
@@ -268,7 +270,6 @@ class Match:
         self.active_player.turn_effects = resolve_turn_effects(self.active_player)
         apply_turn_start_passives(self.active_player, self)
 
-        self.phase = TurnPhase.TURN_START
         self._dice = DiceSet(
             size=self.config.dice_size,
             max_rolls=self.config.max_rolls_per_turn,
@@ -276,10 +277,15 @@ class Match:
         self._toddler_used_this_turn = False
         self._psychic_used_this_turn = False
         self._psychic_previews = {}
+        self._resolve_queued_hindrances(self.active_player)
+        self.active_player.parry_ready = False
+        self.phase = TurnPhase.TURN_ACTIVE
 
     def begin_rolling(self) -> None:
-        """Move from TURN_START to TURN_ACTIVE (GDD: Start Turn button pressed)."""
+        """No-op compatibility: Start turn already enters TURN_ACTIVE."""
         self._ensure_not_over()
+        if self.phase == TurnPhase.TURN_ACTIVE:
+            return
         if self.phase != TurnPhase.TURN_START:
             raise WrongPhaseError(f"Cannot begin rolling during {self.phase.value}")
         self._resolve_queued_hindrances(self.active_player)
@@ -290,22 +296,21 @@ class Match:
         self,
         hindrance_index: int,
         blocker_card_id: CardId | None = None,
+        *,
+        player: Player | None = None,
     ) -> None:
-        """Cancel one queued hindrance during TURN_START (Parry, Guardian, etc.)."""
+        """Cancel one of *player*'s unresolved queued hindrances (Parry, Guardian)."""
         self._ensure_not_over()
-        if self.phase != TurnPhase.TURN_START:
-            raise WrongPhaseError(f"Cannot block hindrances during {self.phase.value}")
-
-        player = self.active_player
-        if hindrance_index < 0 or hindrance_index >= len(player.queued_hindrances):
+        target = player if player is not None else self.active_player
+        if hindrance_index < 0 or hindrance_index >= len(target.queued_hindrances):
             raise ValueError(f"Invalid hindrance index: {hindrance_index}")
 
-        used = self._consume_block_card(player, blocker_card_id)
-        blocked = player.queued_hindrances.pop(hindrance_index)
+        used = self._consume_block_card(target, blocker_card_id)
+        blocked = target.queued_hindrances.pop(hindrance_index)
         self._append_hindrance_feed(
             card_id=blocked.card_id,
             caster_name=blocked.caster_name,
-            target_name=player.name,
+            target_name=target.name,
             blocked=True,
             blocker_card_id=used,
         )
@@ -397,9 +402,9 @@ class Match:
         assert self._dice is not None
         player = self.active_player
         self._dice.lock(index)
-        if player.jail_armed and player.jail_locked_index is None:
-            player.jail_locked_index = index
-            player.jail_armed = False
+        if player.jail_locked_index is None:
+            if self._consume_queued_hindrance(player, CardId.ALREADY_IN_JAIL):
+                player.jail_locked_index = index
 
     def unlock(self, index: int) -> None:
         self._require_active_dice()
@@ -656,6 +661,7 @@ class Match:
             raise WrongPhaseError("Only the active player can use Do over")
         if category is None:
             raise ValueError("Do over requires a previously scored hand")
+        self._fold_pending_score_penalty(player)
         points = compute_do_over_points(values, category, player.turn_effects)
         player.current_sheet.overwrite(
             values,
@@ -700,6 +706,7 @@ class Match:
             raise MustRollBeforeScoreError("Roll at least once before scoring")
 
         values = self._select_scoring_values(die_indices)
+        self._fold_pending_score_penalty(self.active_player)
         points = self.active_player.current_sheet.record(
             values,
             category,
@@ -826,13 +833,40 @@ class Match:
         player.current_sheet = ScoreSheet()
 
     def _resolve_queued_hindrances(self, player: Player) -> None:
+        """Resolve start-turn hindrances that are ready; leave the rest queued."""
         caster_by_name = {candidate.name: candidate for candidate in self.players}
+        remaining: list[QueuedHindrance] = []
         for hindrance in player.queued_hindrances:
             caster = caster_by_name.get(hindrance.caster_name)
             if caster is None:
                 raise ValueError(f"Unknown caster: {hindrance.caster_name}")
-            resolve_hindrance(hindrance.card_id, player, caster, self)
-        player.queued_hindrances.clear()
+            if try_resolve_hindrance_at_start_turn(
+                hindrance.card_id, player, caster, self
+            ):
+                continue
+            remaining.append(hindrance)
+        player.queued_hindrances = remaining
+
+    def _consume_queued_hindrance(self, player: Player, card_id: CardId) -> bool:
+        """Resolve and remove the first queued *card_id*. Returns True if one was consumed."""
+        caster_by_name = {candidate.name: candidate for candidate in self.players}
+        for index, hindrance in enumerate(player.queued_hindrances):
+            if hindrance.card_id != card_id:
+                continue
+            caster = caster_by_name.get(hindrance.caster_name)
+            if caster is None:
+                raise ValueError(f"Unknown caster: {hindrance.caster_name}")
+            resolve_hindrance(card_id, player, caster, self)
+            player.queued_hindrances.pop(index)
+            return True
+        return False
+
+    def _fold_pending_score_penalty(self, player: Player) -> None:
+        """Move armed positive-punishment penalty into this hand's turn effects."""
+        if player.pending_score_penalty <= 0:
+            return
+        player.turn_effects.score_penalty += player.pending_score_penalty
+        player.pending_score_penalty = 0
 
     def _end_turn(self) -> None:
         starting_index = self._current_index
@@ -841,7 +875,6 @@ class Match:
             finishing.lawyer_cooldown_turns -= 1
         if finishing.guardian_cooldown_turns > 0:
             finishing.guardian_cooldown_turns -= 1
-        finishing.jail_armed = False
         finishing.jail_locked_index = None
 
         self._dice = None
@@ -860,7 +893,6 @@ class Match:
                 p.name: p.total_score() for p in self.players
             }
             self._leaderboard_order = self._ranked_player_names()
-
     def _ranked_player_names(self) -> list[str]:
         return [
             player.name

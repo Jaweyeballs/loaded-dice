@@ -23,7 +23,6 @@ from loaded_dice.scoring import Category
 
 def _begin_active_turn(match: Match) -> None:
     match.start_turn()
-    match.begin_rolling()
 
 
 def _end_turn_quickly(match: Match) -> None:
@@ -60,9 +59,8 @@ def test_start_turn_and_roll():
     assert len(values) == 5
 
 
-def test_cannot_roll_before_begin_rolling():
+def test_cannot_roll_before_start_turn():
     match = Match(["Alice"])
-    match.start_turn()
     with pytest.raises(WrongPhaseError):
         match.roll()
 
@@ -210,7 +208,6 @@ def test_cast_icarus_wraps_six_to_one():
 def test_cast_power_card_requires_turn_active():
     match = Match(["Alice"])
     match.active_player.inventory.add_power(Card(CardId.ICARUS, CardKind.POWER))
-    match.start_turn()
     with pytest.raises(WrongPhaseError):
         match.cast_power_card(CardId.ICARUS, die_index=0)
 
@@ -248,14 +245,13 @@ def test_hindrance_resolves_when_turn_begins():
     match.cast_hindrance(CardId.GLASS_HALF_FULL, bob)
     match.end_turn_without_scoring()
 
-    match.start_turn()
     assert bob.turn_effects.zero_upper is False
-    match.begin_rolling()
+    match.start_turn()
     assert bob.turn_effects.zero_upper is True
     assert bob.queued_hindrances == []
 
 
-def test_hindrance_affects_scoring_after_begin_rolling():
+def test_hindrance_affects_scoring_after_start_turn():
     match = Match(["Alice", "Bob"])
     _begin_active_turn(match)
     bob = match.players[1]
@@ -265,7 +261,6 @@ def test_hindrance_affects_scoring_after_begin_rolling():
     match.end_turn_without_scoring()
 
     match.start_turn()
-    match.begin_rolling()
     match.roll()
     for die, value in zip(match.dice.dice, [3, 3, 3, 1, 2]):
         die.value = value
@@ -287,9 +282,8 @@ def test_block_hindrance_cancels_one_queued_effect():
     )
     bob.inventory.add_power(Card(CardId.PARRY, CardKind.POWER))
 
-    match.start_turn()
     match.block_hindrance(0)
-    match.begin_rolling()
+    match.start_turn()
     assert bob.turn_effects.zero_upper is False
     assert bob.turn_effects.zero_lower is True
 
@@ -305,12 +299,24 @@ def test_block_hindrance_can_use_parry_ready():
 
     assert match.active_player.name == "Bob"
     bob.parry_ready = True
-    match.start_turn()
     match.block_hindrance(0)
-    match.begin_rolling()
+    match.start_turn()
     assert bob.turn_effects.zero_upper is False
     assert bob.parry_ready is False
 
+
+def test_block_hindrance_before_own_turn_while_others_play():
+    match = Match(["Alice", "Bob"])
+    _begin_active_turn(match)
+    bob = match.players[1]
+    bob.queued_hindrances.append(
+        QueuedHindrance(card_id=CardId.GLASS_HALF_FULL, caster_name="Alice")
+    )
+    bob.inventory.add_power(Card(CardId.PARRY, CardKind.POWER))
+    # Alice is still mid-turn; Bob blocks his own queued hindrance.
+    match.block_hindrance(0, player=bob)
+    assert bob.queued_hindrances == []
+    assert not bob.inventory.has_power(CardId.PARRY)
 
 def test_cannot_queue_conflicting_glass_half_hindrances():
     match = Match(["Alice", "Bob"])
@@ -336,7 +342,6 @@ def test_cannot_cast_hindrance_on_self():
 def test_cast_hindrance_requires_turn_active():
     match = Match(["Alice", "Bob"])
     match.active_player.inventory.add_power(Card(CardId.GLASS_HALF_FULL, CardKind.POWER))
-    match.start_turn()
     with pytest.raises(WrongPhaseError):
         match.cast_hindrance(CardId.GLASS_HALF_FULL, match.players[1])
 

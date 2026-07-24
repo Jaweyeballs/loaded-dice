@@ -12,7 +12,6 @@ from loaded_dice.scoring import Category
 
 def _begin_active_turn(match: Match) -> None:
     match.start_turn()
-    match.begin_rolling()
 
 
 def _end_turn_quickly(match: Match) -> None:
@@ -135,6 +134,67 @@ def test_positive_punishment_no_effect_if_target_did_not_attack_caster():
         die.value = value
     points = match.score(Category.THREES)
     assert points == 9
+    assert len(bob.queued_hindrances) == 1
+    assert bob.queued_hindrances[0].card_id == CardId.POSITIVE_PUNISHMENT
+
+
+def test_positive_punishment_survives_write_off_until_score():
+    match = Match(["Alice", "Bob"])
+    alice = match.players[0]
+    bob = match.players[1]
+    _begin_active_turn(match)
+    _end_turn_quickly(match)
+    _begin_active_turn(match)
+    bob.inventory.add_power(Card(CardId.GLASS_HALF_FULL, CardKind.POWER))
+    match.roll()
+    match.cast_hindrance(CardId.GLASS_HALF_FULL, alice)
+    _end_turn_quickly(match)
+
+    alice.inventory.add_power(Card(CardId.POSITIVE_PUNISHMENT, CardKind.POWER))
+    _begin_active_turn(match)
+    match.roll()
+    match.cast_hindrance(CardId.POSITIVE_PUNISHMENT, bob)
+    _end_turn_quickly(match)
+
+    match.start_turn()
+    assert bob.pending_score_penalty == POSITIVE_PUNISHMENT_POINT_LOSS
+    assert bob.queued_hindrances == []
+    match.end_turn_without_scoring()
+
+    _end_turn_quickly(match)  # Alice
+    match.start_turn()  # Bob again
+    assert bob.pending_score_penalty == POSITIVE_PUNISHMENT_POINT_LOSS
+    match.roll()
+    for die, value in zip(match.dice.dice, [3, 3, 3, 1, 2]):
+        die.value = value
+    points = match.score(Category.THREES)
+    assert points == 9 - POSITIVE_PUNISHMENT_POINT_LOSS
+    assert bob.pending_score_penalty == 0
+
+
+def test_negative_punishment_waits_when_condition_not_met():
+    match = Match(["Alice", "Bob"])
+    _complete_rotation(match)
+    alice = match.active_player
+    bob = match.players[1]
+    bob.chips = 500
+    alice.inventory.add_power(Card(CardId.NEGATIVE_PUNISHMENT, CardKind.POWER))
+    _begin_active_turn(match)
+    match.roll()
+    match.cast_hindrance(CardId.NEGATIVE_PUNISHMENT, bob)
+    _end_turn_quickly(match)
+
+    from loaded_dice.economy import calculate_compensation, calculate_interest
+
+    chips_before = bob.chips
+    interest = calculate_interest(chips_before)
+    compensation = calculate_compensation(
+        match._previous_rotation_attacks.attacker_count_on(bob.name),
+        match._previous_rotation_attacks.player_attacked(bob.name),
+    )
+    match.start_turn()
+    assert bob.queued_hindrances[0].card_id == CardId.NEGATIVE_PUNISHMENT
+    assert bob.chips == chips_before + interest + compensation
 
 
 def test_negative_punishment_deducts_chips_when_target_attacked_caster():
@@ -156,10 +216,17 @@ def test_negative_punishment_deducts_chips_when_target_attacked_caster():
     match.cast_hindrance(CardId.NEGATIVE_PUNISHMENT, bob)
     _end_turn_quickly(match)
 
+    from loaded_dice.economy import calculate_compensation, calculate_interest
+
+    chips_before = bob.chips
+    interest = calculate_interest(chips_before)
+    compensation = calculate_compensation(
+        match._previous_rotation_attacks.attacker_count_on(bob.name),
+        match._previous_rotation_attacks.player_attacked(bob.name),
+    )
     match.start_turn()
-    chips_after_compensation = bob.chips
-    match.begin_rolling()
-    assert bob.chips == chips_after_compensation - NEGATIVE_PUNISHMENT_CHIP_LOSS
+    assert bob.chips == chips_before + interest + compensation - NEGATIVE_PUNISHMENT_CHIP_LOSS
+    assert bob.queued_hindrances == []
 
 
 def test_score_penalty_floors_at_zero():

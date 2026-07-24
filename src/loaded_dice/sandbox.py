@@ -157,7 +157,7 @@ def _handle_command(match: Match, line: str) -> bool:
         elif command == "start":
             if match.phase == TurnPhase.BETWEEN_TURNS:
                 match.start_turn()
-                print(f"{match.active_player.name}'s turn — review hindrances, then `start` again.")
+                print(f"{match.active_player.name}'s turn — you can roll.")
             elif match.phase == TurnPhase.TURN_START:
                 match.begin_rolling()
                 print("Rolling phase started.")
@@ -262,6 +262,7 @@ def run_sandbox(player_names: list[str], starting_chips: int = SANDBOX_STARTING_
         _print_status(match)
         if match.phase == TurnPhase.BETWEEN_TURNS and not match.is_over():
             print("\nType `start` to begin the next turn, or `shop` / `buy` / `reroll`.")
+            print("Block queued hindrances anytime with `block <index>` before they resolve.")
         elif match.phase == TurnPhase.TURN_START:
             print("\nHindrances queued — `block <index>` then `start` to roll.")
         elif match.phase == TurnPhase.TURN_ACTIVE:
