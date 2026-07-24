@@ -262,6 +262,12 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
   const dieElsRef = useRef<Map<number, HTMLButtonElement>>(new Map());
   const flipHandledRef = useRef(false);
   const tossGenRef = useRef(0);
+  /** Toddler (and similar): force a toss of specific indices on the next dice update. */
+  const pendingTossRef = useRef<{
+    flying: number[];
+    oldValues: number[];
+    trayOrder: number[];
+  } | null>(null);
 
   // Display faces low→high, but keep each die's original index for lock/Icarus actions.
   const sortedDice = useMemo(() => {
@@ -378,10 +384,11 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
     rollTimersRef.current.push(tOut, tReveal, tFlip);
   }
 
-  // Detect a new roll or a multi-die face change (Twins / Toddler) and toss.
+  // Detect a new roll, a pending Toddler toss, or multi-die face change and toss.
   useEffect(() => {
     if (!match.dice) {
       prevDiceRef.current = null;
+      pendingTossRef.current = null;
       setRollAnim(null);
       return;
     }
@@ -391,6 +398,40 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
     const locked = [...match.dice.locked];
     const values = [...match.dice.values];
     const prev = prevDiceRef.current;
+    const pending = pendingTossRef.current;
+
+    // Toddler: treat the picked dice as the only unlocked dice in a roll toss,
+    // even when a face lands on the same number (no value delta).
+    if (pending) {
+      const valuesChanged =
+        values.length === pending.oldValues.length &&
+        values.some((v, i) => v !== pending.oldValues[i]);
+      const toddlerDone = Boolean(match.toddler_used_this_turn);
+      if (!valuesChanged && !toddlerDone) {
+        // Action in flight — wait for the server state update.
+        return;
+      }
+      pendingTossRef.current = null;
+      const flying = new Set(pending.flying);
+      if (values.length === pending.oldValues.length) {
+        for (let i = 0; i < values.length; i++) {
+          if (values[i] !== pending.oldValues[i]) flying.add(i);
+        }
+      }
+      prevDiceRef.current = {
+        rolls,
+        order: pending.trayOrder,
+        locked,
+        values,
+      };
+      beginTossAnimation({
+        trayOrder: pending.trayOrder,
+        flying: [...flying].filter((i) => i < values.length), 
+        oldValues: pending.oldValues,
+        newValues: values,
+      });
+      return;
+    }
 
     if (prev) {
       if (rolls > prev.rolls) {
@@ -410,7 +451,7 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
         for (let i = 0; i < values.length; i++) {
           if (values[i] !== prev.values[i]) changed.push(i);
         }
-        // Twins / Toddler change 2+ faces without consuming a turn roll.
+        // Twins (and similar) change faces without consuming a turn roll.
         if (changed.length >= 2) {
           prevDiceRef.current = { rolls, order: prev.order, locked, values };
           beginTossAnimation({
@@ -427,8 +468,12 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
     if (!rollAnim) {
       prevDiceRef.current = { rolls, order, locked, values };
     }
-  }, [match.dice, sortedDice, rollAnim]);
+  }, [match.dice, sortedDice, rollAnim, match.toddler_used_this_turn]);
 
+  // Drop a pending Toddler toss if the turn ends before the update arrives.
+  useEffect(() => {
+    if (match.phase !== "turn_active") pendingTossRef.current = null;
+  }, [match.phase]);
   // After tray reorders to sorted, invert transforms so dice stay on the felt, then snap home L→H.
   useLayoutEffect(() => {
     if (!rollAnim || rollAnim.phase !== "flip" || !match.dice) return;
@@ -584,6 +629,15 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
         : [...diePick.picked, index].slice(0, need);
       if (next.length === need) {
         if (diePick.mode === "trading") {
+          if (diePick.cardId === "toddler" && match.dice) {
+            const trayOrder =
+              rollAnim?.order ?? sortedDice.map((d) => d.index);
+            pendingTossRef.current = {
+              flying: [...next],
+              oldValues: [...match.dice.values],
+              trayOrder,
+            };
+          }
           onAction({
             type: "activate_trading",
             card_id: diePick.cardId,
@@ -786,6 +840,7 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
       return (
         !match.dice ||
         used ||
+        Boolean(rollAnim) ||
         (match.dice.rolls_this_turn ?? 0) < 1
       );
     }
