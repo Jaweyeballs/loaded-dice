@@ -56,6 +56,26 @@ function spaceFaceOptions(
   return [1, 2, 3, 4, 5, 6];
 }
 
+function dieKindLabel(kind: string): string {
+  if (kind === "benchwarmer") return "Benchwarmer die";
+  if (kind === "boolean") return "Boolean die";
+  return "Regular die";
+}
+
+function formatDieFacesList(faces: number[]): string {
+  const unique = [...new Set(faces)].sort((a, b) => a - b);
+  if (unique.length === 0) return "";
+  if (unique.length === 1) return String(unique[0]);
+  if (unique.length === 2) return `${unique[0]} and ${unique[1]}`;
+  const contiguous = unique.every((v, i) => i === 0 || v === unique[i - 1]! + 1);
+  if (contiguous) return `${unique[0]}-${unique[unique.length - 1]}`;
+  return unique.join(", ");
+}
+
+function dieTipText(kind: string, faces: number[]): string {
+  return `${dieKindLabel(kind)}: faces ${formatDieFacesList(faces)}`;
+}
+
 /** Scoresheet row order — includes summary rows that are not scoreable categories. */
 type SheetRow =
   | { kind: "category"; id: string }
@@ -1285,6 +1305,7 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
                     transform: `translate(${pose.x}px, ${pose.y}px) rotate(${pose.rot}deg)`,
                   }
                 : undefined;
+              const tipFaces = spaceFaceOptions(match.dice!, index);
               return (
                 <div
                   key={index}
@@ -1300,27 +1321,32 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
                       {psychicFace}
                     </span>
                   )}
-                  <button
-                    type="button"
-                    ref={(el) => {
-                      if (el) dieElsRef.current.set(index, el);
-                      else dieElsRef.current.delete(index);
-                    }}
-                    className={`die ${locked ? "locked" : ""} ${
-                      jailLocked ? "die-jail" : ""
-                    } ${kindClass} ${aiming ? "targetable" : ""} ${
-                      picked ? "picked" : ""
-                    } ${twinsLinked ? "die-twins" : ""} ${
-                      rollAnim ? "die-fly" : ""
-                    } ${pose ? "die-scattered" : ""} ${
-                      isReturned ? "die-returned" : ""
-                    } ${rollAnim?.freezeMotion ? "die-no-motion" : ""}`}
-                    style={dieStyle}
-                    disabled={!active || Boolean(rollAnim)}
-                    onClick={() => handleDieClick(index, locked)}
+                  <Tip
+                    text={dieTipText(kind, tipFaces)}
+                    className="die-tip tip-below"
                   >
-                    {value}
-                  </button>
+                    <button
+                      type="button"
+                      ref={(el) => {
+                        if (el) dieElsRef.current.set(index, el);
+                        else dieElsRef.current.delete(index);
+                      }}
+                      className={`die ${locked ? "locked" : ""} ${
+                        jailLocked ? "die-jail" : ""
+                      } ${kindClass} ${aiming ? "targetable" : ""} ${
+                        picked ? "picked" : ""
+                      } ${twinsLinked ? "die-twins" : ""} ${
+                        rollAnim ? "die-fly" : ""
+                      } ${pose ? "die-scattered" : ""} ${
+                        isReturned ? "die-returned" : ""
+                      } ${rollAnim?.freezeMotion ? "die-no-motion" : ""}`}
+                      style={dieStyle}
+                      disabled={!active || Boolean(rollAnim)}
+                      onClick={() => handleDieClick(index, locked)}
+                    >
+                      {value}
+                    </button>
+                  </Tip>
                 </div>
               );
             })}

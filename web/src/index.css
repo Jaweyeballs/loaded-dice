@@ -607,6 +607,10 @@ select {
   min-height: 3.1rem;
 }
 
+.die-slot > .die-tip {
+  display: inline-flex;
+}
+
 .die-slot-flying {
   z-index: 15;
 }
