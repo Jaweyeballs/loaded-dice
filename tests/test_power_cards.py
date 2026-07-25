@@ -453,12 +453,15 @@ def test_already_in_jail_persists_if_turn_ends_without_lock():
     assert bob.queued_hindrances[0].card_id == CardId.ALREADY_IN_JAIL
 
 
-def test_score_with_extra_die_requires_selection():
+def test_score_with_extra_die_auto_picks_best_hand():
     match = Match(["Alice"])
     match.players[0].inventory.add_power(card_for_id(CardId.BENCHWARMER))
     _begin_active_turn(match)
     match.roll()
     match.cast_power_card(CardId.BENCHWARMER)
-    with pytest.raises(Exception):
-        match.score(Category.CHANCE)
-    match.score(Category.CHANCE, die_indices=[0, 1, 2, 3, 4])
+    assert match.dice is not None
+    for i, value in enumerate([6, 6, 6, 6, 1, 2]):
+        match.dice.dice[i].value = value
+    points = match.score(Category.SIXES)
+    assert points == 24
+    assert match.players[0].current_sheet.get_score(Category.SIXES) == 24

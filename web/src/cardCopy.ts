@@ -14,13 +14,13 @@ export const CARD_BLURBS: Record<string, string> = {
   super_serum: "After rolling: raise every die by 1 within its faces (no wrap).",
   do_over:
     "Overwrite your last scored category with this hand’s score there. Full house / 4oak / straights: +5 only if this hand also qualifies (else 0). Use the scoresheet button — cannot overwrite Yahtzee.",
-  benchwarmer: "Add an extra die (faces 1–3). Pick 5 dice when scoring.",
+  benchwarmer: "Add an extra die (faces 1–3). Scoring uses the best 5 automatically.",
   helping_hand:
     "Take 400 chips or +10 on this hand; the other goes to a chosen player.",
   twins:
     "Link 2 dice; on the next roll the 2nd copies the 1st. Click again to cancel. Consumed when the link is rolled.",
   space_die: "After rolling: pick a die, then set it to any face it can show.",
-  boolean: "Add a 6/blank die for the rest of this turn. Pick 5 when scoring.",
+  boolean: "Add a 6/blank die for the rest of this turn. Scoring uses the best 5 automatically.",
   write_off: "End your turn without scoring.",
   parry: "Block a single queued hindrance anytime before it resolves (consumable).",
   glass_half_full: "Target’s upper-section score is 0 this turn.",

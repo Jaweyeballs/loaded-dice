@@ -310,6 +310,33 @@ select {
   overflow: auto;
 }
 
+.sheet-dock-body {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-height: 0;
+}
+
+.sheet-dock-top {
+  flex: 0 0 auto;
+}
+
+.sheet-dock-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+}
+
+.sheet-score-breakdown {
+  flex: 0 0 auto;
+  margin: 0.55rem 0 0;
+  padding-top: 0.45rem;
+  border-top: 1px solid var(--line);
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--ink-soft);
+}
+
 .tab-row,
 .sheet-controls {
   display: flex;
@@ -356,13 +383,6 @@ select {
   font-variant-numeric: tabular-nums;
   color: var(--ink-soft);
   font-weight: 600;
-}
-
-.sheet-score-breakdown {
-  margin: 0.55rem 0 0;
-  font-size: 0.82rem;
-  font-weight: 600;
-  color: var(--ink-soft);
 }
 
 .sheet-score-breakdown ul {

@@ -91,8 +91,12 @@ def _do_over_on_cast(player: Player, match: Match, **kwargs) -> None:
     Card is already consumed by ``cast_power_card``; validation for Do over
     runs there *before* consume so a blocked second Yahtzee never spends the card.
     """
-    die_indices = kwargs.get("die_indices")
-    values = match.select_scoring_values_for_effects(die_indices)
+    if player.last_scored_category is None:
+        raise ValueError("Do over requires a previously scored hand")
+    values = match.select_scoring_values_for_effects(
+        player.last_scored_category,
+        mode="do_over",
+    )
     match.apply_do_over(player, values, player.last_scored_category)
 
 

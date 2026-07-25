@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
+from itertools import combinations
 import random
 
 from loaded_dice.dice import DEFAULT_MAX_ROLLS_PER_TURN, DiceSet, TooManyRollsError
@@ -45,6 +46,7 @@ from loaded_dice.card_effects.trading import (
     gecko_compensation_bonus,
 )
 from loaded_dice.effects import TurnEffects
+from loaded_dice.preview import SCORING_HAND_SIZE, best_scoring_hand
 from loaded_dice.scoring import Category, ScoreSheet, is_yahtzee
 from loaded_dice.shop import Shop, ShopError, sell_price_for_card
 from loaded_dice.turn_effects import apply_turn_start_passives, resolve_turn_effects
@@ -590,8 +592,12 @@ class Match:
 
         # Do over: validate before consume so a second Yahtzee never spends the card.
         if card_id == CardId.DO_OVER:
-            die_indices = kwargs.get("die_indices")
-            values = self._select_scoring_values(die_indices)
+            if player.last_scored_category is None:
+                raise ValueError("Do over requires a previously scored hand")
+            values = self._select_scoring_values(
+                player.last_scored_category,
+                mode="do_over",
+            )
             self._validate_do_over(player, values)
 
         # Face-changing powers: require a roll (and Space Die a legal face) before spend.
@@ -674,10 +680,12 @@ class Match:
 
     def select_scoring_values_for_effects(
         self,
-        die_indices: list[int] | None = None,
+        category: Category,
+        *,
+        mode: str = "score",
     ) -> list[int]:
         """Expose scoring-hand selection for card effects (Do over)."""
-        return self._select_scoring_values(die_indices)
+        return self._select_scoring_values(category, mode=mode)
 
     def _validate_do_over(self, player: Player, values: list[int]) -> Category:
         """Raise if Do over cannot be used; return the category that would be overwritten."""
@@ -722,14 +730,23 @@ class Match:
         return points
 
     def do_over(self, die_indices: list[int] | None = None) -> int:
-        """Consume Do over and overwrite the last scored category with this hand."""
+        """Consume Do over and overwrite the last scored category with this hand.
+
+        *die_indices* is ignored — with more than 5 dice the best hand for the
+        last scored category (under Do over scoring) is always used.
+        """
         self._ensure_not_over()
         if self.phase != TurnPhase.TURN_ACTIVE:
             raise WrongPhaseError(f"Cannot use Do over during {self.phase.value}")
         player = self.active_player
         if not player.inventory.has_power(CardId.DO_OVER):
             raise WrongPhaseError("Do over is not in your inventory")
-        values = self._select_scoring_values(die_indices)
+        if player.last_scored_category is None:
+            raise ValueError("Do over requires a previously scored hand")
+        values = self._select_scoring_values(
+            player.last_scored_category,
+            mode="do_over",
+        )
         category = self._validate_do_over(player, values)
         try:
             player.inventory.consume_power_by_id(CardId.DO_OVER)
@@ -742,7 +759,11 @@ class Match:
         category: Category,
         die_indices: list[int] | None = None,
     ) -> int:
-        """Score the current dice into *category* and end the turn."""
+        """Score the current dice into *category* and end the turn.
+
+        *die_indices* is ignored — with more than 5 dice the best hand for
+        *category* is always used (same as the scoresheet preview).
+        """
         self._ensure_not_over()
         if self.phase != TurnPhase.TURN_ACTIVE:
             raise WrongPhaseError(f"Cannot score during {self.phase.value}")
@@ -751,7 +772,7 @@ class Match:
         if self._dice.rolls_this_turn < 1:
             raise MustRollBeforeScoreError("Roll at least once before scoring")
 
-        values = self._select_scoring_values(die_indices)
+        values = self._select_scoring_values(category, mode="score")
         self._fold_pending_score_penalty(self.active_player)
         try_apply_reinforcements_on_score(self.active_player, self)
         points = self.active_player.current_sheet.record(
@@ -863,26 +884,41 @@ class Match:
         if self._dice is None:
             raise WrongPhaseError("No dice set for this turn")
 
-    def _select_scoring_values(self, die_indices: list[int] | None) -> list[int]:
+    def _select_scoring_values(
+        self,
+        category: Category,
+        *,
+        mode: str = "score",
+    ) -> list[int]:
+        """Return the five-die hand used for scoring.
+
+        With exactly 5 dice, uses all of them. With more, picks the combination
+        that maximizes points for *category* (normal score or Do over rules).
+        """
         assert self._dice is not None
         all_values = self._dice.values
+        if len(all_values) < SCORING_HAND_SIZE:
+            raise InvalidDieSelectionError(
+                f"Need at least {SCORING_HAND_SIZE} dice to score, got {len(all_values)}"
+            )
+        if len(all_values) == SCORING_HAND_SIZE:
+            return list(all_values)
 
-        if die_indices is None:
-            if len(all_values) != 5:
-                raise InvalidDieSelectionError(
-                    f"Must choose 5 dice when {len(all_values)} are in play"
-                )
-            return all_values
+        effects = self.active_player.turn_effects
+        if mode == "do_over":
+            best_values: list[int] | None = None
+            best_points = -1
+            for indices in combinations(range(len(all_values)), SCORING_HAND_SIZE):
+                values = [all_values[i] for i in indices]
+                points = compute_do_over_points(values, category, effects)
+                if points > best_points:
+                    best_points = points
+                    best_values = values
+            assert best_values is not None
+            return best_values
 
-        if len(die_indices) != 5:
-            raise InvalidDieSelectionError("Exactly 5 die indices are required")
-        if len(set(die_indices)) != 5:
-            raise InvalidDieSelectionError("Die indices must be unique")
-
-        try:
-            return [all_values[i] for i in die_indices]
-        except IndexError as exc:
-            raise InvalidDieSelectionError(f"Invalid die index in {die_indices}") from exc
+        values, _, _ = best_scoring_hand(all_values, category, effects)
+        return values
 
     def _award_scoring_income(self, player: Player) -> None:
         assert self._dice is not None

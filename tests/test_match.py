@@ -9,7 +9,6 @@ from loaded_dice.economy import (
     COMPENSATION_PACIFIST_CHIPS,
 )
 from loaded_dice.match import (
-    InvalidDieSelectionError,
     Match,
     MatchConfig,
     MatchOverError,
@@ -118,23 +117,15 @@ def test_cannot_roll_when_all_dice_locked():
     assert match.dice.rolls_this_turn == rolls_before
 
 
-def test_score_with_selected_dice_when_more_than_five():
+def test_score_with_extra_dice_uses_best_hand():
     match = Match(["Alice"], config=MatchConfig(dice_size=6))
     _begin_active_turn(match)
     match.roll()
-    # Force values so we can verify index selection matters
     for i, value in enumerate([1, 2, 3, 4, 5, 6]):
         match.dice.dice[i].value = value
+    # Best Chance hand drops the 1 → 2+3+4+5+6 = 20 (client die_indices ignored).
     points = match.score(Category.CHANCE, die_indices=[0, 1, 2, 3, 4])
-    assert points == 15
-
-
-def test_score_requires_die_selection_when_more_than_five():
-    match = Match(["Alice"], config=MatchConfig(dice_size=6))
-    _begin_active_turn(match)
-    match.roll()
-    with pytest.raises(InvalidDieSelectionError):
-        match.score(Category.CHANCE)
+    assert points == 20
 
 
 def test_grant_extra_rolls_on_active_turn():

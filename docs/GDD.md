@@ -59,7 +59,7 @@ Permanent boosts with drawbacks, picked at the start of a run/match.
 
 ### Turn flow
 1. **Start turn (active player)** — Clicking **Start Turn** pays interest/compensation, then resolves **ready** queued hindrances for this trigger (Glass half, Blue Shell, and punishments whose attack condition is met). Play goes straight to the active/rolling phase. Unresolved hindrances (e.g. Already in Jail, or punishments waiting on their condition) stay queued across turns. Players may **block** any still-queued hindrance on themselves (Parry, Guardian) at any time before that card resolves.
-2. **Active phase** — Standard Yahtzee: roll, lock, reroll, score. Extra dice from active effects roll with the normal dice. When scoring, if more than 5 dice are in play, the player is prompted to select 5 for their scoring hand, then pick a category. The active player may play positive power cards and cast hindrances on chosen targets at any point. Only the active player may cast cards. **Already in Jail** resolves on the first lock of a turn (one queued copy per lock) and can still be blocked before that lock. Once jailed, that die’s face is immutable for the rest of the turn.
+2. **Active phase** — Standard Yahtzee: roll, lock, reroll, score. Extra dice from active effects roll with the normal dice. When scoring with more than 5 dice, the best 5-die combination for the chosen category is used automatically (same as the scoresheet preview). The active player may play positive power cards and cast hindrances on chosen targets at any point. Only the active player may cast cards. **Already in Jail** resolves on the first lock of a turn (one queued copy per lock) and can still be blocked before that lock. Once jailed, that die’s face is immutable for the rest of the turn.
 3. **End turn** — Clicking **End Turn** passes play. The player who just finished may now open the shop (browse, buy, reroll stock) and spectate until their next turn. Shop access closes when they click **Start Turn** and reopens on their next **End Turn**. Players cannot cast cards when it is not their turn.
 
 ---
@@ -76,10 +76,10 @@ Permanent boosts with drawbacks, picked at the start of a run/match.
 | Parry | Block a single unresolved hindrance queued on you (any time before it resolves) |
 | Positive reinforcement | If you attacked no one last rotation, gain 8 points when you **score** a hand (consumed on that score; kept if you Write Off / end without scoring). No Use button. |
 | Negative reinforcement | If you attacked no one last rotation, gain a *transparent* Parry when you **score** a hand (consumed on that score). No Use button. |
-| Benchwarmer | Roll an extra die alongside normal dice this roll (limited to values 1–3); select 5 dice for scoring |
+| Benchwarmer | Roll an extra die alongside normal dice this roll (limited to values 1–3); scoring auto-picks the best 5 |
 | Helping hand | Choose: gain **400** chips, or gain 10 points on this hand — whichever you don't pick goes to another player of your choice |
 | Twins | Link 2 dice (1st = source). On the next roll involving that link, the 2nd copies the 1st. Click the card again to cancel. Consumed only when the link resolves on a roll (including Toddler). |
-| Boolean | Roll an extra die alongside normal dice for the rest of the round (3 six-faces, 3 blank/0 faces); select 5 dice for scoring |
+| Boolean | Roll an extra die alongside normal dice for the rest of the round (3 six-faces, 3 blank/0 faces); scoring auto-picks the best 5 |
 | Write off | End this turn without scoring a hand |
 
 ### Negative (hinder another player)

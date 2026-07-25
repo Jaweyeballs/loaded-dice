@@ -147,9 +147,7 @@ type SheetMode = "mine" | "current";
 type LeftTab = "history" | "leaderboard";
 type DiePickMode =
   | { mode: "trading"; cardId: "toddler" | "psychic"; picked: number[] }
-  | { mode: "twins"; picked: number[] }
-  | { mode: "score"; category: string; picked: number[] }
-  | { mode: "do_over"; picked: number[] };
+  | { mode: "twins"; picked: number[] };
 /** Armed card waiting for a leaderboard click to pick another player. */
 type PlayerTargetMode =
   | { kind: "hindrance"; cardId: string; slotIndex: number }
@@ -835,24 +833,10 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
   }
 
   function requestScore(category: string) {
-    const diceCount = match.dice?.values.length ?? 0;
-    if (diceCount > 5) {
-      setDiePick({ mode: "score", category, picked: [] });
-      setIcarusArming(false);
-      setSpacePick(null);
-      return;
-    }
     onAction({ type: "score", category });
   }
 
   function requestDoOver() {
-    const diceCount = match.dice?.values.length ?? 0;
-    if (diceCount > 5) {
-      setDiePick({ mode: "do_over", picked: [] });
-      setIcarusArming(false);
-      setSpacePick(null);
-      return;
-    }
     onAction({ type: "do_over" });
   }
 
@@ -898,7 +882,7 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
       ) {
         return;
       }
-      const need = diePick.mode === "score" ? 5 : 2;
+      const need = 2;
       const already = diePick.picked.includes(index);
       const next = already
         ? diePick.picked.filter((i) => i !== index)
@@ -919,16 +903,8 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
             card_id: diePick.cardId,
             die_indices: next,
           });
-        } else if (diePick.mode === "twins") {
-          onAction({ type: "cast_power", card_id: "twins", die_indices: next });
-        } else if (diePick.mode === "do_over") {
-          onAction({ type: "do_over", die_indices: next });
         } else {
-          onAction({
-            type: "score",
-            category: diePick.category,
-            die_indices: next,
-          });
+          onAction({ type: "cast_power", card_id: "twins", die_indices: next });
         }
         setDiePick(null);
         return;
@@ -1157,83 +1133,87 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
         >
           {sheetOpen ? "›" : "‹"}
         </button>
-        <div className="dock-body">
-          <div className="sheet-controls">
-            <button
-              type="button"
-              className={sheetMode === "mine" ? "tab active" : "tab"}
-              onClick={() => {
-                setMineSelection(playerName);
-                setSheetMode("mine");
-              }}
-            >
-              Mine
-            </button>
-            <button
-              type="button"
-              className={sheetMode === "current" ? "tab active" : "tab"}
-              onClick={() => setSheetMode("current")}
-            >
-              Current player
-            </button>
-            <button
-              type="button"
-              className="secondary sheet-full-btn"
-              onClick={() => setSheetFullscreen((v) => !v)}
-            >
-              {sheetFullscreen ? "Exit full" : "Fullscreen"}
-            </button>
+        <div className="dock-body sheet-dock-body">
+          <div className="sheet-dock-top">
+            <div className="sheet-controls">
+              <button
+                type="button"
+                className={sheetMode === "mine" ? "tab active" : "tab"}
+                onClick={() => {
+                  setMineSelection(playerName);
+                  setSheetMode("mine");
+                }}
+              >
+                Mine
+              </button>
+              <button
+                type="button"
+                className={sheetMode === "current" ? "tab active" : "tab"}
+                onClick={() => setSheetMode("current")}
+              >
+                Current player
+              </button>
+              <button
+                type="button"
+                className="secondary sheet-full-btn"
+                onClick={() => setSheetFullscreen((v) => !v)}
+              >
+                {sheetFullscreen ? "Exit full" : "Fullscreen"}
+              </button>
+            </div>
+            {sheetMode === "mine" && (
+              <select
+                className="sheet-player-select"
+                value={mineSelection}
+                onChange={(e) => setMineSelection(e.target.value)}
+              >
+                {match.players.map((p) => (
+                  <option key={p.name} value={p.name}>
+                    {p.name}
+                    {p.name === playerName ? " (you)" : ""}
+                  </option>
+                ))}
+              </select>
+            )}
+            <p className="sheet-heading">
+              {sheetPlayer.name}
+              {sheetMode === "current" ? " · live turn" : ""}
+            </p>
+            <p className="sheet-summary">
+              {sheetPlayer.total_score} pts · {sheetPlayer.chips} chips
+              {sheetPlace != null ? ` · #${sheetPlace}` : ""}
+            </p>
           </div>
-          {sheetMode === "mine" && (
-            <select
-              className="sheet-player-select"
-              value={mineSelection}
-              onChange={(e) => setMineSelection(e.target.value)}
-            >
-              {match.players.map((p) => (
-                <option key={p.name} value={p.name}>
-                  {p.name}
-                  {p.name === playerName ? " (you)" : ""}
-                </option>
-              ))}
-            </select>
-          )}
-          <p className="sheet-heading">
-            {sheetPlayer.name}
-            {sheetMode === "current" ? " · live turn" : ""}
-          </p>
-          <p className="sheet-summary">
-            {sheetPlayer.total_score} pts · {sheetPlayer.chips} chips
-            {sheetPlace != null ? ` · #${sheetPlace}` : ""}
-          </p>
-          <ScoreSheetTable
-            player={sheetPlayer}
-            previews={
-              sheetPlayer.name === match.active_player ? match.previews : null
-            }
-            doOverPreview={
-              sheetPlayer.name === match.active_player
-                ? (match.do_over_preview ?? null)
-                : null
-            }
-            canScore={
-              active &&
-              sheetPlayer.name === playerName &&
-              match.phase === "turn_active" &&
-              !aiming &&
-              Boolean(match.dice && match.dice.rolls_this_turn >= 1)
-            }
-            canDoOver={
-              active &&
-              sheetPlayer.name === playerName &&
-              match.phase === "turn_active" &&
-              !aiming &&
-              Boolean(match.do_over_preview) &&
-              Boolean(match.dice && match.dice.rolls_this_turn >= 1)
-            }
-            onScore={requestScore}
-            onDoOver={requestDoOver}
-          />
+          <div className="sheet-dock-scroll">
+            <ScoreSheetTable
+              player={sheetPlayer}
+              previews={
+                sheetPlayer.name === match.active_player ? match.previews : null
+              }
+              doOverPreview={
+                sheetPlayer.name === match.active_player
+                  ? (match.do_over_preview ?? null)
+                  : null
+              }
+              canScore={
+                active &&
+                sheetPlayer.name === playerName &&
+                match.phase === "turn_active" &&
+                !aiming &&
+                Boolean(match.dice && match.dice.rolls_this_turn >= 1)
+              }
+              canDoOver={
+                active &&
+                sheetPlayer.name === playerName &&
+                match.phase === "turn_active" &&
+                !aiming &&
+                Boolean(match.do_over_preview) &&
+                Boolean(match.dice && match.dice.rolls_this_turn >= 1)
+              }
+              onScore={requestScore}
+              onDoOver={requestDoOver}
+            />
+          </div>
           {scoreBreakdown && scoreBreakdown.lines.length > 0 && (
             <div className="sheet-score-breakdown">
               <ul>
@@ -1345,19 +1325,17 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
               );
             })}
             <span className="dice-meta">
-              {diePick?.mode === "score"
-                ? `Pick ${5 - diePick.picked.length} more die(s) to score ${label(diePick.category)}`
-                    : diePick?.mode === "twins"
-                      ? `Pick ${2 - diePick.picked.length} more: 1st is source, 2nd copies it on the next roll`
-                      : diePick?.mode === "trading"
-                    ? `Pick ${2 - diePick.picked.length} more die(s) for ${label(diePick.cardId)}`
-                    : spacePick
-                      ? spacePick.dieIndex === null
-                        ? "Click a die to choose its face"
-                        : "Choose a face for the selected die"
-                      : icarusArming
-                        ? "Click a die to bump"
-                        : `${match.dice.rolls_this_turn}/${match.dice.max_rolls} rolls`}
+              {diePick?.mode === "twins"
+                ? `Pick ${2 - diePick.picked.length} more: 1st is source, 2nd copies it on the next roll`
+                : diePick?.mode === "trading"
+                  ? `Pick ${2 - diePick.picked.length} more die(s) for ${label(diePick.cardId)}`
+                  : spacePick
+                    ? spacePick.dieIndex === null
+                      ? "Click a die to choose its face"
+                      : "Choose a face for the selected die"
+                    : icarusArming
+                      ? "Click a die to bump"
+                      : `${match.dice.rolls_this_turn}/${match.dice.max_rolls} rolls`}
             </span>
           </div>
         )}
