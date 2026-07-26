@@ -1,7 +1,13 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { cardBlurb, cardTipLabel } from "./cardCopy";
 import { Tip } from "./Tip";
-import type { CardInfo, MatchState, PlayerState, RoomState } from "./types";
+import type {
+  CardInfo,
+  MatchState,
+  PlayerState,
+  RoomState,
+  TurnBrief,
+} from "./types";
 
 type Props = {
   room: RoomState;
@@ -74,6 +80,23 @@ function formatDieFacesList(faces: number[]): string {
 
 function dieTipText(kind: string, faces: number[]): string {
   return `${dieKindLabel(kind)}: faces ${formatDieFacesList(faces)}`;
+}
+
+function formatBriefAmount(amount: number): string {
+  return amount > 0 ? `+${amount}` : String(amount);
+}
+
+function emptyTurnBrief(): TurnBrief {
+  return {
+    kind: "preview",
+    version: 0,
+    debuffs: [],
+    chips: [],
+    buffs: [],
+    scores: [],
+    net_chips: 0,
+    net_score: 0,
+  };
 }
 
 /** Scoresheet row order — includes summary rows that are not scoreable categories. */
@@ -306,6 +329,9 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
   const [playerTarget, setPlayerTarget] = useState<PlayerTargetMode | null>(null);
   const [cardExpand, setCardExpand] = useState<CardExpand | null>(null);
   const [rollAnim, setRollAnim] = useState<RollAnim | null>(null);
+  const [briefOverlay, setBriefOverlay] = useState(false);
+  const [briefEmpty, setBriefEmpty] = useState(false);
+  const seenPreviewVersionRef = useRef(0);
   const prevDiceRef = useRef<{
     rolls: number;
     order: number[];
@@ -629,6 +655,30 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
   useEffect(() => {
     if (!canShop) setShopOpen(false);
   }, [canShop]);
+
+  // Auto-open turn preview when this player's Start Turn refreshes it.
+  useEffect(() => {
+    const version = me?.last_turn_preview?.version ?? 0;
+    if (
+      active &&
+      match.phase === "turn_active" &&
+      version > seenPreviewVersionRef.current
+    ) {
+      seenPreviewVersionRef.current = version;
+      setBriefEmpty(false);
+      setBriefOverlay(true);
+    }
+  }, [active, match.phase, me?.last_turn_preview?.version]);
+
+  function openTurnPreview() {
+    setBriefEmpty(!me?.last_turn_preview);
+    setBriefOverlay(true);
+  }
+
+  function closeTurnBrief() {
+    setBriefOverlay(false);
+    setBriefEmpty(false);
+  }
 
   // Jump scoresheet to a player (used by leaderboard name clicks).
   function selectSheetPlayer(name: string) {
@@ -996,6 +1046,12 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
         me.turn_effects.zero_lower ? "Glass half empty (lower = 0)" : null,
       ].filter(Boolean)
     : [];
+
+  const displayedBrief: TurnBrief | null = briefOverlay
+    ? briefEmpty
+      ? emptyTurnBrief()
+      : (me?.last_turn_preview ?? emptyTurnBrief())
+    : null;
 
   return (
     <div className="hud">
@@ -1767,6 +1823,94 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
           >
             Reroll ({match.shop.reroll_cost})
           </button>
+        </div>
+      )}
+
+      <div className="brief-corner">
+        <button type="button" className="secondary" onClick={openTurnPreview}>
+          Preview
+        </button>
+      </div>
+
+      {briefOverlay && displayedBrief && (
+        <div className="turn-brief-scrim" role="presentation">
+          <div
+            className="turn-brief-panel"
+            role="dialog"
+            aria-label="Your turn in preview"
+          >
+            <header className="turn-brief-head">
+              <h2>Your turn in preview</h2>
+              <button type="button" onClick={closeTurnBrief}>
+                Confirm
+              </button>
+            </header>
+            {briefEmpty ? (
+              <p className="turn-brief-empty">None available</p>
+            ) : (
+              <div className="turn-brief-body">
+                {displayedBrief.debuffs.length > 0 && (
+                  <section>
+                    <h3>Debuffs</h3>
+                    <ul>
+                      {displayedBrief.debuffs.map((line) => (
+                        <li key={line}>{line}</li>
+                      ))}
+                    </ul>
+                  </section>
+                )}
+                {displayedBrief.chips.length > 0 && (
+                  <section>
+                    <h3>Chips</h3>
+                    <ul>
+                      {displayedBrief.chips.map((line) => (
+                        <li key={`${line.label}-${line.amount}`}>
+                          {formatBriefAmount(line.amount)} ({line.label})
+                        </li>
+                      ))}
+                    </ul>
+                  </section>
+                )}
+                {displayedBrief.buffs.length > 0 && (
+                  <section>
+                    <h3>Buffs</h3>
+                    <ul>
+                      {displayedBrief.buffs.map((line) => (
+                        <li key={line}>{line}</li>
+                      ))}
+                    </ul>
+                  </section>
+                )}
+                {displayedBrief.scores.length > 0 && (
+                  <section>
+                    <h3>Score</h3>
+                    <ul>
+                      {displayedBrief.scores.map((line) => (
+                        <li key={`${line.label}-${line.amount}`}>
+                          {formatBriefAmount(line.amount)} ({line.label})
+                        </li>
+                      ))}
+                    </ul>
+                  </section>
+                )}
+                <section className="turn-brief-nets">
+                  <p>
+                    Net Chips Change:{" "}
+                    {formatBriefAmount(displayedBrief.net_chips)}
+                  </p>
+                  <p>
+                    Net Score Change:{" "}
+                    {formatBriefAmount(displayedBrief.net_score)}
+                  </p>
+                </section>
+              </div>
+            )}
+            <footer className="turn-brief-foot">
+              <button type="button" onClick={closeTurnBrief}>
+                Confirm
+              </button>
+            </footer>
+          </div>
         </div>
       )}
     </div>

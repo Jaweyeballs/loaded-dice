@@ -113,6 +113,8 @@ def _helping_hand_on_cast(player: Player, match: Match, **kwargs) -> None:
         raise ValueError("Helping hand requires choice='chips' or 'points'")
     if target is None:
         raise ValueError("Helping hand requires target")
+    from loaded_dice.turn_brief import BriefAmountLine
+
     if choice == "chips":
         player.earn_chips(HELPING_HAND_CHIPS)
         target.turn_effects.score_bonus += HELPING_HAND_POINTS
@@ -121,6 +123,12 @@ def _helping_hand_on_cast(player: Player, match: Match, **kwargs) -> None:
         player.turn_effects.score_bonus += HELPING_HAND_POINTS
         player.turn_effects.helping_hand_bonus += HELPING_HAND_POINTS
         target.earn_chips(HELPING_HAND_CHIPS)
+        target.offturn_chip_events.append(
+            BriefAmountLine(
+                HELPING_HAND_CHIPS,
+                f"Helping hand casted by {player.name}",
+            )
+        )
 
 
 def _twins_on_cast(player: Player, match: Match, **kwargs) -> None:

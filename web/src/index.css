@@ -985,6 +985,113 @@ select {
   background: color-mix(in srgb, var(--shop) 80%, black);
 }
 
+.brief-corner {
+  position: absolute;
+  z-index: 50;
+  left: 1rem;
+  bottom: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.brief-corner button {
+  min-width: 5.5rem;
+  font-size: 0.85rem;
+}
+
+.turn-brief-scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.25rem;
+  background: color-mix(in srgb, black 45%, transparent);
+}
+
+.turn-brief-panel {
+  width: min(420px, 94vw);
+  max-height: min(78vh, 640px);
+  display: flex;
+  flex-direction: column;
+  background: color-mix(in srgb, #6b6b6b 92%, white);
+  color: #f4f4f4;
+  border: 1px solid color-mix(in srgb, white 22%, transparent);
+  box-shadow: var(--shadow);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.turn-brief-head,
+.turn-brief-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.85rem 1rem;
+  background: color-mix(in srgb, #4a4a4a 90%, black);
+}
+
+.turn-brief-head h2 {
+  margin: 0;
+  font-family: "Fraunces", Georgia, serif;
+  font-size: 1.15rem;
+  font-weight: 700;
+}
+
+.turn-brief-body {
+  padding: 0.85rem 1rem 0.4rem;
+  overflow: auto;
+  flex: 1 1 auto;
+}
+
+.turn-brief-body section {
+  margin-bottom: 0.85rem;
+}
+
+.turn-brief-body h3 {
+  margin: 0 0 0.35rem;
+  font-size: 0.92rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: color-mix(in srgb, white 75%, transparent);
+}
+
+.turn-brief-body ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.turn-brief-body li {
+  margin: 0.2rem 0;
+  font-size: 0.95rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.turn-brief-nets {
+  border-top: 1px solid color-mix(in srgb, white 18%, transparent);
+  padding-top: 0.65rem;
+  font-weight: 700;
+}
+
+.turn-brief-nets p {
+  margin: 0.25rem 0;
+}
+
+.turn-brief-empty {
+  margin: 1.5rem 1rem;
+  text-align: center;
+  color: color-mix(in srgb, white 70%, transparent);
+  font-size: 1rem;
+}
+
+.turn-brief-foot {
+  justify-content: flex-end;
+}
+
 .shop-panel {
   position: absolute;
   z-index: 56;

@@ -155,6 +155,9 @@ def serialize_player(player: Player, match: Match) -> dict[str, Any]:
         "attacked_by_last_rotation": sorted(
             match.attackers_on_player_last_rotation(player)
         ),
+        "last_turn_preview": (
+            player.last_turn_preview.to_dict() if player.last_turn_preview else None
+        ),
     }
 
 

@@ -10,7 +10,11 @@ import random
 from loaded_dice.dice import DEFAULT_MAX_ROLLS_PER_TURN, DiceSet, TooManyRollsError
 from loaded_dice.economy import (
     CHIPS_PER_SCORED_HAND,
-    calculate_compensation,
+    COMPENSATION_CHIPS_PER_ATTACKER,
+    COMPENSATION_PACIFIST_CHIPS,
+    INTEREST_BLOCK_SIZE,
+    INTEREST_CHIPS_PER_BLOCK,
+    MAX_INTEREST_CHIPS,
     calculate_interest,
     chips_for_unused_standard_rolls,
     InsufficientChipsError,
@@ -24,7 +28,10 @@ from loaded_dice.cards import (
     UNTARGETED_HINDRANCE_IDS,
 )
 from loaded_dice.card_effects.negative_power import (
+    BLUE_SHELL_POINT_LOSS,
     HindranceConflictError,
+    NEGATIVE_PUNISHMENT_CHIP_LOSS,
+    POSITIVE_PUNISHMENT_POINT_LOSS,
     resolve_hindrance,
     try_resolve_hindrance_at_start_turn,
     validate_hindrance_queue,
@@ -32,6 +39,7 @@ from loaded_dice.card_effects.negative_power import (
 from loaded_dice.card_effects.positive_power import (
     compute_do_over_points,
     POSITIVE_POWER_CAST,
+    POSITIVE_REINFORCEMENT_BONUS,
     cast_positive_power,
     try_apply_reinforcements_on_score,
 )
@@ -41,6 +49,8 @@ from loaded_dice.card_effects.trading import (
     GAMBLER_COST_STEP,
     GUARDIAN_COOLDOWN_TURNS,
     LAWYER_COOLDOWN_TURNS,
+    MERCHANT_CHIPS_PER_TURN,
+    PERSUADER_SCORE_BONUS,
     PSYCHIC_DIE_COUNT,
     TODDLER_DIE_COUNT,
     gecko_compensation_bonus,
@@ -49,6 +59,7 @@ from loaded_dice.effects import TurnEffects
 from loaded_dice.preview import SCORING_HAND_SIZE, best_scoring_hand
 from loaded_dice.scoring import Category, ScoreSheet, is_yahtzee
 from loaded_dice.shop import Shop, ShopError, sell_price_for_card
+from loaded_dice.turn_brief import BriefAmountLine, TurnBrief, card_display_name
 from loaded_dice.turn_effects import apply_turn_start_passives, resolve_turn_effects
 
 
@@ -141,6 +152,10 @@ class Player:
     # Positive punishment armed at start turn; applied on the next scored hand.
     pending_score_penalty: int = 0
     jail_locked_index: int | None = None
+    # Chip gifts received while not on your turn (e.g. Helping hand).
+    offturn_chip_events: list[BriefAmountLine] = field(default_factory=list)
+    last_turn_preview: TurnBrief | None = None
+    turn_brief_version: int = 0
 
     def total_score(self) -> int:
         return self.game_total + self.current_sheet.grand_total()
@@ -261,17 +276,68 @@ class Match:
         if self.active_player.is_out_of_match(self.config):
             raise WrongPhaseError(f"{self.active_player.name} has finished the match")
 
-        interest = calculate_interest(self.active_player.chips)
-        self.active_player.earn_chips(interest)
+        player = self.active_player
+        own_chip_lines: list[BriefAmountLine] = []
+        other_chip_lines: list[BriefAmountLine] = list(player.offturn_chip_events)
+        player.offturn_chip_events.clear()
+        compensation_chip_lines: list[BriefAmountLine] = []
+        interest_chip_lines: list[BriefAmountLine] = []
+        score_lines: list[BriefAmountLine] = []
+        debuff_lines: list[str] = []
+        buff_lines: list[str] = []
+
+        # Interest uses the pre-payout balance; applied after other income is recorded.
+        interest = calculate_interest(player.chips)
+
         if self._rotation_count > 0:
-            compensation = calculate_compensation(
-                self._previous_rotation_attacks.attacker_count_on(self.active_player.name),
-                self._previous_rotation_attacks.player_attacked(self.active_player.name),
+            attackers = sorted(
+                self._previous_rotation_attacks.attacks_on.get(player.name, set())
             )
-            compensation += gecko_compensation_bonus(self.active_player)
-            self.active_player.earn_chips(compensation)
-        self.active_player.turn_effects = resolve_turn_effects(self.active_player)
-        apply_turn_start_passives(self.active_player, self)
+            for attacker_name in attackers:
+                compensation_chip_lines.append(
+                    BriefAmountLine(
+                        COMPENSATION_CHIPS_PER_ATTACKER,
+                        f"Compensation: {attacker_name}",
+                    )
+                )
+            if not self._previous_rotation_attacks.player_attacked(player.name):
+                compensation_chip_lines.append(
+                    BriefAmountLine(
+                        COMPENSATION_PACIFIST_CHIPS,
+                        "Compensation: Pacifist",
+                    )
+                )
+            gecko = gecko_compensation_bonus(player)
+            if gecko and compensation_chip_lines:
+                compensation_chip_lines.append(
+                    BriefAmountLine(gecko, "Compensation: Gecko")
+                )
+            compensation_total = sum(line.amount for line in compensation_chip_lines)
+            if compensation_total:
+                player.earn_chips(compensation_total)
+
+        if interest:
+            interest_chip_lines.append(
+                BriefAmountLine(
+                    interest,
+                    f"Interest: {INTEREST_CHIPS_PER_BLOCK} chips per "
+                    f"{INTEREST_BLOCK_SIZE} (Max {MAX_INTEREST_CHIPS})",
+                )
+            )
+            player.earn_chips(interest)
+
+        # Preserve Helping Hand points gifted before this turn.
+        preserved_hh = player.turn_effects.helping_hand_bonus
+        player.turn_effects = resolve_turn_effects(player)
+        if preserved_hh:
+            player.turn_effects.helping_hand_bonus = preserved_hh
+            player.turn_effects.score_bonus += preserved_hh
+
+        if player.inventory.has_trading(CardId.MERCHANT):
+            own_chip_lines.append(
+                BriefAmountLine(MERCHANT_CHIPS_PER_TURN, "Merchant")
+            )
+        apply_turn_start_passives(player, self)
 
         self._dice = DiceSet(
             size=self.config.dice_size,
@@ -280,8 +346,121 @@ class Match:
         self._toddler_used_this_turn = False
         self._psychic_used_this_turn = False
         self._psychic_previews = {}
-        self._resolve_queued_hindrances(self.active_player)
-        self.active_player.parry_ready = False
+
+        caster_by_name = {candidate.name: candidate for candidate in self.players}
+        remaining: list[QueuedHindrance] = []
+        for hindrance in player.queued_hindrances:
+            caster = caster_by_name.get(hindrance.caster_name, player)
+            name = card_display_name(hindrance.card_id.value)
+            if try_resolve_hindrance_at_start_turn(
+                hindrance.card_id, player, caster, self
+            ):
+                if hindrance.card_id in (
+                    CardId.GLASS_HALF_FULL,
+                    CardId.GLASS_HALF_EMPTY,
+                ):
+                    debuff_lines.append(
+                        f"{name} casted on you by {hindrance.caster_name}!"
+                    )
+                elif hindrance.card_id == CardId.BLUE_SHELL:
+                    score_lines.append(
+                        BriefAmountLine(
+                            -BLUE_SHELL_POINT_LOSS,
+                            f"Blue shell ({hindrance.caster_name})",
+                        )
+                    )
+                elif hindrance.card_id == CardId.NEGATIVE_PUNISHMENT:
+                    other_chip_lines.append(
+                        BriefAmountLine(
+                            -NEGATIVE_PUNISHMENT_CHIP_LOSS,
+                            f"Negative punishment ({hindrance.caster_name})",
+                        )
+                    )
+                elif hindrance.card_id == CardId.POSITIVE_PUNISHMENT:
+                    score_lines.append(
+                        BriefAmountLine(
+                            -POSITIVE_PUNISHMENT_POINT_LOSS,
+                            f"Positive punishment armed ({hindrance.caster_name})",
+                        )
+                    )
+            else:
+                remaining.append(hindrance)
+        player.queued_hindrances = remaining
+
+        for hindrance in player.queued_hindrances:
+            name = card_display_name(hindrance.card_id.value)
+            debuff_lines.append(
+                f"{name} casted on you by {hindrance.caster_name}!"
+            )
+
+        if preserved_hh:
+            buff_lines.append(
+                f"+{preserved_hh} points on next scored hand (Helping hand)"
+            )
+
+        if (
+            player.inventory.has_power(CardId.POSITIVE_REINFORCEMENT)
+            and self.rotation_count > 0
+            and not self.player_attacked_last_rotation(player)
+        ):
+            buff_lines.append(
+                f"+{POSITIVE_REINFORCEMENT_BONUS} points on next scored hand "
+                "(Positive reinforcement)"
+            )
+
+        if player.inventory.has_trading(CardId.GUARDIAN):
+            if player.guardian_cooldown_turns == 0:
+                buff_lines.append("Guardian is ready")
+            else:
+                buff_lines.append(
+                    f"Guardian cooldown: {player.guardian_cooldown_turns}"
+                )
+
+        if player.inventory.has_trading(CardId.LAWYER):
+            if player.lawyer_cooldown_turns == 0:
+                buff_lines.append("Lawyer is ready")
+            else:
+                buff_lines.append(
+                    f"Lawyer cooldown: {player.lawyer_cooldown_turns}"
+                )
+
+        if player.inventory.has_trading(CardId.PERSUADER):
+            buff_lines.append(
+                f"+{PERSUADER_SCORE_BONUS} points on next scored hand (Persuader)"
+            )
+
+        # Own passives → gifts/attacks from others → compensation → interest.
+        chip_lines = (
+            own_chip_lines
+            + other_chip_lines
+            + compensation_chip_lines
+            + interest_chip_lines
+        )
+        net_chips = sum(line.amount for line in chip_lines)
+        net_score = sum(line.amount for line in score_lines)
+        if preserved_hh:
+            net_score += preserved_hh
+        if (
+            player.inventory.has_power(CardId.POSITIVE_REINFORCEMENT)
+            and self.rotation_count > 0
+            and not self.player_attacked_last_rotation(player)
+        ):
+            net_score += POSITIVE_REINFORCEMENT_BONUS
+        if player.inventory.has_trading(CardId.PERSUADER):
+            net_score += PERSUADER_SCORE_BONUS
+        player.turn_brief_version += 1
+        player.last_turn_preview = TurnBrief(
+            kind="preview",
+            version=player.turn_brief_version,
+            debuffs=debuff_lines,
+            chips=chip_lines,
+            buffs=buff_lines,
+            scores=score_lines,
+            net_chips=net_chips,
+            net_score=net_score,
+        )
+
+        player.parry_ready = False
         self.phase = TurnPhase.TURN_ACTIVE
 
     def begin_rolling(self) -> None:

@@ -48,6 +48,19 @@ export type PlayerState = {
   attacked_last_rotation?: boolean;
   /** Players who cast a hindrance on this player last rotation. */
   attacked_by_last_rotation?: string[];
+  /** Latest "your turn in preview" brief (null until first Start Turn). */
+  last_turn_preview?: TurnBrief | null;
+};
+
+export type TurnBrief = {
+  kind: "preview" | string;
+  version: number;
+  debuffs: string[];
+  chips: { amount: number; label: string }[];
+  buffs: string[];
+  scores: { amount: number; label: string }[];
+  net_chips: number;
+  net_score: number;
 };
 
 export type MatchState = {
