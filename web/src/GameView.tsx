@@ -171,7 +171,7 @@ type DiePickMode =
 /** Armed card waiting for a leaderboard click to pick another player. */
 type PlayerTargetMode =
   | { kind: "hindrance"; cardId: string; slotIndex: number }
-  | { kind: "helping_hand" };
+  | { kind: "helping_hand"; choice: "chips" | "points" | null };
 
 function formatScoreDelta(delta: number): string {
   if (delta > 0) return `+${delta}`;
@@ -301,7 +301,6 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
   const [spacePick, setSpacePick] = useState<{ dieIndex: number | null } | null>(
     null
   );
-  const [helpingChoice, setHelpingChoice] = useState<"chips" | "points">("chips");
   const [diePick, setDiePick] = useState<DiePickMode | null>(null);
   const [blockArming, setBlockArming] = useState<"parry" | "guardian" | null>(null);
   const [playerTarget, setPlayerTarget] = useState<PlayerTargetMode | null>(null);
@@ -796,7 +795,7 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
       return;
     }
     if (card.id === "helping_hand") {
-      armPlayerTarget({ kind: "helping_hand" });
+      armPlayerTarget({ kind: "helping_hand", choice: null });
       return;
     }
     onAction({ type: "cast_power", card_id: card.id });
@@ -870,10 +869,11 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
   function selectLeaderboardPlayer(name: string) {
     if (playerTarget && name !== playerName) {
       if (playerTarget.kind === "helping_hand") {
+        if (playerTarget.choice == null) return;
         onAction({
           type: "cast_power",
           card_id: "helping_hand",
-          choice: helpingChoice,
+          choice: playerTarget.choice,
           target: name,
         });
       } else {
@@ -1143,6 +1143,10 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
       <aside
         className={`hud-dock hud-sheet ${sheetOpen ? "open" : "peek"} ${
           sheetFullscreen ? "fullscreen" : ""
+        } ${
+          scoreBreakdown && scoreBreakdown.lines.length > 0
+            ? "has-score-bonus"
+            : ""
         }`}
       >
         <button
@@ -1266,6 +1270,33 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
                   : cards.map((id) => label(id)).join(", ")}
               </div>
             ))}
+          </div>
+        )}
+
+        {playerTarget?.kind === "helping_hand" && (
+          <div className="face-picker space-face-picker helping-hand-picker">
+            <button
+              type="button"
+              className={`face-option ${
+                playerTarget.choice === "chips" ? "selected" : ""
+              }`}
+              onClick={() =>
+                setPlayerTarget({ kind: "helping_hand", choice: "chips" })
+              }
+            >
+              Take chips
+            </button>
+            <button
+              type="button"
+              className={`face-option ${
+                playerTarget.choice === "points" ? "selected" : ""
+              }`}
+              onClick={() =>
+                setPlayerTarget({ kind: "helping_hand", choice: "points" })
+              }
+            >
+              Take score
+            </button>
           </div>
         )}
 
@@ -1409,21 +1440,6 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
                     </button>
                   ))}
                 </div>
-              )}
-              {(powerFanCards.some((c) => c.id === "helping_hand") ||
-                playerTarget?.kind === "helping_hand") && (
-                <label className="face-picker">
-                  Helping hand
-                  <select
-                    value={helpingChoice}
-                    onChange={(e) =>
-                      setHelpingChoice(e.target.value as "chips" | "points")
-                    }
-                  >
-                    <option value="chips">I take chips</option>
-                    <option value="points">I take +10 pts</option>
-                  </select>
-                </label>
               )}
               {aiming && (
                 <button type="button" className="secondary" onClick={clearAiming}>

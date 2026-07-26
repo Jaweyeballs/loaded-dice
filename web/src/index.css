@@ -276,6 +276,14 @@ select {
   right: 0;
   bottom: 15rem;
   width: min(340px, 90vw);
+  transition:
+    transform 0.28s ease,
+    bottom 0.28s ease;
+}
+
+.hud-sheet.has-score-bonus:not(.fullscreen) {
+  /* Grow the dock so the bonus feed doesn't steal sheet scroll height. */
+  bottom: 11.25rem;
 }
 
 .hud-sheet.peek {
@@ -1196,10 +1204,30 @@ select {
   background: color-mix(in srgb, var(--felt-deep) 40%, black);
 }
 
+.space-face-picker .face-option.selected {
+  border-color: var(--cream);
+  background: color-mix(in srgb, var(--cream) 22%, var(--felt-deep));
+  font-weight: 700;
+}
+
+.helping-hand-picker {
+  justify-content: center;
+  margin: 0 auto 0.65rem;
+  width: fit-content;
+}
+
+.helping-hand-picker .face-option {
+  min-width: 6.5rem;
+}
+
 @media (max-width: 800px) {
   .hud-left,
   .hud-sheet {
     bottom: 14rem;
+  }
+
+  .hud-sheet.has-score-bonus:not(.fullscreen) {
+    bottom: 10.25rem;
   }
 
   .card-trays {
