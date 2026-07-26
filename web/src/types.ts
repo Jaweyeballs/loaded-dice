@@ -25,6 +25,10 @@ export type PlayerState = {
   sheet_total?: number;
   power_cards: CardInfo[];
   trading_cards: CardInfo[];
+  /** Public inventory sizes (safe to show for opponents). */
+  power_count?: number;
+  trading_count?: number;
+  card_count?: number;
   queued_hindrances: { card_id: string; caster_name: string }[];
   pending_score_penalty?: number;
   /** Signed modifiers shown under the scoresheet (null when none). */

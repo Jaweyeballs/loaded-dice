@@ -156,6 +156,8 @@ class Player:
     offturn_chip_events: list[BriefAmountLine] = field(default_factory=list)
     last_turn_preview: TurnBrief | None = None
     turn_brief_version: int = 0
+    # Snapshot of other players' hindrances — refreshed only on Start Turn with Forecaster.
+    forecaster_reveals: dict[str, list[str]] | None = None
 
     def total_score(self) -> int:
         return self.game_total + self.current_sheet.grand_total()
@@ -461,7 +463,24 @@ class Match:
         )
 
         player.parry_ready = False
+        self._refresh_forecaster_reveals(player)
         self.phase = TurnPhase.TURN_ACTIVE
+
+    def _refresh_forecaster_reveals(self, player: Player) -> None:
+        """Capture other players' hindrance hands if *player* holds Forecaster."""
+        if not player.inventory.has_trading(CardId.FORECASTER):
+            player.forecaster_reveals = None
+            return
+        reveals: dict[str, list[str]] = {}
+        for other in self.players:
+            if other is player:
+                continue
+            reveals[other.name] = [
+                card.id.value
+                for card in other.inventory.power_cards
+                if card.id in NEGATIVE_POWER_IDS
+            ]
+        player.forecaster_reveals = reveals
 
     def begin_rolling(self) -> None:
         """No-op compatibility: Start turn already enters TURN_ACTIVE."""

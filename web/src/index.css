@@ -205,6 +205,111 @@ select {
   border-bottom: 1px solid color-mix(in srgb, white 10%, transparent);
 }
 
+.opponent-rail {
+  position: absolute;
+  z-index: 22;
+  top: 4.35rem;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(54vw, 640px);
+  height: 8.5rem;
+  pointer-events: none;
+}
+
+.opponent-seat {
+  position: absolute;
+  top: 0.15rem;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  width: 6.75rem;
+  pointer-events: auto;
+}
+
+.opponent-seat.is-active .opponent-name {
+  color: #ffe6a8;
+}
+
+.opponent-meta {
+  display: flex;
+  align-items: baseline;
+  gap: 0.35rem;
+  max-width: 100%;
+}
+
+.opponent-name {
+  font-family: "Fraunces", Georgia, serif;
+  font-size: 0.92rem;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 4.6rem;
+}
+
+.opponent-count {
+  flex: 0 0 auto;
+  min-width: 1.25rem;
+  padding: 0.05rem 0.3rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, black 35%, transparent);
+  border: 1px solid color-mix(in srgb, var(--cream) 28%, transparent);
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.opponent-hand {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  min-height: 2.4rem;
+  padding-left: 0.85rem;
+}
+
+.opponent-card-back {
+  width: 1.55rem;
+  height: 2.2rem;
+  margin-left: -0.85rem;
+  border-radius: 0.28rem;
+  background:
+    linear-gradient(145deg, color-mix(in srgb, var(--panel-dark) 70%, #1a1a1a), #1c2420);
+  border: 1px solid color-mix(in srgb, var(--cream) 22%, transparent);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.28);
+}
+
+.opponent-card-more {
+  margin-left: 0.2rem;
+  font-size: 0.7rem;
+  opacity: 0.8;
+}
+
+.opponent-reveals {
+  display: flex;
+  justify-content: center;
+  padding-left: 0.7rem;
+  margin-top: 0.1rem;
+  min-height: 2.6rem;
+}
+
+.opponent-reveal-card {
+  width: 2.55rem !important;
+  height: 3.55rem !important;
+  margin-left: -0.7rem;
+  padding: 0.2rem 0.15rem !important;
+  font-size: 0.55rem !important;
+  line-height: 1.05;
+  border-radius: 0.3rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  cursor: default;
+  transform: translateY(0.15rem);
+}
+
 .hud-brand {
   display: flex;
   gap: 0.75rem;
@@ -1264,22 +1369,6 @@ select {
 .fan-card.dormant {
   opacity: 0.48;
   filter: grayscale(0.4);
-}
-
-.forecaster-panel {
-  margin: 0.75rem 0 0;
-  padding: 0.55rem 0.7rem;
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--felt-deep) 70%, black);
-  border: 1px solid color-mix(in srgb, white 14%, transparent);
-  font-size: 0.85rem;
-  max-width: min(360px, 90vw);
-}
-
-.forecaster-panel h3 {
-  margin: 0 0 0.35rem;
-  font-family: "Fraunces", Georgia, serif;
-  font-size: 0.95rem;
 }
 
 .face-picker {

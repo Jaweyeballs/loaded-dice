@@ -101,33 +101,18 @@ class Room:
                     self.match.can_use_shop(viewer) if viewer else False
                 )
                 match_state["forecaster_reveals"] = (
-                    self._forecaster_reveals(viewer)
+                    viewer.forecaster_reveals
                     if viewer is not None
+                    and self.match.active_player is viewer
                     else None
                 )
+                # Never leak other players' exact card IDs — only counts + Forecaster snapshot.
+                for entry in match_state["players"]:
+                    if entry["name"] != viewer_name:
+                        entry["power_cards"] = []
+                        entry["trading_cards"] = []
             payload["match"] = match_state
         return payload
-
-    def _forecaster_reveals(self, viewer) -> dict[str, list[str]] | None:
-        """Hindrance cards held by others — only while viewing on your turn with Forecaster."""
-        from loaded_dice.cards import CardId, NEGATIVE_POWER_IDS
-
-        assert self.match is not None
-        if self.match.active_player is not viewer:
-            return None
-        if not viewer.inventory.has_trading(CardId.FORECASTER):
-            return None
-        reveals: dict[str, list[str]] = {}
-        for player in self.match.players:
-            if player is viewer:
-                continue
-            hindrances = [
-                card.id.value
-                for card in player.inventory.power_cards
-                if card.id in NEGATIVE_POWER_IDS
-            ]
-            reveals[player.name] = hindrances
-        return reveals
 
 
 class RoomManager:

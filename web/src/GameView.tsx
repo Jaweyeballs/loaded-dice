@@ -99,6 +99,37 @@ function emptyTurnBrief(): TurnBrief {
   };
 }
 
+/** Horizontal seat percents (0–100) for N opponents across the top rail. */
+function opponentSeatPercents(count: number): number[] {
+  if (count <= 0) return [];
+  if (count === 1) return [50];
+  if (count === 2) return [34, 66];
+  const left = 22;
+  const right = 78;
+  if (count % 2 === 1) {
+    const mid = Math.floor(count / 2);
+    const positions: number[] = new Array(count);
+    positions[mid] = 50;
+    for (let i = 0; i < mid; i++) {
+      const t = mid === 1 ? 0 : i / (mid - 1);
+      positions[i] = left + (48 - left) * t;
+      positions[count - 1 - i] = right - (right - 52) * t;
+    }
+    return positions;
+  }
+  const half = count / 2;
+  const positions: number[] = [];
+  for (let i = 0; i < half; i++) {
+    const t = half === 1 ? 0.5 : i / (half - 1);
+    positions.push(left + (48 - left) * t);
+  }
+  for (let i = 0; i < half; i++) {
+    const t = half === 1 ? 0.5 : i / (half - 1);
+    positions.push(52 + (right - 52) * t);
+  }
+  return positions;
+}
+
 /** Scoresheet row order — includes summary rows that are not scoreable categories. */
 type SheetRow =
   | { kind: "category"; id: string }
@@ -1053,6 +1084,21 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
       : (me?.last_turn_preview ?? emptyTurnBrief())
     : null;
 
+  const opponents = useMemo(() => {
+    const names = match.players.map((p) => p.name);
+    const myIndex = names.indexOf(playerName);
+    if (myIndex < 0) return [] as PlayerState[];
+    const ordered = [
+      ...match.players.slice(myIndex + 1),
+      ...match.players.slice(0, myIndex),
+    ];
+    return ordered;
+  }, [match.players, playerName]);
+  const opponentSeats = useMemo(
+    () => opponentSeatPercents(opponents.length),
+    [opponents.length],
+  );
+
   return (
     <div className="hud">
       <div className="hud-felt" aria-hidden />
@@ -1089,6 +1135,67 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
           Leave
         </button>
       </header>
+
+      {opponents.length > 0 && (
+        <div className="opponent-rail" aria-label="Opponents">
+          {opponents.map((opp, i) => {
+            const left = opponentSeats[i] ?? 50;
+            const cardCount =
+              opp.card_count ??
+              (opp.power_count ?? 0) + (opp.trading_count ?? 0);
+            const blanks = Math.min(cardCount, 6);
+            const revealed = match.forecaster_reveals?.[opp.name] ?? [];
+            return (
+              <div
+                key={opp.name}
+                className={`opponent-seat ${
+                  opp.name === match.active_player ? "is-active" : ""
+                }`}
+                style={{ left: `${left}%` }}
+              >
+                <div className="opponent-meta">
+                  <span className="opponent-name">{opp.name}</span>
+                  <span className="opponent-count" title="Cards in hand">
+                    {cardCount}
+                  </span>
+                </div>
+                <div className="opponent-hand" aria-hidden={cardCount === 0}>
+                  {Array.from({ length: blanks }, (_, bi) => (
+                    <span
+                      key={bi}
+                      className="opponent-card-back"
+                      style={{ zIndex: bi + 1 }}
+                    />
+                  ))}
+                  {cardCount > blanks && (
+                    <span className="opponent-card-more">
+                      +{cardCount - blanks}
+                    </span>
+                  )}
+                </div>
+                {revealed.length > 0 && (
+                  <div className="opponent-reveals">
+                    {revealed.map((cardId, ri) => (
+                      <Tip
+                        key={`${cardId}-${ri}`}
+                        text={tipText(cardId)}
+                        className="tip-below"
+                      >
+                        <span
+                          className="opponent-reveal-card fan-card hindrance"
+                          style={{ zIndex: ri + 1 }}
+                        >
+                          {label(cardId)}
+                        </span>
+                      </Tip>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       <aside className={`hud-dock hud-left ${leftOpen ? "open" : "peek"}`}>
         <div className="dock-body">
@@ -1315,20 +1422,6 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
       </aside>
 
       <main className="hud-table">
-        {match.forecaster_reveals && (
-          <div className="forecaster-panel">
-            <h3>Forecaster</h3>
-            {Object.entries(match.forecaster_reveals).map(([name, cards]) => (
-              <div key={name}>
-                <strong>{name}:</strong>{" "}
-                {cards.length === 0
-                  ? "no hindrances"
-                  : cards.map((id) => label(id)).join(", ")}
-              </div>
-            ))}
-          </div>
-        )}
-
         {playerTarget?.kind === "helping_hand" && (
           <div className="face-picker space-face-picker helping-hand-picker">
             <button

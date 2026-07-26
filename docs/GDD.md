@@ -106,7 +106,7 @@ Permanent boosts with drawbacks, picked at the start of a run/match.
 | The gambler | Pay **200** chips for an extra reroll; cost increases by **100** chips each time used |
 | The psychic | Choose 2 dice to preview their next rolled value (once per turn) |
 | The guardian | Block an unresolved queued hindrance of your choice; goes on cooldown for one turn after triggering |
-| The forecaster | Reveals all hindrance cards held by all players, visible only to you, on your turn |
+| The forecaster | On your **Start Turn**, reveals other players’ held hindrance cards under their hidden hands (visible only to you). Selling it clears the peek on your next Start Turn. |
 | The merchant | Earn **200** chips on your turn |
 | The lawyer | End your turn without scoring a hand (2-turn cooldown) |
 

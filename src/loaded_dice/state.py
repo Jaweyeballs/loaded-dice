@@ -126,6 +126,11 @@ def serialize_player(player: Player, match: Match) -> dict[str, Any]:
             else 0
         ),
         "sheet_total": player.current_sheet.grand_total(),
+        "power_count": len(player.inventory.power_cards),
+        "trading_count": len(player.inventory.trading_cards),
+        "card_count": (
+            len(player.inventory.power_cards) + len(player.inventory.trading_cards)
+        ),
         "power_cards": [serialize_card(c) for c in player.inventory.power_cards],
         "trading_cards": [serialize_card(c) for c in player.inventory.trading_cards],
         "queued_hindrances": [

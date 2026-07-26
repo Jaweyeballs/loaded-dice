@@ -205,6 +205,7 @@ def test_forecaster_reveals_only_to_active_holder():
     bob = room.match.players[1]
     alice.inventory.add_trading(card_for_id(CardId.FORECASTER))
     bob.inventory.add_power(card_for_id(CardId.GLASS_HALF_EMPTY))
+    room.match.start_turn()
 
     alice_view = room.public_state(viewer_name="Alice")
     assert alice_view["match"]["forecaster_reveals"] == {
