@@ -9,7 +9,8 @@ export const CARD_BLURBS: Record<string, string> = {
   toddler: "Pick 2 dice to immediately reroll them (once per turn).",
   psychic: "Pick 2 dice to preview their next rolled faces (once per turn).",
   guardian: "Block a queued hindrance anytime before it resolves (1-turn cooldown).",
-  forecaster: "On your Start Turn, peek at other players’ hindrance cards under their hands.",
+  forecaster:
+    "On Start Turn, peek at others’ hindrance cards until your next Start Turn (new buys stay hidden).",
   icarus: "After rolling: bump one die up within its faces (standard wraps 6 → 1).",
   super_serum: "After rolling: raise every die by 1 within its faces (no wrap).",
   do_over:

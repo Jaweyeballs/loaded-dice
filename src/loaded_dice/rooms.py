@@ -100,12 +100,7 @@ class Room:
                 match_state["you_can_use_shop"] = (
                     self.match.can_use_shop(viewer) if viewer else False
                 )
-                match_state["forecaster_reveals"] = (
-                    viewer.forecaster_reveals
-                    if viewer is not None
-                    and self.match.active_player is viewer
-                    else None
-                )
+                match_state["forecaster_reveals"] = self._forecaster_view_for(viewer)
                 # Never leak other players' exact card IDs — only counts + Forecaster snapshot.
                 for entry in match_state["players"]:
                     if entry["name"] != viewer_name:
@@ -113,6 +108,26 @@ class Room:
                         entry["trading_cards"] = []
             payload["match"] = match_state
         return payload
+
+    def _forecaster_view_for(self, viewer) -> dict[str, list[str]] | None:
+        """Turn-start snapshot for *viewer*, dropping cards no longer held.
+
+        Stays visible until their next Start Turn refreshes or clears it — including
+        after they score / while spectating — so long as the snapshot exists.
+        """
+        assert self.match is not None
+        if viewer is None or viewer.forecaster_reveals is None:
+            return None
+        by_name = {player.name: player for player in self.match.players}
+        filtered: dict[str, list[str]] = {}
+        for name, card_ids in viewer.forecaster_reveals.items():
+            other = by_name.get(name)
+            if other is None:
+                filtered[name] = []
+                continue
+            held = {card.id.value for card in other.inventory.power_cards}
+            filtered[name] = [card_id for card_id in card_ids if card_id in held]
+        return filtered
 
 
 class RoomManager:

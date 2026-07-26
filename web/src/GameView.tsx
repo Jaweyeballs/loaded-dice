@@ -1143,8 +1143,10 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
             const cardCount =
               opp.card_count ??
               (opp.power_count ?? 0) + (opp.trading_count ?? 0);
-            const blanks = Math.min(cardCount, 6);
             const revealed = match.forecaster_reveals?.[opp.name] ?? [];
+            // Revealed hindrances are "flipped out" of the blank hand.
+            const hiddenCount = Math.max(0, cardCount - revealed.length);
+            const blanks = Math.min(hiddenCount, 6);
             return (
               <div
                 key={opp.name}
@@ -1159,7 +1161,7 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
                     {cardCount}
                   </span>
                 </div>
-                <div className="opponent-hand" aria-hidden={cardCount === 0}>
+                <div className="opponent-hand" aria-hidden={hiddenCount === 0}>
                   {Array.from({ length: blanks }, (_, bi) => (
                     <span
                       key={bi}
@@ -1167,9 +1169,9 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
                       style={{ zIndex: bi + 1 }}
                     />
                   ))}
-                  {cardCount > blanks && (
+                  {hiddenCount > blanks && (
                     <span className="opponent-card-more">
-                      +{cardCount - blanks}
+                      +{hiddenCount - blanks}
                     </span>
                   )}
                 </div>
@@ -1934,9 +1936,6 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
           >
             <header className="turn-brief-head">
               <h2>Your turn in preview</h2>
-              <button type="button" onClick={closeTurnBrief}>
-                Confirm
-              </button>
             </header>
             {briefEmpty ? (
               <p className="turn-brief-empty">None available</p>

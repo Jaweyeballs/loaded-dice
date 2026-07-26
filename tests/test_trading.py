@@ -193,7 +193,7 @@ def test_guardian_blocks_hindrance_with_cooldown():
     match.start_turn()
     assert bob.turn_effects.zero_upper is False
 
-def test_forecaster_reveals_only_to_active_holder():
+def test_forecaster_reveals_only_to_holder():
     from loaded_dice.rooms import Room
 
     room = Room(code="ABCD", starting_chips=1000)

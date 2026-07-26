@@ -30,6 +30,20 @@ def test_forecaster_snapshot_on_start_turn_only():
     # Mid-turn acquisition is not reflected until next Start Turn.
     bob.inventory.add_power(card_for_id(CardId.ALREADY_IN_JAIL))
     assert alice.forecaster_reveals == {"Bob": ["glass_half_empty"]}
+    assert room.public_state(viewer_name="Alice")["match"]["forecaster_reveals"] == {
+        "Bob": ["glass_half_empty"],
+    }
+
+    # After scoring / ending turn, peek stays until Alice's next Start Turn.
+    room.match.end_turn_without_scoring()
+    assert room.public_state(viewer_name="Alice")["match"]["forecaster_reveals"] == {
+        "Bob": ["glass_half_empty"],
+    }
+    # Used cards drop out of the visible peek immediately.
+    bob.inventory.power_cards.clear()
+    assert room.public_state(viewer_name="Alice")["match"]["forecaster_reveals"] == {
+        "Bob": [],
+    }
 
 
 def test_forecaster_clears_after_sell_on_next_start():
@@ -45,10 +59,16 @@ def test_forecaster_clears_after_sell_on_next_start():
     room.match.start_turn()
     assert alice.forecaster_reveals == {"Bob": ["blue_shell"]}
 
-    # Sell Forecaster mid-turn — snapshot stays until next Start Turn.
+    # Sell Forecaster mid-turn — snapshot stays visible until next Start Turn.
     alice.inventory.trading_cards.clear()
     assert alice.forecaster_reveals == {"Bob": ["blue_shell"]}
+    assert room.public_state(viewer_name="Alice")["match"]["forecaster_reveals"] == {
+        "Bob": ["blue_shell"],
+    }
     room.match.end_turn_without_scoring()
+    assert room.public_state(viewer_name="Alice")["match"]["forecaster_reveals"] == {
+        "Bob": ["blue_shell"],
+    }
     room.match.start_turn()  # Bob
     room.match.end_turn_without_scoring()
     room.match.start_turn()  # Alice again — no Forecaster
