@@ -45,6 +45,10 @@ class CardId(Enum):
     NEGATIVE_PUNISHMENT = "negative_punishment"
     BLUE_SHELL = "blue_shell"
     ALREADY_IN_JAIL = "already_in_jail"
+    SMOKE_BOMB = "smoke_bomb"
+    TAX_AUDIT = "tax_audit"
+    BOUNTY_NOTICE = "bounty_notice"
+    MIXUP = "mixup"
 
 
 @dataclass(frozen=True)
@@ -64,6 +68,7 @@ CARD_DEFS: dict[CardId, Card] = {
     CardId.PSYCHIC: Card(CardId.PSYCHIC, CardKind.TRADING),
     CardId.GUARDIAN: Card(CardId.GUARDIAN, CardKind.TRADING),
     CardId.FORECASTER: Card(CardId.FORECASTER, CardKind.TRADING),
+    CardId.MIXUP: Card(CardId.MIXUP, CardKind.TRADING),
     CardId.PARRY: Card(CardId.PARRY, CardKind.POWER),
     CardId.ICARUS: Card(CardId.ICARUS, CardKind.POWER),
     CardId.SUPER_SERUM: Card(CardId.SUPER_SERUM, CardKind.POWER),
@@ -82,6 +87,9 @@ CARD_DEFS: dict[CardId, Card] = {
     CardId.NEGATIVE_PUNISHMENT: Card(CardId.NEGATIVE_PUNISHMENT, CardKind.POWER),
     CardId.BLUE_SHELL: Card(CardId.BLUE_SHELL, CardKind.POWER),
     CardId.ALREADY_IN_JAIL: Card(CardId.ALREADY_IN_JAIL, CardKind.POWER),
+    CardId.SMOKE_BOMB: Card(CardId.SMOKE_BOMB, CardKind.POWER),
+    CardId.TAX_AUDIT: Card(CardId.TAX_AUDIT, CardKind.POWER),
+    CardId.BOUNTY_NOTICE: Card(CardId.BOUNTY_NOTICE, CardKind.POWER),
 }
 
 # Positive powers that require target= (another player).
@@ -100,6 +108,9 @@ NEGATIVE_POWER_IDS: frozenset[CardId] = frozenset(
         CardId.NEGATIVE_PUNISHMENT,
         CardId.BLUE_SHELL,
         CardId.ALREADY_IN_JAIL,
+        CardId.SMOKE_BOMB,
+        CardId.TAX_AUDIT,
+        CardId.BOUNTY_NOTICE,
     }
 )
 

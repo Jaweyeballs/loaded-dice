@@ -27,7 +27,7 @@ def effective_turn_effects(player: Player, match: Match | None = None) -> TurnEf
     if (
         match is not None
         and match.rotation_count > 0
-        and not match.player_attacked_last_rotation(player)
+        and match.player_qualifies_as_pacifist(player)
         and player.inventory.has_power(CardId.POSITIVE_REINFORCEMENT)
     ):
         score_bonus += POSITIVE_REINFORCEMENT_BONUS
@@ -67,7 +67,7 @@ def serialize_score_breakdown(player: Player, match: Match) -> dict[str, Any] | 
             lines.append({"label": "persuader", "amount": PERSUADER_SCORE_BONUS})
         if (
             match.rotation_count > 0
-            and not match.player_attacked_last_rotation(player)
+            and match.player_qualifies_as_pacifist(player)
             and player.inventory.has_power(CardId.POSITIVE_REINFORCEMENT)
         ):
             lines.append(
@@ -161,6 +161,7 @@ def serialize_player(player: Player, match: Match) -> dict[str, Any]:
         "lawyer_cooldown": player.lawyer_cooldown_turns,
         "guardian_cooldown": player.guardian_cooldown_turns,
         "attacked_last_rotation": match.player_attacked_last_rotation(player),
+        "pacifist_qualified": match.player_qualifies_as_pacifist(player),
         "attacked_by_last_rotation": sorted(
             match.attackers_on_player_last_rotation(player)
         ),

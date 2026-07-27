@@ -200,7 +200,7 @@ def try_apply_reinforcements_on_score(player: Player, match: Match) -> None:
     """Consume Positive/Negative Reinforcement when scoring as a pacifist last rotation."""
     if match.rotation_count == 0:
         return
-    if match.player_attacked_last_rotation(player):
+    if not match.player_qualifies_as_pacifist(player):
         return
 
     if player.inventory.has_power(CardId.POSITIVE_REINFORCEMENT):

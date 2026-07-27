@@ -73,4 +73,4 @@ ACTIVATABLE_TRADING_IDS: frozenset[CardId] = frozenset(
     }
 )
 
-# Guardian is used via block_hindrance at turn start, not activate_trading.
+# Guardian / Mixup are not activate_trading — block passives.

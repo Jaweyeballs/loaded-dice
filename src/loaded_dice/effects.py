@@ -15,3 +15,5 @@ class TurnEffects:
     score_penalty: int = 0
     # Portion of score_bonus from Helping Hand (for HUD labeling).
     helping_hand_bonus: int = 0
+    # Smoke Bomb: lock this many random unlocked dice after the first roll.
+    smoke_bomb_locks: int = 0

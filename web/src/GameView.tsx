@@ -192,6 +192,9 @@ const HINDRANCE_IDS = new Set([
   "negative_punishment",
   "blue_shell",
   "already_in_jail",
+  "smoke_bomb",
+  "tax_audit",
+  "bounty_notice",
 ]);
 
 const UNTARGETED_HINDRANCES = new Set(["blue_shell"]);
@@ -208,6 +211,7 @@ const NO_USE_CARD_IDS = new Set([
   "persuader",
   "gecko",
   "forecaster",
+  "mixup",
 ]);
 
 const REINFORCEMENT_IDS = new Set([
@@ -284,7 +288,8 @@ function conditionStatus(
 ): "ACTIVE" | "DORMANT" | null {
   if (REINFORCEMENT_IDS.has(cardId)) {
     if (rotationCount <= 0) return "DORMANT";
-    return me?.attacked_last_rotation ? "DORMANT" : "ACTIVE";
+    const pacifist = me?.pacifist_qualified ?? !me?.attacked_last_rotation;
+    return pacifist ? "ACTIVE" : "DORMANT";
   }
   if (PUNISHMENT_IDS.has(cardId)) {
     if (rotationCount <= 0) return "DORMANT";

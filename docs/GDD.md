@@ -89,6 +89,9 @@ Permanent boosts with drawbacks, picked at the start of a run/match.
 | Negative punishment | If the target attacked **anyone** last rotation, they lose **200** chips at Start Turn. If not, the card stays queued until a later Start Turn where the condition is true. |
 | Blue shell | Queued on the highest-standing player **other than you** at cast time; that player loses 10 points on their next Start Turn (does not retarget if standings change). |
 | Already in jail | Stays queued until the target’s **first lock** on a turn (or blocked). That die cannot be unlocked for the rest of the turn, and its face value cannot change under any effect (Icarus, Super Serum, Space Die, Toddler, Psychic, Twins, etc.). Each lock consumes one queued copy. |
+| Smoke bomb | At Start Turn: after the target’s **first roll**, **2** random unlocked dice are force-locked (blockable beforehand). |
+| Tax audit | At Start Turn: take up to **150** chips from the target (paid to the caster). |
+| Bounty notice | Marks the target; the **next** hindrance cast on them pays that caster **200** chips, then the notice clears (placing Bounty itself does not pay out). |
 | Glass half empty | At Start Turn: any lower-section hand scored this turn is 0 (resolves for the turn regardless of which half they score). |
 | Glass half full | At Start Turn: any upper-section hand scored this turn is 0 (resolves for the turn regardless of which half they score). |
 
@@ -107,6 +110,7 @@ Permanent boosts with drawbacks, picked at the start of a run/match.
 | The psychic | Choose 2 dice to preview their next rolled value (once per turn) |
 | The guardian | Block an unresolved queued hindrance of your choice; goes on cooldown for one turn after triggering |
 | The forecaster | On your **Start Turn**, reveals other players’ held hindrance cards under their hidden hands (visible only to you until your next Start Turn). New buys mid-cycle stay hidden; used cards drop out of the peek. Selling Forecaster clears the peek on your next Start Turn. |
+| The mixup | Hindrances you cast cannot be blocked by **Parry** (Guardian still works). |
 | The merchant | Earn **200** chips on your turn |
 | The lawyer | End your turn without scoring a hand (2-turn cooldown) |
 

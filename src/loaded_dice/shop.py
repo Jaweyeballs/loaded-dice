@@ -39,6 +39,10 @@ CARD_PRICES: dict[CardId, int] = {
     CardId.NEGATIVE_PUNISHMENT: 350,
     CardId.BLUE_SHELL: 400,
     CardId.ALREADY_IN_JAIL: 350,
+    CardId.SMOKE_BOMB: 350,
+    CardId.TAX_AUDIT: 400,
+    CardId.BOUNTY_NOTICE: 350,
+    CardId.MIXUP: 450,
 }
 
 # Playtest-friendly mix: power, trading activate, trading passive.

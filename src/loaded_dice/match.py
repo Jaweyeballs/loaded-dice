@@ -29,9 +29,11 @@ from loaded_dice.cards import (
 )
 from loaded_dice.card_effects.negative_power import (
     BLUE_SHELL_POINT_LOSS,
+    BOUNTY_NOTICE_REWARD,
     HindranceConflictError,
     NEGATIVE_PUNISHMENT_CHIP_LOSS,
     POSITIVE_PUNISHMENT_POINT_LOSS,
+    TAX_AUDIT_CHIP_LOSS,
     resolve_hindrance,
     try_resolve_hindrance_at_start_turn,
     validate_hindrance_queue,
@@ -302,7 +304,7 @@ class Match:
                         f"Compensation: {attacker_name}",
                     )
                 )
-            if not self._previous_rotation_attacks.player_attacked(player.name):
+            if self.player_qualifies_as_pacifist(player):
                 compensation_chip_lines.append(
                     BriefAmountLine(
                         COMPENSATION_PACIFIST_CHIPS,
@@ -378,6 +380,17 @@ class Match:
                             f"Negative punishment ({hindrance.caster_name})",
                         )
                     )
+                elif hindrance.card_id == CardId.TAX_AUDIT:
+                    other_chip_lines.append(
+                        BriefAmountLine(
+                            -TAX_AUDIT_CHIP_LOSS,
+                            f"Tax audit ({hindrance.caster_name})",
+                        )
+                    )
+                elif hindrance.card_id == CardId.SMOKE_BOMB:
+                    debuff_lines.append(
+                        f"{name} casted on you by {hindrance.caster_name}!"
+                    )
                 elif hindrance.card_id == CardId.POSITIVE_PUNISHMENT:
                     score_lines.append(
                         BriefAmountLine(
@@ -403,7 +416,7 @@ class Match:
         if (
             player.inventory.has_power(CardId.POSITIVE_REINFORCEMENT)
             and self.rotation_count > 0
-            and not self.player_attacked_last_rotation(player)
+            and self.player_qualifies_as_pacifist(player)
         ):
             buff_lines.append(
                 f"+{POSITIVE_REINFORCEMENT_BONUS} points on next scored hand "
@@ -445,7 +458,7 @@ class Match:
         if (
             player.inventory.has_power(CardId.POSITIVE_REINFORCEMENT)
             and self.rotation_count > 0
-            and not self.player_attacked_last_rotation(player)
+            and self.player_qualifies_as_pacifist(player)
         ):
             net_score += POSITIVE_REINFORCEMENT_BONUS
         if player.inventory.has_trading(CardId.PERSUADER):
@@ -506,7 +519,12 @@ class Match:
         if hindrance_index < 0 or hindrance_index >= len(target.queued_hindrances):
             raise ValueError(f"Invalid hindrance index: {hindrance_index}")
 
-        used = self._consume_block_card(target, blocker_card_id)
+        pending = target.queued_hindrances[hindrance_index]
+        used = self._consume_block_card(
+            target,
+            blocker_card_id,
+            against_caster_name=pending.caster_name,
+        )
         blocked = target.queued_hindrances.pop(hindrance_index)
         self._append_hindrance_feed(
             card_id=blocked.card_id,
@@ -520,24 +538,39 @@ class Match:
         self,
         player: Player,
         blocker_card_id: CardId | None,
+        *,
+        against_caster_name: str | None = None,
     ) -> CardId:
         """Spend Parry/Guardian (or auto-pick) and return which card was used."""
+        mixup_blocks_parry = self._caster_has_mixup(against_caster_name)
+
         if blocker_card_id is None:
-            if player.parry_ready:
-                player.parry_ready = False
-                return CardId.PARRY
-            if player.inventory.has_power(CardId.PARRY):
-                player.inventory.consume_power_by_id(CardId.PARRY)
-                return CardId.PARRY
+            if not mixup_blocks_parry:
+                if player.parry_ready:
+                    player.parry_ready = False
+                    return CardId.PARRY
+                if player.inventory.has_power(CardId.PARRY):
+                    player.inventory.consume_power_by_id(CardId.PARRY)
+                    return CardId.PARRY
             if (
                 player.inventory.has_trading(CardId.GUARDIAN)
                 and player.guardian_cooldown_turns == 0
             ):
                 player.guardian_cooldown_turns = GUARDIAN_COOLDOWN_TURNS
                 return CardId.GUARDIAN
+            if mixup_blocks_parry and (
+                player.parry_ready or player.inventory.has_power(CardId.PARRY)
+            ):
+                raise WrongPhaseError(
+                    "The Mixup: Parry cannot block this hindrance (use Guardian)"
+                )
             raise WrongPhaseError("No parry available")
 
         if blocker_card_id == CardId.PARRY:
+            if mixup_blocks_parry:
+                raise WrongPhaseError(
+                    "The Mixup: Parry cannot block this hindrance"
+                )
             if player.parry_ready:
                 player.parry_ready = False
                 return CardId.PARRY
@@ -556,6 +589,14 @@ class Match:
             raise WrongPhaseError("Guardian unavailable")
 
         raise WrongPhaseError(f"{blocker_card_id.value} cannot block a hindrance")
+
+    def _caster_has_mixup(self, caster_name: str | None) -> bool:
+        if not caster_name:
+            return False
+        for candidate in self.players:
+            if candidate.name == caster_name:
+                return candidate.inventory.has_trading(CardId.MIXUP)
+        return False
 
     def _append_hindrance_feed(
         self,
@@ -598,7 +639,26 @@ class Match:
         }
         if had_twins:
             self._consume_twins_card()
+        self._apply_smoke_bomb_locks()
         return values
+
+    def _apply_smoke_bomb_locks(self) -> None:
+        """After the first roll, Smoke Bomb force-locks random unlocked dice."""
+        assert self._dice is not None
+        player = self.active_player
+        locks = player.turn_effects.smoke_bomb_locks
+        if locks <= 0 or self._dice.rolls_this_turn != 1:
+            return
+        player.turn_effects.smoke_bomb_locks = 0
+        unlocked = [
+            index
+            for index, die in enumerate(self._dice.dice)
+            if not die.locked
+        ]
+        if not unlocked:
+            return
+        for index in random.sample(unlocked, min(locks, len(unlocked))):
+            self._dice.lock(index)
 
     def lock(self, index: int) -> None:
         self._require_active_dice()
@@ -862,6 +922,9 @@ class Match:
         except CardNotInInventoryError as exc:
             raise WrongPhaseError(str(exc)) from exc
 
+        bounty_pending = any(
+            h.card_id == CardId.BOUNTY_NOTICE for h in target.queued_hindrances
+        )
         target.queued_hindrances.append(
             QueuedHindrance(card_id=card_id, caster_name=caster.name)
         )
@@ -871,6 +934,24 @@ class Match:
             caster_name=caster.name,
             target_name=target.name,
         )
+        if bounty_pending and card_id != CardId.BOUNTY_NOTICE:
+            self._collect_bounty_notice(target, collector=caster)
+
+    def _collect_bounty_notice(self, target: Player, *, collector: Player) -> None:
+        """Pay *collector* for hitting a Bounty-marked player; consume one notice."""
+        for index, hindrance in enumerate(target.queued_hindrances):
+            if hindrance.card_id != CardId.BOUNTY_NOTICE:
+                continue
+            target.queued_hindrances.pop(index)
+            collector.earn_chips(BOUNTY_NOTICE_REWARD)
+            if collector is not self.active_player:
+                collector.offturn_chip_events.append(
+                    BriefAmountLine(
+                        BOUNTY_NOTICE_REWARD,
+                        f"Bounty notice ({target.name})",
+                    )
+                )
+            return
 
     def _blue_shell_target(self, caster: Player) -> Player:
         """Highest-scoring player other than *caster* (name tie-break). Locked at cast."""
@@ -1066,6 +1147,10 @@ class Match:
     def player_attacked_last_rotation(self, player: Player) -> bool:
         """Whether *player* cast a hindrance during the previous rotation."""
         return self._previous_rotation_attacks.player_attacked(player.name)
+
+    def player_qualifies_as_pacifist(self, player: Player) -> bool:
+        """Whether *player* earns pacifist compensation / reinforcements."""
+        return not self.player_attacked_last_rotation(player)
 
     def attackers_on_player_last_rotation(self, player: Player) -> frozenset[str]:
         """Names of players who attacked *player* during the previous rotation."""

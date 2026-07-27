@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Callable
 
 from loaded_dice.cards import CardId
+from loaded_dice.turn_brief import BriefAmountLine
 
 if TYPE_CHECKING:
     from loaded_dice.match import Match, Player
@@ -14,6 +15,9 @@ if TYPE_CHECKING:
 BLUE_SHELL_POINT_LOSS = 10
 POSITIVE_PUNISHMENT_POINT_LOSS = 5
 NEGATIVE_PUNISHMENT_CHIP_LOSS = 200
+TAX_AUDIT_CHIP_LOSS = 150
+BOUNTY_NOTICE_REWARD = 200
+SMOKE_BOMB_LOCK_COUNT = 2
 
 # Resolve on the target's Start Turn (if any condition is met).
 START_TURN_HINDRANCES = frozenset(
@@ -23,11 +27,16 @@ START_TURN_HINDRANCES = frozenset(
         CardId.BLUE_SHELL,
         CardId.POSITIVE_PUNISHMENT,
         CardId.NEGATIVE_PUNISHMENT,
+        CardId.SMOKE_BOMB,
+        CardId.TAX_AUDIT,
     }
 )
 
 # Resolve when the target locks a die (one card per lock).
 FIRST_LOCK_HINDRANCES = frozenset({CardId.ALREADY_IN_JAIL})
+
+# Stay queued until another hindrance is cast on the marked player (or blocked).
+ON_CAST_TRIGGER_HINDRANCES = frozenset({CardId.BOUNTY_NOTICE})
 
 # --- Hindrance resolvers ---
 
@@ -58,6 +67,23 @@ def _negative_punishment_on_resolve(target: Player, caster: Player, match: Match
     target.lose_chips(NEGATIVE_PUNISHMENT_CHIP_LOSS)
 
 
+def _smoke_bomb_on_resolve(target: Player, caster: Player, match: Match) -> None:
+    target.turn_effects.smoke_bomb_locks = SMOKE_BOMB_LOCK_COUNT
+
+
+def _tax_audit_on_resolve(target: Player, caster: Player, match: Match) -> None:
+    before = target.chips
+    target.lose_chips(TAX_AUDIT_CHIP_LOSS)
+    taken = before - target.chips
+    if taken <= 0:
+        return
+    caster.earn_chips(taken)
+    if caster is not match.active_player:
+        caster.offturn_chip_events.append(
+            BriefAmountLine(taken, f"Tax audit ({target.name})")
+        )
+
+
 HINDRANCE_RESOLVERS: dict[CardId, Callable[[Player, Player, Match], None]] = {
     CardId.GLASS_HALF_FULL: _glass_half_full_on_resolve,
     CardId.GLASS_HALF_EMPTY: _glass_half_empty_on_resolve,
@@ -65,6 +91,8 @@ HINDRANCE_RESOLVERS: dict[CardId, Callable[[Player, Player, Match], None]] = {
     CardId.NEGATIVE_PUNISHMENT: _negative_punishment_on_resolve,
     CardId.BLUE_SHELL: _blue_shell_on_resolve,
     CardId.ALREADY_IN_JAIL: _already_in_jail_on_resolve,
+    CardId.SMOKE_BOMB: _smoke_bomb_on_resolve,
+    CardId.TAX_AUDIT: _tax_audit_on_resolve,
 }
 
 _GLASS_HALF_OPPOSITES: dict[CardId, CardId] = {
@@ -118,7 +146,7 @@ def try_resolve_hindrance_at_start_turn(
     match: Match,
 ) -> bool:
     """Resolve a start-turn hindrance if ready. Returns True if consumed from queue."""
-    if card_id in FIRST_LOCK_HINDRANCES:
+    if card_id in FIRST_LOCK_HINDRANCES or card_id in ON_CAST_TRIGGER_HINDRANCES:
         return False
     if card_id not in START_TURN_HINDRANCES:
         return False

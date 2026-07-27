@@ -55,6 +55,8 @@ export type PlayerState = {
   guardian_cooldown: number;
   /** True if this player cast a hindrance last rotation. */
   attacked_last_rotation?: boolean;
+  /** True when pacifist rewards apply. */
+  pacifist_qualified?: boolean;
   /** Players who cast a hindrance on this player last rotation. */
   attacked_by_last_rotation?: string[];
   /** Latest "your turn in preview" brief (null until first Start Turn). */
