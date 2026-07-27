@@ -43,7 +43,7 @@ export const CARD_BLURBS: Record<string, string> = {
   tax_audit:
     "At Start Turn: take up to 150 chips from the target (paid to you).",
   bounty_notice:
-    "Mark a player; the next hindrance cast on them pays that caster 200 chips (then clears).",
+    "Mark a player; the next hindrance cast on them pays that caster 300 chips (then clears).",
   mixup:
     "Hindrances you cast cannot be blocked by Parry (Guardian still works).",
 };
