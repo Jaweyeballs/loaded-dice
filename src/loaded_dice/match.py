@@ -154,6 +154,8 @@ class Player:
     # Positive punishment armed at start turn; applied on the next scored hand.
     pending_score_penalty: int = 0
     jail_locked_index: int | None = None
+    # Die indices force-locked by Smoke Bomb this turn (visual + tracking).
+    smoke_bomb_locked_indices: list[int] = field(default_factory=list)
     # Chip gifts received while not on your turn (e.g. Helping hand).
     offturn_chip_events: list[BriefAmountLine] = field(default_factory=list)
     last_turn_preview: TurnBrief | None = None
@@ -542,7 +544,7 @@ class Match:
         against_caster_name: str | None = None,
     ) -> CardId:
         """Spend Parry/Guardian (or auto-pick) and return which card was used."""
-        mixup_blocks_parry = self._caster_has_mixup(against_caster_name)
+        mixup_blocks_parry = self.caster_has_mixup(against_caster_name)
 
         if blocker_card_id is None:
             if not mixup_blocks_parry:
@@ -590,7 +592,7 @@ class Match:
 
         raise WrongPhaseError(f"{blocker_card_id.value} cannot block a hindrance")
 
-    def _caster_has_mixup(self, caster_name: str | None) -> bool:
+    def caster_has_mixup(self, caster_name: str | None) -> bool:
         if not caster_name:
             return False
         for candidate in self.players:
@@ -650,6 +652,7 @@ class Match:
         if locks <= 0 or self._dice.rolls_this_turn != 1:
             return
         player.turn_effects.smoke_bomb_locks = 0
+        player.smoke_bomb_locked_indices = []
         unlocked = [
             index
             for index, die in enumerate(self._dice.dice)
@@ -657,8 +660,10 @@ class Match:
         ]
         if not unlocked:
             return
-        for index in random.sample(unlocked, min(locks, len(unlocked))):
+        picked = random.sample(unlocked, min(locks, len(unlocked)))
+        for index in picked:
             self._dice.lock(index)
+        player.smoke_bomb_locked_indices = list(picked)
 
     def lock(self, index: int) -> None:
         self._require_active_dice()
@@ -1285,6 +1290,7 @@ class Match:
         if finishing.guardian_cooldown_turns > 0:
             finishing.guardian_cooldown_turns -= 1
         finishing.jail_locked_index = None
+        finishing.smoke_bomb_locked_indices = []
 
         self._dice = None
         self._psychic_previews = {}

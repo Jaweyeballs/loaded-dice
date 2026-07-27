@@ -260,8 +260,9 @@ function tipText(cardId: string, transparent = false, extra?: string): string {
   return extra ? `${head} — ${body} ${extra}` : `${head} — ${body}`;
 }
 
-function debuffOnYouTip(cardId: string, casterName: string): string {
-  return `${tipText(cardId)}\nCast on you by ${casterName}`;
+function debuffOnYouTip(cardId: string, casterName: string, mixup = false): string {
+  const base = `${tipText(cardId)}\nCast on you by ${casterName}`;
+  return mixup ? `${base}\nThe Mixup: Parry cannot block this.` : base;
 }
 
 function killfeedLine(entry: {
@@ -1474,6 +1475,9 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
                     Object.values(match.twins_links).includes(index)),
               );
               const jailLocked = match.dice?.jail_locked_index === index;
+              const smokeLocked = Boolean(
+                match.dice?.smoke_bomb_locked_indices?.includes(index),
+              );
               const isFlying = Boolean(rollAnim?.flying.includes(index));
               const isReturned = Boolean(rollAnim?.returned.includes(index));
               const scatter = rollAnim?.scatter[index];
@@ -1520,13 +1524,15 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
                       }}
                       className={`die ${locked ? "locked" : ""} ${
                         jailLocked ? "die-jail" : ""
-                      } ${kindClass} ${aiming ? "targetable" : ""} ${
-                        picked ? "picked" : ""
-                      } ${twinsLinked ? "die-twins" : ""} ${
-                        rollAnim ? "die-fly" : ""
-                      } ${pose ? "die-scattered" : ""} ${
-                        isReturned ? "die-returned" : ""
-                      } ${rollAnim?.freezeMotion ? "die-no-motion" : ""}`}
+                      } ${smokeLocked ? "die-smoke" : ""} ${kindClass} ${
+                        aiming ? "targetable" : ""
+                      } ${picked ? "picked" : ""} ${
+                        twinsLinked ? "die-twins" : ""
+                      } ${rollAnim ? "die-fly" : ""} ${
+                        pose ? "die-scattered" : ""
+                      } ${isReturned ? "die-returned" : ""} ${
+                        rollAnim?.freezeMotion ? "die-no-motion" : ""
+                      }`}
                       style={dieStyle}
                       disabled={!active || Boolean(rollAnim)}
                       onClick={() => handleDieClick(index, locked)}
@@ -1561,8 +1567,8 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
           )}
           {blockArming && (
             <p className="hint table-hint">
-              Click a purple debuff to block with {label(blockArming)} (or click the
-              card again to cancel)
+              Click a debuff to block with {label(blockArming)} (or click the card
+              again to cancel). Red = Mixup (Parry won&apos;t work).
             </p>
           )}
           {match.phase === "turn_active" && active && (
@@ -1644,12 +1650,14 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
               {myDebuffs.map((h, i) => (
                 <Tip
                   key={`d-${h.card_id}-${i}`}
-                  text={debuffOnYouTip(h.card_id, h.caster_name)}
+                  text={debuffOnYouTip(h.card_id, h.caster_name, h.mixup)}
                   tipAlign="start"
                 >
                   <button
                     type="button"
-                    className={`fan-card debuff ${blockArming ? "targetable" : ""}`}
+                    className={`fan-card debuff ${h.mixup ? "mixup" : ""} ${
+                      blockArming ? "targetable" : ""
+                    }`}
                     style={{ zIndex: i + 1 }}
                     disabled={!blockArming}
                     onClick={() => {

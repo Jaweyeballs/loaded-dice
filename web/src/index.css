@@ -812,6 +812,11 @@ select {
   outline-offset: 1px;
 }
 
+.die.die-smoke {
+  outline: 3px solid #3a3a3a;
+  outline-offset: 1px;
+}
+
 .dice-tray.targeting .die.targetable:not(:disabled) {
   box-shadow: 0 0 0 3px #9BE7B0, 0 8px 16px rgba(0, 0, 0, 0.25);
   cursor: crosshair;
@@ -1037,6 +1042,12 @@ select {
   cursor: default;
 }
 
+/* Mixup-boosted: bright red, distinct from held hindrance dark red. */
+.fan-card.debuff.mixup {
+  background: linear-gradient(160deg, #f87171, #e11d48);
+  color: #fff5f5;
+}
+
 .fan-card.debuff:disabled {
   cursor: default;
   opacity: 0.92;
@@ -1045,6 +1056,10 @@ select {
 .fan.block-targeting .fan-card.debuff.targetable:not(:disabled) {
   box-shadow: 0 0 0 3px #c4b5fd, 0 8px 18px rgba(0, 0, 0, 0.3);
   cursor: crosshair;
+}
+
+.fan.block-targeting .fan-card.debuff.mixup.targetable:not(:disabled) {
+  box-shadow: 0 0 0 3px #fda4af, 0 8px 18px rgba(0, 0, 0, 0.3);
 }
 
 .active-effect-strip {

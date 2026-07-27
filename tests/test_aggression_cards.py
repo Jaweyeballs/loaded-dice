@@ -30,6 +30,8 @@ def test_smoke_bomb_locks_two_dice_after_first_roll():
     locked = sum(1 for die in match.dice.dice if die.locked)
     assert locked == SMOKE_BOMB_LOCK_COUNT
     assert bob.turn_effects.smoke_bomb_locks == 0
+    assert len(bob.smoke_bomb_locked_indices) == SMOKE_BOMB_LOCK_COUNT
+    assert all(match.dice.dice[i].locked for i in bob.smoke_bomb_locked_indices)
 
 
 def test_tax_audit_transfers_chips_to_caster():

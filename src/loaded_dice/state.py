@@ -141,6 +141,7 @@ def serialize_player(player: Player, match: Match) -> dict[str, Any]:
             {
                 "card_id": h.card_id.value,
                 "caster_name": h.caster_name,
+                "mixup": match.caster_has_mixup(h.caster_name),
             }
             for h in player.queued_hindrances
         ],
@@ -184,6 +185,9 @@ def serialize_dice(match: Match) -> dict[str, Any] | None:
         "rolls_this_turn": dice.rolls_this_turn,
         "max_rolls": dice.max_rolls,
         "jail_locked_index": match.active_player.jail_locked_index,
+        "smoke_bomb_locked_indices": list(
+            match.active_player.smoke_bomb_locked_indices
+        ),
     }
 
 

@@ -34,7 +34,12 @@ export type PlayerState = {
   power_slot_capacity?: number;
   trading_slots_used?: number;
   trading_slot_capacity?: number;
-  queued_hindrances: { card_id: string; caster_name: string }[];
+  queued_hindrances: {
+    card_id: string;
+    caster_name: string;
+    /** Caster holds The Mixup — Parry cannot block this. */
+    mixup?: boolean;
+  }[];
   pending_score_penalty?: number;
   /** Signed modifiers shown under the scoresheet (null when none). */
   score_breakdown?: {
@@ -94,6 +99,8 @@ export type MatchState = {
     max_rolls: number;
     /** Die index locked by Already in Jail this turn, if any. */
     jail_locked_index?: number | null;
+    /** Die indices force-locked by Smoke Bomb this turn. */
+    smoke_bomb_locked_indices?: number[];
   } | null;
   shop: {
     stock: { index: number; card_id: string; price: number }[];
