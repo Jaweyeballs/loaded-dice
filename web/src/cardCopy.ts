@@ -34,7 +34,8 @@ export const CARD_BLURBS: Record<string, string> = {
     "If the target attacked anyone last rotation, −5 on their next scored hand (stays until they score).",
   negative_punishment:
     "If the target attacked anyone last rotation, they lose 200 chips at their Start Turn (else keeps waiting).",
-  blue_shell: "Queued on current 1st place; they lose 10 points on their Start Turn.",
+  blue_shell:
+    "Queued on the highest other player at cast; they lose 10 points on their Start Turn.",
   already_in_jail:
     "Stays until the target’s first lock; that die cannot be unlocked or have its face changed (blockable until then).",
 };

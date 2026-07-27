@@ -29,6 +29,11 @@ export type PlayerState = {
   power_count?: number;
   trading_count?: number;
   card_count?: number;
+  /** Held power cards / capacity (transparent cards expand capacity). */
+  power_slots_used?: number;
+  power_slot_capacity?: number;
+  trading_slots_used?: number;
+  trading_slot_capacity?: number;
   queued_hindrances: { card_id: string; caster_name: string }[];
   pending_score_penalty?: number;
   /** Signed modifiers shown under the scoresheet (null when none). */

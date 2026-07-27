@@ -131,6 +131,10 @@ def serialize_player(player: Player, match: Match) -> dict[str, Any]:
         "card_count": (
             len(player.inventory.power_cards) + len(player.inventory.trading_cards)
         ),
+        "power_slots_used": len(player.inventory.power_cards),
+        "power_slot_capacity": player.inventory.power_capacity(),
+        "trading_slots_used": player.inventory.trading_slots_used(),
+        "trading_slot_capacity": player.inventory.trading_capacity(),
         "power_cards": [serialize_card(c) for c in player.inventory.power_cards],
         "trading_cards": [serialize_card(c) for c in player.inventory.trading_cards],
         "queued_hindrances": [

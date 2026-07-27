@@ -31,6 +31,10 @@ def test_transparent_power_card_does_not_use_slot():
     inventory.add_power(Card(CardId.PARRY, CardKind.POWER, transparent=True))
     assert inventory.power_slots_used() == DEFAULT_POWER_SLOTS
     assert len(inventory.power_cards) == DEFAULT_POWER_SLOTS + 1
+    # Transparent cards expand displayed capacity (bring their own slot).
+    assert inventory.power_capacity() == DEFAULT_POWER_SLOTS + 1
+    inventory.consume_power_by_id(CardId.PARRY)
+    assert inventory.power_capacity() == DEFAULT_POWER_SLOTS
 
 
 def test_trading_inventory_respects_slot_limit():

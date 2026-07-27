@@ -1672,7 +1672,14 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
           </div>
 
           <div className="card-tray power-tray">
-            <span className="tray-label">Power</span>
+            <span className="tray-label">
+              Power{" "}
+              <span className="tray-slots">
+                {me?.power_slots_used ?? powerFanCards.length}/
+                {me?.power_slot_capacity ??
+                  5 + powerFanCards.filter((c) => c.transparent).length}
+              </span>
+            </span>
             <div className="fan">
               {powerFanCards.length === 0 && !showParryReadyChip && (
                 <span className="empty-fan muted">Empty</span>
@@ -1782,7 +1789,13 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
           </div>
 
           <div className="card-tray trading-tray">
-            <span className="tray-label">Trading</span>
+            <span className="tray-label">
+              Trading{" "}
+              <span className="tray-slots">
+                {me?.trading_slots_used ?? tradingCards.length}/
+                {me?.trading_slot_capacity ?? 3}
+              </span>
+            </span>
             <div className="fan">
               {tradingCards.length === 0 && (
                 <span className="empty-fan muted">Empty</span>

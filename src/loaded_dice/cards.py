@@ -103,7 +103,7 @@ NEGATIVE_POWER_IDS: frozenset[CardId] = frozenset(
     }
 )
 
-# Untargeted hindrances — Match picks the victim (e.g. current leader).
+# Untargeted hindrances — Match picks the victim (highest other player).
 UNTARGETED_HINDRANCE_IDS: frozenset[CardId] = frozenset(
     {
         CardId.BLUE_SHELL,
@@ -133,8 +133,18 @@ class CardInventory:
     def power_slots_used(self) -> int:
         return sum(1 for card in self.power_cards if not card.transparent)
 
+    def transparent_power_count(self) -> int:
+        return sum(1 for card in self.power_cards if card.transparent)
+
+    def power_capacity(self) -> int:
+        """Base slots plus one per transparent card (each brings its own slot)."""
+        return self.power_slot_limit + self.transparent_power_count()
+
     def trading_slots_used(self) -> int:
         return len(self.trading_cards)
+
+    def trading_capacity(self) -> int:
+        return self.trading_slot_limit
 
     def can_add_power(self, card: Card) -> bool:
         if card.kind != CardKind.POWER:

@@ -835,20 +835,21 @@ class Match:
         cast_positive_power(card_id, player, self, **kwargs)
 
     def cast_hindrance(self, card_id: CardId, target: Player | None = None) -> None:
-        """Queue a negative power card (Blue Shell auto-targets current leader)."""
+        """Queue a negative power card (Blue Shell auto-targets top other player)."""
         self._ensure_not_over()
         if self.phase != TurnPhase.TURN_ACTIVE:
             raise WrongPhaseError(f"Cannot cast hindrances during {self.phase.value}")
         if card_id not in NEGATIVE_POWER_IDS:
             raise WrongPhaseError(f"{card_id.value} is not a castable hindrance")
 
+        caster = self.active_player
         if card_id in UNTARGETED_HINDRANCE_IDS:
-            target = self._leader_player()
+            target = self._blue_shell_target(caster)
         elif target is None:
             raise ValueError(f"{card_id.value} requires target")
         if target not in self.players:
             raise ValueError("target must be a player in this match")
-        if target is self.active_player and card_id not in UNTARGETED_HINDRANCE_IDS:
+        if target is caster:
             raise ValueError("Cannot cast a hindrance on yourself")
 
         try:
@@ -856,7 +857,6 @@ class Match:
         except HindranceConflictError as exc:
             raise WrongPhaseError(str(exc)) from exc
 
-        caster = self.active_player
         try:
             caster.inventory.consume_power_by_id(card_id)
         except CardNotInInventoryError as exc:
@@ -872,9 +872,12 @@ class Match:
             target_name=target.name,
         )
 
-    def _leader_player(self) -> Player:
-        """Current first-place player (name tie-break) for Blue Shell."""
-        return max(self.players, key=lambda p: (p.total_score(), p.name))
+    def _blue_shell_target(self, caster: Player) -> Player:
+        """Highest-scoring player other than *caster* (name tie-break). Locked at cast."""
+        others = [player for player in self.players if player is not caster]
+        if not others:
+            raise WrongPhaseError("Blue Shell needs another player to target")
+        return max(others, key=lambda p: (p.total_score(), p.name))
 
     def select_scoring_values_for_effects(
         self,

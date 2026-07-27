@@ -54,7 +54,7 @@ Permanent boosts with drawbacks, picked at the start of a run/match.
   - **Positive** power cards take effect **immediately**.
   - **Negative** power cards take effect **on the target's turn**.
 - **Trading cards** = persistent modifiers that stay in effect as long as they're in your party.
-- **Transparent power cards**: trait of power cards, makes them not take up a slot in inventory. can be randomly spawned or given (e.g. Negative Reinforcement). Do **not** consume a power card slot. Selling a transparent card yields **double** its shop price.
+- **Transparent power cards**: trait of power cards, makes them not take up a base inventory slot (they expand capacity instead — e.g. **6/6** with five normal + one transparent). Can be randomly spawned or given (e.g. Negative Reinforcement). Selling a transparent card yields **double** its shop price.
 - **Inventory Use / Sell**: Clicking a held card opens **Use** (green) and/or **Sell** (red). Sell is always available and pays shop price − **100** (floor **0**), or 2× shop price if transparent. Use appears only on manually played cards; it is grayed out when the card cannot be used right now. Do over uses the scoresheet control instead of Use. Passives and reinforcements have Sell only.
 
 ### Turn flow
@@ -87,7 +87,7 @@ Permanent boosts with drawbacks, picked at the start of a run/match.
 |---|---|
 | Positive punishment | If the target attacked **anyone** last rotation, arm −5 that applies on their **next scored hand** (survives Write Off). If the attack condition is not met at Start Turn, the card stays queued. |
 | Negative punishment | If the target attacked **anyone** last rotation, they lose **200** chips at Start Turn. If not, the card stays queued until a later Start Turn where the condition is true. |
-| Blue shell | Queued on whoever is in **1st at cast time**; that player loses 10 points on their next Start Turn (does not retarget if standings change). |
+| Blue shell | Queued on the highest-standing player **other than you** at cast time; that player loses 10 points on their next Start Turn (does not retarget if standings change). |
 | Already in jail | Stays queued until the target’s **first lock** on a turn (or blocked). That die cannot be unlocked for the rest of the turn, and its face value cannot change under any effect (Icarus, Super Serum, Space Die, Toddler, Psychic, Twins, etc.). Each lock consumes one queued copy. |
 | Glass half empty | At Start Turn: any lower-section hand scored this turn is 0 (resolves for the turn regardless of which half they score). |
 | Glass half full | At Start Turn: any upper-section hand scored this turn is 0 (resolves for the turn regardless of which half they score). |

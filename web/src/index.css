@@ -896,6 +896,12 @@ select {
   padding-left: 0.25rem;
 }
 
+.tray-slots {
+  letter-spacing: 0.02em;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.95;
+}
+
 .fan {
   display: flex;
   align-items: flex-end;

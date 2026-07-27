@@ -341,6 +341,28 @@ def test_blue_shell_queues_on_leader():
     assert bob.game_total == 40
 
 
+def test_blue_shell_skips_caster_when_they_lead():
+    match = Match(["Alice", "Bob", "Carol"])
+    alice, bob, carol = match.players
+    alice.game_total = 100
+    bob.game_total = 40
+    carol.game_total = 70
+    alice.inventory.add_power(card_for_id(CardId.BLUE_SHELL))
+    _begin_active_turn(match)
+    match.roll()
+    match.cast_hindrance(CardId.BLUE_SHELL)
+    assert alice.queued_hindrances == []
+    assert bob.queued_hindrances == []
+    assert carol.queued_hindrances[0].card_id == CardId.BLUE_SHELL
+    # Locked at cast — Carol stays targeted even if Bob surpasses her.
+    bob.game_total = 200
+    match.end_turn_without_scoring()
+    match.start_turn()  # Bob
+    match.end_turn_without_scoring()
+    match.start_turn()  # Carol
+    assert carol.game_total == 60
+
+
 def test_already_in_jail_locks_first_die():
     match = Match(["Alice", "Bob"])
     alice, bob = match.players
