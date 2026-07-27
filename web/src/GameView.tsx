@@ -320,7 +320,7 @@ function CardFace({
   const cd = cooldownTurnsLeft(cardId, me);
   return (
     <>
-      {title ?? label(cardId)}
+      <span className="card-title">{title ?? label(cardId)}</span>
       {status && (
         <span className={`card-status ${status === "ACTIVE" ? "active" : "dormant"}`}>
           {status}
@@ -328,7 +328,7 @@ function CardFace({
       )}
       {cd > 0 && (
         <span className="card-cooldown">
-          COOLDOWN: {cd} turn{cd === 1 ? "" : "s"} left
+          Cooldown: {cd} turn{cd === 1 ? "" : "s"} left
         </span>
       )}
     </>
@@ -1712,10 +1712,10 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
                       <button
                         type="button"
                         className={`fan-card ${isHindrance ? "hindrance" : "power"} ${
-                          armed || expanded ? "armed" : ""
-                        } ${cd > 0 ? "on-cooldown" : ""} ${
-                          status === "DORMANT" ? "dormant" : ""
-                        }`}
+                          card.transparent ? "transparent" : ""
+                        } ${armed || expanded ? "armed" : ""} ${
+                          cd > 0 ? "on-cooldown" : ""
+                        } ${status === "DORMANT" ? "dormant" : ""}`}
                         onClick={() => toggleCardExpand("power", i, card)}
                       >
                         <CardFace

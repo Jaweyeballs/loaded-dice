@@ -1005,6 +1005,13 @@ class Match:
             and self._dice is not None
         ):
             self._clear_twins_without_consuming()
+        # Cooldown belongs to the held copy — selling it shouldn't punish a later buy.
+        if card.id == CardId.LAWYER and not player.inventory.has_trading(CardId.LAWYER):
+            player.lawyer_cooldown_turns = 0
+        elif card.id == CardId.GUARDIAN and not player.inventory.has_trading(
+            CardId.GUARDIAN
+        ):
+            player.guardian_cooldown_turns = 0
         payout = sell_price_for_card(card)
         player.earn_chips(payout)
         return payout

@@ -106,6 +106,58 @@ def test_lawyer_ends_turn_and_enters_cooldown():
     assert alice.lawyer_cooldown_turns == 2
 
 
+def test_lawyer_cooldown_clears_when_sold():
+    match = Match(["Alice", "Bob"])
+    alice = match.players[0]
+    alice.inventory.add_trading(card_for_id(CardId.LAWYER))
+    _begin_active_turn(match)
+    match.roll()
+    match.activate_trading_card(CardId.LAWYER)
+    assert alice.lawyer_cooldown_turns == 2
+    assert alice.inventory.has_trading(CardId.LAWYER)
+
+    match.sell_card(alice, kind="trading", index=0)
+    assert alice.lawyer_cooldown_turns == 0
+
+    alice.inventory.add_trading(card_for_id(CardId.LAWYER))
+    _begin_active_turn(match)  # Bob
+    match.end_turn_without_scoring()
+    _begin_active_turn(match)  # Alice
+    match.roll()
+    match.activate_trading_card(CardId.LAWYER)
+    assert match.active_player.name == "Bob"
+    assert alice.lawyer_cooldown_turns == 2
+
+
+def test_guardian_cooldown_clears_when_sold():
+    match = Match(["Alice", "Bob"])
+    alice = match.players[0]
+    bob = match.players[1]
+    bob.inventory.add_trading(card_for_id(CardId.GUARDIAN))
+    alice.inventory.add_power(card_for_id(CardId.GLASS_HALF_FULL))
+    _begin_active_turn(match)
+    match.roll()
+    match.cast_hindrance(CardId.GLASS_HALF_FULL, bob)
+    match.end_turn_without_scoring()
+
+    match.block_hindrance(0, CardId.GUARDIAN)
+    assert bob.guardian_cooldown_turns == 2
+    match.sell_card(bob, kind="trading", index=0)
+    assert bob.guardian_cooldown_turns == 0
+
+    bob.inventory.add_trading(card_for_id(CardId.GUARDIAN))
+    alice.inventory.add_power(card_for_id(CardId.GLASS_HALF_EMPTY))
+    match.start_turn()  # Bob
+    match.end_turn_without_scoring()
+    match.start_turn()  # Alice
+    match.roll()
+    match.cast_hindrance(CardId.GLASS_HALF_EMPTY, bob)
+    match.end_turn_without_scoring()
+    match.block_hindrance(0, CardId.GUARDIAN)
+    assert bob.queued_hindrances == []
+    assert bob.guardian_cooldown_turns == 2
+
+
 def test_merchant_still_pays_at_turn_start():
     match = Match(["Alice"])
     match.players[0].inventory.add_trading(card_for_id(CardId.MERCHANT))

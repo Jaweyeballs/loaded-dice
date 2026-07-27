@@ -903,6 +903,9 @@ select {
 }
 
 .fan-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
   width: 6.55rem;
   height: 9.35rem;
   margin-left: -1.65rem;
@@ -915,7 +918,13 @@ select {
   text-transform: capitalize;
   line-height: 1.2;
   text-align: left;
+  overflow: hidden;
   transition: transform 0.15s ease, margin 0.15s ease;
+}
+
+.card-title {
+  display: block;
+  width: 100%;
 }
 
 .fan-card:first-child,
@@ -1006,6 +1015,16 @@ select {
   color: #f3fff6;
 }
 
+.fan-card.power.transparent {
+  background: linear-gradient(
+    160deg,
+    color-mix(in srgb, #6f8a78 55%, #9aa39c),
+    color-mix(in srgb, var(--power) 35%, #6b736e)
+  );
+  color: #eef2ef;
+  border: 1px dashed color-mix(in srgb, white 40%, #8a968c);
+}
+
 .fan-card.debuff {
   background: linear-gradient(160deg, #8b5cf6, #5b21b6);
   color: #f5f0ff;
@@ -1038,8 +1057,6 @@ select {
 .fan-card.trading {
   background: linear-gradient(160deg, #e0c45a, var(--trading));
   color: #2a2208;
-  display: flex;
-  align-items: flex-start;
 }
 
 .fan-card.trading.passive {
@@ -1337,6 +1354,7 @@ select {
 
 .card-status {
   display: block;
+  width: 100%;
   margin-top: 0.4rem;
   font-size: 0.62rem;
   font-weight: 800;
@@ -1355,13 +1373,16 @@ select {
 
 .card-cooldown {
   display: block;
+  width: 100%;
   margin-top: 0.35rem;
-  font-size: 0.6rem;
+  font-size: 0.58rem;
   font-weight: 700;
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  text-transform: none;
   line-height: 1.25;
   opacity: 0.9;
+  overflow-wrap: break-word;
+  word-break: break-word;
 }
 
 .fan-card.on-cooldown,
