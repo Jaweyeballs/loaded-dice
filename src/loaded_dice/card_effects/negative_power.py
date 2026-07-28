@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from enum import Enum
 from typing import TYPE_CHECKING, Callable
 
 from loaded_dice.cards import CardId
@@ -18,6 +19,60 @@ NEGATIVE_PUNISHMENT_CHIP_LOSS = 200
 TAX_AUDIT_CHIP_LOSS = 150
 BOUNTY_NOTICE_REWARD = 300
 SMOKE_BOMB_LOCK_COUNT = 2
+
+
+class HindranceLinger(Enum):
+    """How long a resolved hindrance stays in the debuff fan while it still affects you.
+
+    Rule: if the player is still being affected, keep the card readable in Debuffs.
+    New hindrances should pick a linger (default END_OF_TURN if omitted).
+    """
+
+    # Fully done at resolve (points/chips already applied) — leave the fan immediately.
+    INSTANT = "instant"
+    # Still affecting this turn (locks, turn flags, etc.) — clear at end of turn.
+    END_OF_TURN = "end_of_turn"
+    # Armed across turns until a hand is scored (e.g. pending score penalty).
+    UNTIL_SCORE = "until_score"
+    # Turn-scoped scoring modifier — clear on score, or at end of turn if unscored.
+    UNTIL_SCORE_OR_END_TURN = "until_score_or_end_turn"
+
+
+# Explicit linger for known cards. Unlisted resolving hindrances default to END_OF_TURN.
+HINDRANCE_LINGER: dict[CardId, HindranceLinger] = {
+    CardId.BLUE_SHELL: HindranceLinger.INSTANT,
+    CardId.TAX_AUDIT: HindranceLinger.INSTANT,
+    CardId.NEGATIVE_PUNISHMENT: HindranceLinger.INSTANT,
+    CardId.GLASS_HALF_FULL: HindranceLinger.UNTIL_SCORE_OR_END_TURN,
+    CardId.GLASS_HALF_EMPTY: HindranceLinger.UNTIL_SCORE_OR_END_TURN,
+    CardId.SMOKE_BOMB: HindranceLinger.END_OF_TURN,
+    CardId.ALREADY_IN_JAIL: HindranceLinger.END_OF_TURN,
+    CardId.POSITIVE_PUNISHMENT: HindranceLinger.UNTIL_SCORE,
+}
+
+
+def hindrance_linger(card_id: CardId) -> HindranceLinger:
+    """Linger policy for *card_id* after it resolves (default: end of turn)."""
+    return HINDRANCE_LINGER.get(card_id, HindranceLinger.END_OF_TURN)
+
+
+def persists_after_resolve(card_id: CardId) -> bool:
+    return hindrance_linger(card_id) is not HindranceLinger.INSTANT
+
+
+def clears_active_on_end_turn(card_id: CardId) -> bool:
+    return hindrance_linger(card_id) in (
+        HindranceLinger.END_OF_TURN,
+        HindranceLinger.UNTIL_SCORE_OR_END_TURN,
+    )
+
+
+def clears_active_on_score(card_id: CardId) -> bool:
+    return hindrance_linger(card_id) in (
+        HindranceLinger.UNTIL_SCORE,
+        HindranceLinger.UNTIL_SCORE_OR_END_TURN,
+    )
+
 
 # Resolve on the target's Start Turn (if any condition is met).
 START_TURN_HINDRANCES = frozenset(

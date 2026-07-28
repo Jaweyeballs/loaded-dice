@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from enum import Enum
 from itertools import combinations
 import random
@@ -34,6 +34,9 @@ from loaded_dice.card_effects.negative_power import (
     NEGATIVE_PUNISHMENT_CHIP_LOSS,
     POSITIVE_PUNISHMENT_POINT_LOSS,
     TAX_AUDIT_CHIP_LOSS,
+    clears_active_on_end_turn,
+    clears_active_on_score,
+    persists_after_resolve,
     resolve_hindrance,
     try_resolve_hindrance_at_start_turn,
     validate_hindrance_queue,
@@ -89,10 +92,12 @@ class InvalidDieSelectionError(Exception):
 
 @dataclass(frozen=True)
 class QueuedHindrance:
-    """Hindrance waiting to resolve on the target's next turn start."""
+    """Hindrance on a player — pending resolve, or active and still shown in the fan."""
 
     card_id: CardId
     caster_name: str
+    # True after the effect has applied; card may linger for hover until cleared.
+    active: bool = False
 
 
 @dataclass(frozen=True)
@@ -356,11 +361,20 @@ class Match:
         caster_by_name = {candidate.name: candidate for candidate in self.players}
         remaining: list[QueuedHindrance] = []
         for hindrance in player.queued_hindrances:
+            if hindrance.active:
+                remaining.append(hindrance)
+                name = card_display_name(hindrance.card_id.value)
+                debuff_lines.append(
+                    f"{name} casted on you by {hindrance.caster_name}!"
+                )
+                continue
             caster = caster_by_name.get(hindrance.caster_name, player)
             name = card_display_name(hindrance.card_id.value)
             if try_resolve_hindrance_at_start_turn(
                 hindrance.card_id, player, caster, self
             ):
+                if persists_after_resolve(hindrance.card_id):
+                    remaining.append(replace(hindrance, active=True))
                 if hindrance.card_id in (
                     CardId.GLASS_HALF_FULL,
                     CardId.GLASS_HALF_EMPTY,
@@ -405,6 +419,8 @@ class Match:
         player.queued_hindrances = remaining
 
         for hindrance in player.queued_hindrances:
+            if hindrance.active:
+                continue
             name = card_display_name(hindrance.card_id.value)
             debuff_lines.append(
                 f"{name} casted on you by {hindrance.caster_name}!"
@@ -515,7 +531,7 @@ class Match:
         *,
         player: Player | None = None,
     ) -> None:
-        """Cancel one of *player*'s unresolved queued hindrances (Parry, Guardian)."""
+        """Cancel one of *player*'s queued/active hindrances (Parry, Guardian)."""
         self._ensure_not_over()
         target = player if player is not None else self.active_player
         if hindrance_index < 0 or hindrance_index >= len(target.queued_hindrances):
@@ -528,6 +544,8 @@ class Match:
             against_caster_name=pending.caster_name,
         )
         blocked = target.queued_hindrances.pop(hindrance_index)
+        if blocked.active:
+            self._undo_active_hindrance(target, blocked.card_id)
         self._append_hindrance_feed(
             card_id=blocked.card_id,
             caster_name=blocked.caster_name,
@@ -535,6 +553,26 @@ class Match:
             blocked=True,
             blocker_card_id=used,
         )
+
+    def _undo_active_hindrance(self, player: Player, card_id: CardId) -> None:
+        """Reverse a lingering active debuff when blocked after it resolved."""
+        if card_id == CardId.GLASS_HALF_FULL:
+            player.turn_effects.zero_upper = False
+        elif card_id == CardId.GLASS_HALF_EMPTY:
+            player.turn_effects.zero_lower = False
+        elif card_id == CardId.POSITIVE_PUNISHMENT:
+            player.pending_score_penalty = max(
+                0, player.pending_score_penalty - POSITIVE_PUNISHMENT_POINT_LOSS
+            )
+        elif card_id == CardId.SMOKE_BOMB:
+            player.turn_effects.smoke_bomb_locks = 0
+            if self._dice is not None and player is self.active_player:
+                for index in player.smoke_bomb_locked_indices:
+                    if 0 <= index < len(self._dice.dice):
+                        self._dice.unlock(index)
+            player.smoke_bomb_locked_indices = []
+        elif card_id == CardId.ALREADY_IN_JAIL:
+            player.jail_locked_index = None
 
     def _consume_block_card(
         self,
@@ -1012,6 +1050,7 @@ class Match:
         player.last_scored_values = list(values)
         player.last_scored_category = category
         self._clear_scored_turn_modifiers(player)
+        self._clear_active_debuffs_on_score(player)
         self._award_scoring_income(player)
         self._end_turn()
         return points
@@ -1070,6 +1109,7 @@ class Match:
         self.active_player.last_scored_values = list(values)
         self.active_player.last_scored_category = category
         self._clear_scored_turn_modifiers(self.active_player)
+        self._clear_active_debuffs_on_score(self.active_player)
         self._award_scoring_income(self.active_player)
         self._on_sheet_completed(self.active_player)
         self._end_turn()
@@ -1242,29 +1282,53 @@ class Match:
         caster_by_name = {candidate.name: candidate for candidate in self.players}
         remaining: list[QueuedHindrance] = []
         for hindrance in player.queued_hindrances:
+            if hindrance.active:
+                remaining.append(hindrance)
+                continue
             caster = caster_by_name.get(hindrance.caster_name)
             if caster is None:
                 raise ValueError(f"Unknown caster: {hindrance.caster_name}")
             if try_resolve_hindrance_at_start_turn(
                 hindrance.card_id, player, caster, self
             ):
+                if persists_after_resolve(hindrance.card_id):
+                    remaining.append(replace(hindrance, active=True))
                 continue
             remaining.append(hindrance)
         player.queued_hindrances = remaining
 
     def _consume_queued_hindrance(self, player: Player, card_id: CardId) -> bool:
-        """Resolve and remove the first queued *card_id*. Returns True if one was consumed."""
+        """Resolve the first pending *card_id*. Returns True if one was resolved."""
         caster_by_name = {candidate.name: candidate for candidate in self.players}
         for index, hindrance in enumerate(player.queued_hindrances):
-            if hindrance.card_id != card_id:
+            if hindrance.card_id != card_id or hindrance.active:
                 continue
             caster = caster_by_name.get(hindrance.caster_name)
             if caster is None:
                 raise ValueError(f"Unknown caster: {hindrance.caster_name}")
             resolve_hindrance(card_id, player, caster, self)
-            player.queued_hindrances.pop(index)
+            if persists_after_resolve(card_id):
+                player.queued_hindrances[index] = replace(hindrance, active=True)
+            else:
+                player.queued_hindrances.pop(index)
             return True
         return False
+
+    def _clear_active_debuffs_on_score(self, player: Player) -> None:
+        """Remove lingering debuffs whose effect was consumed by scoring."""
+        player.queued_hindrances = [
+            h
+            for h in player.queued_hindrances
+            if not (h.active and clears_active_on_score(h.card_id))
+        ]
+
+    def _clear_active_debuffs_on_end_turn(self, player: Player) -> None:
+        """Remove lingering debuffs whose turn-scoped effect has ended."""
+        player.queued_hindrances = [
+            h
+            for h in player.queued_hindrances
+            if not (h.active and clears_active_on_end_turn(h.card_id))
+        ]
 
     def _fold_pending_score_penalty(self, player: Player) -> None:
         """Move armed positive-punishment penalty into this hand's turn effects."""
@@ -1291,6 +1355,7 @@ class Match:
             finishing.guardian_cooldown_turns -= 1
         finishing.jail_locked_index = None
         finishing.smoke_bomb_locked_indices = []
+        self._clear_active_debuffs_on_end_turn(finishing)
 
         self._dice = None
         self._psychic_previews = {}

@@ -285,22 +285,24 @@ function conditionStatus(
   cardId: string,
   me: PlayerState | undefined,
   rotationCount: number,
-  players?: PlayerState[],
 ): "ACTIVE" | "DORMANT" | null {
+  // Reinforcements activate on the holder — show status in their inventory.
   if (REINFORCEMENT_IDS.has(cardId)) {
     if (rotationCount <= 0) return "DORMANT";
     const pacifist = me?.pacifist_qualified ?? !me?.attacked_last_rotation;
     return pacifist ? "ACTIVE" : "DORMANT";
   }
-  if (PUNISHMENT_IDS.has(cardId)) {
-    if (rotationCount <= 0) return "DORMANT";
-    // Active if someone else attacked last rotation (a valid punish target may exist).
-    const someoneElseAttacked = (players ?? []).some(
-      (p) => p.name !== me?.name && p.attacked_last_rotation,
-    );
-    return someoneElseAttacked ? "ACTIVE" : "DORMANT";
-  }
+  // Punishments: status is for the *target* (debuff fan), not the caster's inventory.
   return null;
+}
+
+function targetPunishmentStatus(
+  me: PlayerState | undefined,
+  rotationCount: number,
+): "ACTIVE" | "DORMANT" {
+  // Resolves if the target attacked anyone last rotation.
+  if (rotationCount <= 0) return "DORMANT";
+  return me?.attacked_last_rotation ? "ACTIVE" : "DORMANT";
 }
 
 function cooldownTurnsLeft(cardId: string, me: PlayerState | undefined): number {
@@ -313,16 +315,14 @@ function CardFace({
   cardId,
   me,
   rotationCount,
-  players,
   title,
 }: {
   cardId: string;
   me: PlayerState | undefined;
   rotationCount: number;
-  players?: PlayerState[];
   title?: string;
 }) {
-  const status = conditionStatus(cardId, me, rotationCount, players);
+  const status = conditionStatus(cardId, me, rotationCount);
   const cd = cooldownTurnsLeft(cardId, me);
   return (
     <>
@@ -1647,7 +1647,15 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
               {myDebuffs.length === 0 && (
                 <span className="empty-fan muted">None</span>
               )}
-              {myDebuffs.map((h, i) => (
+              {myDebuffs.map((h, i) => {
+                const punishmentStatus =
+                  PUNISHMENT_IDS.has(h.card_id) && !h.active
+                    ? targetPunishmentStatus(me, match.rotation_count)
+                    : null;
+                const statusLabel = h.active
+                  ? "ACTIVE"
+                  : punishmentStatus;
+                return (
                 <Tip
                   key={`d-${h.card_id}-${i}`}
                   text={debuffOnYouTip(h.card_id, h.caster_name, h.mixup)}
@@ -1656,8 +1664,8 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
                   <button
                     type="button"
                     className={`fan-card debuff ${h.mixup ? "mixup" : ""} ${
-                      blockArming ? "targetable" : ""
-                    }`}
+                      h.active ? "is-active" : ""
+                    } ${blockArming ? "targetable" : ""}`}
                     style={{ zIndex: i + 1 }}
                     disabled={!blockArming}
                     onClick={() => {
@@ -1670,10 +1678,20 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
                       clearAiming();
                     }}
                   >
-                    {label(h.card_id)}
+                    <span className="card-title">{label(h.card_id)}</span>
+                    {statusLabel && (
+                      <span
+                        className={`card-status ${
+                          statusLabel === "ACTIVE" ? "active" : "dormant"
+                        }`}
+                      >
+                        {statusLabel}
+                      </span>
+                    )}
                   </button>
                 </Tip>
-              ))}
+                );
+              })}
             </div>
             {activeEffects.length > 0 && (
               <ul className="active-effect-strip">
@@ -1703,7 +1721,6 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
                   card.id,
                   me,
                   match.rotation_count,
-                  match.players,
                 );
                 const cd = cooldownTurnsLeft(card.id, me);
                 const expanded =
@@ -1742,7 +1759,6 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
                           cardId={card.id}
                           me={me}
                           rotationCount={match.rotation_count}
-                          players={match.players}
                         />
                       </button>
                     </Tip>
@@ -1861,7 +1877,6 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
                           cardId={card.id}
                           me={me}
                           rotationCount={match.rotation_count}
-                          players={match.players}
                           title={tradingLabel(card)}
                         />
                       </button>

@@ -39,6 +39,8 @@ export type PlayerState = {
     caster_name: string;
     /** Caster holds The Mixup — Parry cannot block this. */
     mixup?: boolean;
+    /** Effect already applied; still shown for hover until cleared. */
+    active?: boolean;
   }[];
   pending_score_penalty?: number;
   /** Signed modifiers shown under the scoresheet (null when none). */

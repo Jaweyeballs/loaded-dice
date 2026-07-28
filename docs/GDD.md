@@ -96,6 +96,7 @@ Permanent boosts with drawbacks, picked at the start of a run/match.
 | Glass half full | At Start Turn: any upper-section hand scored this turn is 0 (resolves for the turn regardless of which half they score). |
 
 - **Glass half empty** and **Glass half full** cannot both be active on the same player at the same time.
+- **Debuff fan linger**: while a hindrance is still affecting you, it stays in your Debuffs tray (marked ACTIVE) so you can re-read it on hover — including future cards. Instant one-shots (e.g. Blue Shell / Tax Audit chip or point loss already applied) leave immediately. Turn-scoped effects clear at end of turn (and on score when relevant); armed cross-turn effects (e.g. Positive punishment) stay until scored or blocked. Blocked cards always leave (and undo an already-applied linger effect when needed).
 
 ---
 

@@ -376,7 +376,8 @@ def test_already_in_jail_locks_first_die():
     assert bob.queued_hindrances[0].card_id == CardId.ALREADY_IN_JAIL
     match.roll()
     match.lock(2)
-    assert bob.queued_hindrances == []
+    assert len(bob.queued_hindrances) == 1
+    assert bob.queued_hindrances[0].active is True
     assert bob.jail_locked_index == 2
     with pytest.raises(WrongPhaseError, match="jail"):
         match.unlock(2)
@@ -416,7 +417,10 @@ def test_already_in_jail_stacks_one_per_lock():
     match.roll()
     match.lock(1)
     assert bob.jail_locked_index == 1
-    assert len(bob.queued_hindrances) == 1
+    # One copy is active (lingering); one pending remains for the next lock.
+    assert len(bob.queued_hindrances) == 2
+    assert sum(1 for h in bob.queued_hindrances if h.active) == 1
+    assert sum(1 for h in bob.queued_hindrances if not h.active) == 1
     with pytest.raises(WrongPhaseError, match="jail"):
         match.unlock(1)
 

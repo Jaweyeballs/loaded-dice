@@ -201,18 +201,22 @@ def test_positive_punishment_survives_write_off_until_score():
 
     match.start_turn()
     assert bob.pending_score_penalty == POSITIVE_PUNISHMENT_POINT_LOSS
-    assert bob.queued_hindrances == []
+    assert len(bob.queued_hindrances) == 1
+    assert bob.queued_hindrances[0].card_id == CardId.POSITIVE_PUNISHMENT
+    assert bob.queued_hindrances[0].active is True
     match.end_turn_without_scoring()
 
     _end_turn_quickly(match)  # Alice
     match.start_turn()  # Bob again
     assert bob.pending_score_penalty == POSITIVE_PUNISHMENT_POINT_LOSS
+    assert bob.queued_hindrances[0].active is True
     match.roll()
     for die, value in zip(match.dice.dice, [3, 3, 3, 1, 2]):
         die.value = value
     points = match.score(Category.THREES)
     assert points == 9 - POSITIVE_PUNISHMENT_POINT_LOSS
     assert bob.pending_score_penalty == 0
+    assert bob.queued_hindrances == []
 
 
 def test_negative_punishment_waits_when_condition_not_met():

@@ -142,6 +142,7 @@ def serialize_player(player: Player, match: Match) -> dict[str, Any]:
                 "card_id": h.card_id.value,
                 "caster_name": h.caster_name,
                 "mixup": match.caster_has_mixup(h.caster_name),
+                "active": h.active,
             }
             for h in player.queued_hindrances
         ],

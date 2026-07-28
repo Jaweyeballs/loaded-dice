@@ -258,7 +258,9 @@ def test_hindrance_resolves_when_turn_begins():
     assert bob.turn_effects.zero_upper is False
     match.start_turn()
     assert bob.turn_effects.zero_upper is True
-    assert bob.queued_hindrances == []
+    assert len(bob.queued_hindrances) == 1
+    assert bob.queued_hindrances[0].active is True
+    assert bob.queued_hindrances[0].card_id == CardId.GLASS_HALF_FULL
 
 
 def test_hindrance_affects_scoring_after_start_turn():
@@ -276,6 +278,7 @@ def test_hindrance_affects_scoring_after_start_turn():
         die.value = value
     points = match.score(Category.THREES)
     assert points == 0
+    assert bob.queued_hindrances == []
 
 
 def test_block_hindrance_cancels_one_queued_effect():
