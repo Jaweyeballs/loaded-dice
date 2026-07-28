@@ -40,8 +40,8 @@ CARD_PRICES: dict[CardId, int] = {
     CardId.BLUE_SHELL: 400,
     CardId.ALREADY_IN_JAIL: 350,
     CardId.SMOKE_BOMB: 350,
-    CardId.TAX_AUDIT: 400,
-    CardId.BOUNTY_NOTICE: 350,
+    CardId.TAX_AUDIT: 100,
+    CardId.BOUNTY_NOTICE: 250,
     CardId.MIXUP: 450,
 }
 

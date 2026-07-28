@@ -89,7 +89,7 @@ Permanent boosts with drawbacks, picked at the start of a run/match.
 | Negative punishment | If the target attacked **anyone** last rotation, they lose **200** chips at Start Turn. If not, the card stays queued until a later Start Turn where the condition is true. |
 | Blue shell | Queued on the highest-standing player **other than you** at cast time; that player loses 10 points on their next Start Turn (does not retarget if standings change). |
 | Already in jail | Stays queued until the target’s **first lock** on a turn (or blocked). That die cannot be unlocked for the rest of the turn, and its face value cannot change under any effect (Icarus, Super Serum, Space Die, Toddler, Psychic, Twins, etc.). Each lock consumes one queued copy. |
-| Smoke bomb | At Start Turn: after the target’s **first roll**, **2** random unlocked dice are force-locked (blockable beforehand). |
+| Smoke bomb | At Start Turn: after the target’s **first roll**, **2** random unlocked dice are force-locked (blockable beforehand). Those dice cannot be unlocked and their faces cannot change (Icarus, Super Serum, Space Die, Toddler, Psychic, Twins, etc.) — only Parry / Guardian clears them. |
 | Tax audit | At Start Turn: take up to **150** chips from the target (paid to the caster). |
 | Bounty notice | Marks the target; the **next** hindrance cast on them pays that caster **300** chips, then the notice clears (placing Bounty itself does not pay out). |
 | Glass half empty | At Start Turn: any lower-section hand scored this turn is 0 (resolves for the turn regardless of which half they score). |

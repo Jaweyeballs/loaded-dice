@@ -80,7 +80,7 @@ def _super_serum_on_cast(player: Player, match: Match, **kwargs) -> None:
     _require_rolled_before_face_change(match)
     assert match.dice is not None
     for index, die in enumerate(match.dice.dice):
-        if match.die_is_jailed(index):
+        if match.die_is_force_locked(index):
             continue
         raise_die_no_wrap(die)
 

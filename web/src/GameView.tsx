@@ -981,10 +981,14 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
   function handleDieClick(index: number, locked: boolean) {
     if (!active) return;
     const jailed = match.dice?.jail_locked_index === index;
+    const smokeLocked = Boolean(
+      match.dice?.smoke_bomb_locked_indices?.includes(index),
+    );
+    const forceLocked = jailed || smokeLocked;
     if (diePick) {
-      // Jail die face cannot change — exclude from Toddler / Psychic / Twins picks.
+      // Force-locked faces cannot change — exclude from Toddler / Psychic / Twins picks.
       if (
-        jailed &&
+        forceLocked &&
         (diePick.mode === "twins" ||
           (diePick.mode === "trading" &&
             (diePick.cardId === "toddler" || diePick.cardId === "psychic")))
@@ -1022,18 +1026,20 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
       return;
     }
     if (spacePick) {
-      if (jailed) return;
+      if (forceLocked) return;
       // Already choosing a face — allow re-picking a different die.
       if (spacePick.dieIndex !== null && spacePick.dieIndex === index) return;
       setSpacePick({ dieIndex: index });
       return;
     }
     if (icarusArming) {
-      if (jailed) return;
+      if (forceLocked) return;
       onAction({ type: "cast_power", card_id: "icarus", die_index: index });
       setIcarusArming(false);
       return;
     }
+    // Force-locked dice cannot be unlocked (Parry / Guardian only).
+    if (locked && forceLocked) return;
     // No locking before the first roll of the turn.
     if (!locked && (match.dice?.rolls_this_turn ?? 0) < 1) return;
     onAction({ type: locked ? "unlock" : "lock", index });
@@ -1527,7 +1533,7 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
                       className={`die ${locked ? "locked" : ""} ${
                         jailLocked ? "die-jail" : ""
                       } ${smokeLocked ? "die-smoke" : ""} ${kindClass} ${
-                        aiming ? "targetable" : ""
+                        aiming && !jailLocked && !smokeLocked ? "targetable" : ""
                       } ${picked ? "picked" : ""} ${
                         twinsLinked ? "die-twins" : ""
                       } ${rollAnim ? "die-fly" : ""} ${

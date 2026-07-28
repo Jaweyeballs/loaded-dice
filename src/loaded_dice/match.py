@@ -701,6 +701,9 @@ class Match:
         picked = random.sample(unlocked, min(locks, len(unlocked)))
         for index in picked:
             self._dice.lock(index)
+            # Pending Psychic faces must not rewrite force-locked dice later.
+            self._psychic_previews.pop(index, None)
+            self._dice.clear_forced_roll(index)
         player.smoke_bomb_locked_indices = list(picked)
 
     def lock(self, index: int) -> None:
@@ -723,16 +726,28 @@ class Match:
         player = self.active_player
         if player.jail_locked_index == index:
             raise WrongPhaseError("You are already in jail!")
+        if self.die_is_smoke_locked(index):
+            raise WrongPhaseError("That die is smoke-locked!")
         self._dice.unlock(index)
 
     def die_is_jailed(self, index: int) -> bool:
         """True if *index* is the Already in Jail die for the active player."""
         return self.active_player.jail_locked_index == index
 
+    def die_is_smoke_locked(self, index: int) -> bool:
+        """True if *index* was force-locked by Smoke Bomb this turn."""
+        return index in self.active_player.smoke_bomb_locked_indices
+
+    def die_is_force_locked(self, index: int) -> bool:
+        """True if opponent force-lock prevents unlock / face changes."""
+        return self.die_is_jailed(index) or self.die_is_smoke_locked(index)
+
     def ensure_die_mutable(self, index: int) -> None:
-        """Raise if *index* is jailed (face value cannot change)."""
+        """Raise if *index* cannot have its face changed (jail / smoke)."""
         if self.die_is_jailed(index):
             raise WrongPhaseError("You are already in jail!")
+        if self.die_is_smoke_locked(index):
+            raise WrongPhaseError("That die is smoke-locked!")
 
     def grant_extra_rolls(self, count: int = 1) -> None:
         """Pass-through for card effects (e.g. The Gambler) on the active turn."""
@@ -826,7 +841,7 @@ class Match:
 
         if resolves_twins:
             for follower, leader in twins.items():
-                if self.die_is_jailed(follower):
+                if self.die_is_force_locked(follower):
                     continue
                 face = self._dice.dice[leader].value
                 follower_die = self._dice.dice[follower]

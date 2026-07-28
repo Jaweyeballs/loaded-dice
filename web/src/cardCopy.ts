@@ -39,7 +39,7 @@ export const CARD_BLURBS: Record<string, string> = {
   already_in_jail:
     "Stays until the target’s first lock; that die cannot be unlocked or have its face changed (blockable until then).",
   smoke_bomb:
-    "At Start Turn: after their first roll, 2 random unlocked dice are force-locked (blockable).",
+    "At Start Turn: after their first roll, 2 random unlocked dice are force-locked and cannot be unlocked or have faces changed (blockable).",
   tax_audit:
     "At Start Turn: take up to 150 chips from the target (paid to you).",
   bounty_notice:
@@ -60,7 +60,7 @@ export const CARD_BLURBS_ON_YOU: Record<string, string> = {
   already_in_jail:
     "On your first lock this turn, that die stays locked and its face cannot change (blockable until then).",
   smoke_bomb:
-    "After your first roll this turn, 2 random unlocked dice are force-locked (blockable beforehand).",
+    "After your first roll this turn, 2 random unlocked dice are force-locked — you cannot unlock them or change their faces (blockable beforehand).",
   tax_audit: "At Start Turn you lose up to 150 chips (paid to the caster).",
   bounty_notice:
     "You are marked: the next hindrance cast on you pays that caster 300 chips (then clears).",

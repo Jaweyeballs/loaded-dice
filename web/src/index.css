@@ -813,8 +813,10 @@ select {
 }
 
 .die.die-smoke {
-  outline: 3px solid #3a3a3a;
+  outline: 3px solid #9a9a9a;
   outline-offset: 1px;
+  box-shadow: 0 4px 0 #000000, 0 0 0 1px rgba(255, 255, 255, 0.35),
+    0 8px 16px rgba(0, 0, 0, 0.4);
 }
 
 .dice-tray.targeting .die.targetable:not(:disabled) {

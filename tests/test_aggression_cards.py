@@ -38,6 +38,52 @@ def test_smoke_bomb_locks_two_dice_after_first_roll():
     assert bob.queued_hindrances == []
 
 
+def test_smoke_bomb_blocks_unlock_and_face_changing_effects():
+    match = Match(["Alice", "Bob"])
+    alice, bob = match.players
+    alice.inventory.add_power(card_for_id(CardId.SMOKE_BOMB))
+    _begin(match)
+    match.roll()
+    match.cast_hindrance(CardId.SMOKE_BOMB, bob)
+    match.end_turn_without_scoring()
+    _begin(match)
+    match.roll()
+    smoked = list(bob.smoke_bomb_locked_indices)
+    assert len(smoked) == SMOKE_BOMB_LOCK_COUNT
+    target = smoked[0]
+    free = next(i for i in range(5) if i not in smoked)
+    face = match.dice.dice[target].value
+
+    with pytest.raises(WrongPhaseError, match="smoke"):
+        match.unlock(target)
+    assert match.dice.dice[target].locked is True
+    assert match.dice.dice[target].value == face
+
+    bob.inventory.add_power(card_for_id(CardId.ICARUS))
+    with pytest.raises(WrongPhaseError, match="smoke"):
+        match.cast_power_card(CardId.ICARUS, die_index=target)
+    assert match.dice.dice[target].value == face
+
+    bob.inventory.add_power(card_for_id(CardId.SPACE_DIE))
+    with pytest.raises(WrongPhaseError, match="smoke"):
+        match.cast_power_card(CardId.SPACE_DIE, die_index=target, face_value=6)
+    assert match.dice.dice[target].value == face
+
+    bob.inventory.add_power(card_for_id(CardId.SUPER_SERUM))
+    match.cast_power_card(CardId.SUPER_SERUM)
+    assert match.dice.dice[target].value == face
+
+    bob.inventory.add_trading(card_for_id(CardId.TODDLER))
+    with pytest.raises(WrongPhaseError, match="smoke"):
+        match.activate_trading_card(CardId.TODDLER, die_indices=[target, free])
+    assert match.dice.dice[target].value == face
+
+    bob.inventory.add_trading(card_for_id(CardId.PSYCHIC))
+    with pytest.raises(WrongPhaseError, match="smoke"):
+        match.activate_trading_card(CardId.PSYCHIC, die_indices=[target, free])
+    assert match.dice.dice[target].value == face
+
+
 def test_tax_audit_transfers_chips_to_caster():
     match = Match(["Alice", "Bob"])
     alice, bob = match.players
