@@ -48,8 +48,31 @@ export const CARD_BLURBS: Record<string, string> = {
     "Hindrances you cast cannot be blocked by Parry (Guardian still works).",
 };
 
+/** Second-person blurbs when a hindrance is on *you* (Debuffs tray). */
+export const CARD_BLURBS_ON_YOU: Record<string, string> = {
+  glass_half_full: "Your upper-section score is 0 this turn.",
+  glass_half_empty: "Your lower-section score is 0 this turn.",
+  positive_punishment:
+    "If you attacked anyone last rotation, −5 on your next scored hand (stays until you score).",
+  negative_punishment:
+    "If you attacked anyone last rotation, you lose 200 chips at Start Turn (else it keeps waiting).",
+  blue_shell: "You lose 10 points at your Start Turn.",
+  already_in_jail:
+    "On your first lock this turn, that die stays locked and its face cannot change (blockable until then).",
+  smoke_bomb:
+    "After your first roll this turn, 2 random unlocked dice are force-locked (blockable beforehand).",
+  tax_audit: "At Start Turn you lose up to 150 chips (paid to the caster).",
+  bounty_notice:
+    "You are marked: the next hindrance cast on you pays that caster 300 chips (then clears).",
+};
+
 export function cardBlurb(cardId: string): string {
   return CARD_BLURBS[cardId] ?? "Ability description coming soon.";
+}
+
+/** Description for a hindrance sitting on the viewing player. */
+export function cardBlurbOnYou(cardId: string): string {
+  return CARD_BLURBS_ON_YOU[cardId] ?? cardBlurb(cardId);
 }
 
 export function cardTipLabel(cardId: string, transparent = false): string {

@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { cardBlurb, cardTipLabel } from "./cardCopy";
+import { cardBlurb, cardBlurbOnYou, cardTipLabel } from "./cardCopy";
 import { Tip } from "./Tip";
 import type {
   CardInfo,
@@ -261,7 +261,9 @@ function tipText(cardId: string, transparent = false, extra?: string): string {
 }
 
 function debuffOnYouTip(cardId: string, casterName: string, mixup = false): string {
-  const base = `${tipText(cardId)}\nCast on you by ${casterName}`;
+  const head = cardTipLabel(cardId);
+  const body = cardBlurbOnYou(cardId);
+  const base = `${head} — ${body}\nCast on you by ${casterName}`;
   return mixup ? `${base}\nThe Mixup: Parry cannot block this.` : base;
 }
 
