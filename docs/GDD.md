@@ -151,7 +151,19 @@ Reference mock: [`docs/ui-refs/hud.jpg`](ui-refs/hud.jpg). The play surface is a
 
 ---
 
-## 8. Open Questions / Deferred
+## 8. Concept cards (unimplemented)
+
+Ideas only — not in the shop or engine yet. Numbers and wording may change.
+
+| Kind | Name | Concept |
+|---|---|---|
+| Trading | The mercenary | Pay **300** chips per blocked power card (reward for successfully blocking). Exact trigger timing TBD (per block vs. end of turn). |
+| Power (negative) | Smoke bomb *(rework)* | Every roll, **1–2** random unlocked dice get force-locked (instead of only after the first roll). Same unlock/face immutability as the current card; only Parry / Guardian clears them. |
+| Power (negative) | Chud | Swap one of the target’s regular dice for a die that can only roll **0–2**. Duration / blockability TBD. |
+
+---
+
+## 9. Open Questions / Deferred
 
 Everything blocking M0–M2 has been resolved (see Definitions in §4 and updated Currency rules in §2). These are pure balance / later-product decisions — not blocking:
 

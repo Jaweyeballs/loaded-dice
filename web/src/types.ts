@@ -16,6 +16,10 @@ export type PlayerState = {
   sheet: Record<string, number | null>;
   /** Last category filled by scoring (for Do over). */
   last_scored_category?: string | null;
+  /** Chips from the most recent scored hand (base + unused-roll income). */
+  last_score_chip_gain?: number | null;
+  /** Increments each score so the HUD can replay the same amount. */
+  last_score_chip_gain_version?: number;
   upper_subtotal?: number;
   upper_bonus?: number;
   lower_subtotal?: number;

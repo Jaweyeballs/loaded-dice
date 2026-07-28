@@ -370,7 +370,11 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
   const [rollAnim, setRollAnim] = useState<RollAnim | null>(null);
   const [briefOverlay, setBriefOverlay] = useState(false);
   const [briefEmpty, setBriefEmpty] = useState(false);
+  const [chipFlash, setChipFlash] = useState<{ amount: number; key: number } | null>(
+    null,
+  );
   const seenPreviewVersionRef = useRef(0);
+  const seenScoreChipVersionRef = useRef(0);
   const prevDiceRef = useRef<{
     rolls: number;
     order: number[];
@@ -655,6 +659,20 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
       clearTossTimers();
     };
   }, []);
+
+  useEffect(() => {
+    const version = me?.last_score_chip_gain_version ?? 0;
+    const amount = me?.last_score_chip_gain;
+    if (
+      amount == null ||
+      amount <= 0 ||
+      version <= seenScoreChipVersionRef.current
+    ) {
+      return;
+    }
+    seenScoreChipVersionRef.current = version;
+    setChipFlash({ amount, key: version });
+  }, [me?.last_score_chip_gain, me?.last_score_chip_gain_version]);
 
   // Where everyone would sit if the leaderboard re-sorted on current totals right now.
   const predictedOrder = useMemo(
@@ -1123,8 +1141,17 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
           <span>Room {room.room_code}</span>
         </div>
         <div className="hud-you-stats" aria-label="Your chips, score, and place">
-          <span>
+          <span className="hud-chips">
             <em>Chips</em> {me?.chips ?? 0}
+            {chipFlash && (
+              <span
+                key={chipFlash.key}
+                className="hud-chip-flash"
+                onAnimationEnd={() => setChipFlash(null)}
+              >
+                +{chipFlash.amount}
+              </span>
+            )}
           </span>
           <span>
             <em>Score</em> {me?.total_score ?? 0}

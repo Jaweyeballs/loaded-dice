@@ -117,6 +117,8 @@ def serialize_player(player: Player, match: Match) -> dict[str, Any]:
             if player.last_scored_category is not None
             else None
         ),
+        "last_score_chip_gain": player.last_score_chip_gain,
+        "last_score_chip_gain_version": player.last_score_chip_gain_version,
         "upper_subtotal": player.current_sheet.upper_subtotal(),
         "upper_bonus": player.current_sheet.upper_bonus(),
         "lower_subtotal": player.current_sheet.lower_subtotal(),

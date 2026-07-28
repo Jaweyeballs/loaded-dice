@@ -349,6 +349,45 @@ select {
   font-family: "DM Sans", sans-serif;
 }
 
+.hud-chips {
+  position: relative;
+  display: inline-flex;
+  align-items: baseline;
+}
+
+.hud-chip-flash {
+  position: absolute;
+  left: 0.15rem;
+  top: 100%;
+  margin-top: 0.15rem;
+  font-size: 0.85rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: #9be7b0;
+  pointer-events: none;
+  white-space: nowrap;
+  animation: chip-flash-fade 1.6s ease-out forwards;
+}
+
+@keyframes chip-flash-fade {
+  0% {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  12% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  55% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
 .you-active {
   color: #9BE7B0;
   font-weight: 700;

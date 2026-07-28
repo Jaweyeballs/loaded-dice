@@ -83,8 +83,10 @@ def test_scoring_awards_hand_and_unused_roll_chips():
     match.roll()
     match.score(Category.CHANCE)
     # 300 for scoring + 150 * 2 unused standard rolls
-    assert match.players[0].chips == CHIPS_PER_SCORED_HAND + 2 * CHIPS_PER_UNUSED_STANDARD_ROLL
-
+    expected = CHIPS_PER_SCORED_HAND + 2 * CHIPS_PER_UNUSED_STANDARD_ROLL
+    assert match.players[0].chips == expected
+    assert match.players[0].last_score_chip_gain == expected
+    assert match.players[0].last_score_chip_gain_version == 1
 
 def test_interest_paid_at_turn_start():
     match = Match(["Alice"])

@@ -156,6 +156,9 @@ class Player:
     guardian_cooldown_turns: int = 0
     last_scored_values: list[int] | None = None
     last_scored_category: Category | None = None
+    # Chips earned from the most recent scored hand (base + unused-roll income).
+    last_score_chip_gain: int | None = None
+    last_score_chip_gain_version: int = 0
     # Positive punishment armed at start turn; applied on the next scored hand.
     pending_score_penalty: int = 0
     jail_locked_index: int | None = None
@@ -1275,12 +1278,15 @@ class Match:
 
     def _award_scoring_income(self, player: Player) -> None:
         assert self._dice is not None
-        player.earn_chips(CHIPS_PER_SCORED_HAND)
         roll_income = chips_for_unused_standard_rolls(
             self._dice.rolls_this_turn,
             self._dice.standard_max_rolls,
         )
+        total = CHIPS_PER_SCORED_HAND + roll_income
+        player.earn_chips(CHIPS_PER_SCORED_HAND)
         player.earn_chips(roll_income)
+        player.last_score_chip_gain = total
+        player.last_score_chip_gain_version += 1
 
     def _on_sheet_completed(self, player: Player) -> None:
         if not player.current_sheet.is_complete():
