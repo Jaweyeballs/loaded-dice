@@ -14,11 +14,14 @@ if TYPE_CHECKING:
 # --- Constants (balance here) ---
 
 BLUE_SHELL_POINT_LOSS = 10
+BLUE_SHELL_CHIP_LOSS = 200
 POSITIVE_PUNISHMENT_POINT_LOSS = 5
 NEGATIVE_PUNISHMENT_CHIP_LOSS = 200
 TAX_AUDIT_CHIP_LOSS = 150
 BOUNTY_NOTICE_REWARD = 300
 SMOKE_BOMB_LOCK_COUNT = 2
+PROVOKE_CHIP_STEAL = 100
+PROVOKE_PACIFIST_CHIP_STEAL = 350
 
 
 class HindranceLinger(Enum):
@@ -42,6 +45,7 @@ class HindranceLinger(Enum):
 HINDRANCE_LINGER: dict[CardId, HindranceLinger] = {
     CardId.BLUE_SHELL: HindranceLinger.INSTANT,
     CardId.TAX_AUDIT: HindranceLinger.INSTANT,
+    CardId.PROVOKE: HindranceLinger.INSTANT,
     CardId.NEGATIVE_PUNISHMENT: HindranceLinger.INSTANT,
     CardId.GLASS_HALF_FULL: HindranceLinger.UNTIL_SCORE_OR_END_TURN,
     CardId.GLASS_HALF_EMPTY: HindranceLinger.UNTIL_SCORE_OR_END_TURN,
@@ -84,6 +88,7 @@ START_TURN_HINDRANCES = frozenset(
         CardId.NEGATIVE_PUNISHMENT,
         CardId.SMOKE_BOMB,
         CardId.TAX_AUDIT,
+        CardId.PROVOKE,
     }
 )
 
@@ -106,6 +111,7 @@ def _glass_half_empty_on_resolve(target: Player, caster: Player, match: Match) -
 
 def _blue_shell_on_resolve(target: Player, caster: Player, match: Match) -> None:
     target.lose_points(BLUE_SHELL_POINT_LOSS)
+    target.lose_chips(BLUE_SHELL_CHIP_LOSS)
 
 
 def _already_in_jail_on_resolve(target: Player, caster: Player, match: Match) -> None:
@@ -139,6 +145,27 @@ def _tax_audit_on_resolve(target: Player, caster: Player, match: Match) -> None:
         )
 
 
+def provoke_steal_amount(target: Player, match: Match) -> int:
+    """100 chips normally; 350 if the target was pacifist last rotation."""
+    if match.rotation_count > 0 and match.player_qualifies_as_pacifist(target):
+        return PROVOKE_PACIFIST_CHIP_STEAL
+    return PROVOKE_CHIP_STEAL
+
+
+def _provoke_on_resolve(target: Player, caster: Player, match: Match) -> None:
+    amount = provoke_steal_amount(target, match)
+    before = target.chips
+    target.lose_chips(amount)
+    taken = before - target.chips
+    if taken <= 0:
+        return
+    caster.earn_chips(taken)
+    if caster is not match.active_player:
+        caster.offturn_chip_events.append(
+            BriefAmountLine(taken, f"Provoke ({target.name})")
+        )
+
+
 HINDRANCE_RESOLVERS: dict[CardId, Callable[[Player, Player, Match], None]] = {
     CardId.GLASS_HALF_FULL: _glass_half_full_on_resolve,
     CardId.GLASS_HALF_EMPTY: _glass_half_empty_on_resolve,
@@ -148,6 +175,7 @@ HINDRANCE_RESOLVERS: dict[CardId, Callable[[Player, Player, Match], None]] = {
     CardId.ALREADY_IN_JAIL: _already_in_jail_on_resolve,
     CardId.SMOKE_BOMB: _smoke_bomb_on_resolve,
     CardId.TAX_AUDIT: _tax_audit_on_resolve,
+    CardId.PROVOKE: _provoke_on_resolve,
 }
 
 _GLASS_HALF_OPPOSITES: dict[CardId, CardId] = {

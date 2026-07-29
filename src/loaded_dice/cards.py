@@ -49,6 +49,7 @@ class CardId(Enum):
     TAX_AUDIT = "tax_audit"
     BOUNTY_NOTICE = "bounty_notice"
     MIXUP = "mixup"
+    PROVOKE = "provoke"
 
 
 @dataclass(frozen=True)
@@ -90,6 +91,7 @@ CARD_DEFS: dict[CardId, Card] = {
     CardId.SMOKE_BOMB: Card(CardId.SMOKE_BOMB, CardKind.POWER),
     CardId.TAX_AUDIT: Card(CardId.TAX_AUDIT, CardKind.POWER),
     CardId.BOUNTY_NOTICE: Card(CardId.BOUNTY_NOTICE, CardKind.POWER),
+    CardId.PROVOKE: Card(CardId.PROVOKE, CardKind.POWER),
 }
 
 # Positive powers that require target= (another player).
@@ -111,6 +113,7 @@ NEGATIVE_POWER_IDS: frozenset[CardId] = frozenset(
         CardId.SMOKE_BOMB,
         CardId.TAX_AUDIT,
         CardId.BOUNTY_NOTICE,
+        CardId.PROVOKE,
     }
 )
 

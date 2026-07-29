@@ -81,7 +81,7 @@ def test_buy_from_shop_through_match():
     alice = match.players[0]
     alice.chips = 500
     merchant_index = next(
-        i for i, offer in enumerate(match.shop.stock) if offer.card_id == CardId.MERCHANT
+        i for i, offer in enumerate(alice.shop.stock) if offer.card_id == CardId.MERCHANT
     )
     card = match.buy_from_shop(alice, merchant_index)
     assert card.kind == CardKind.TRADING
@@ -96,8 +96,24 @@ def test_reroll_shop_changes_stock():
     match.score(Category.CHANCE)
     bob = match.players[1]
     bob.chips = 500
-    before = [offer.card_id for offer in match.shop.stock]
+    before = [offer.card_id for offer in bob.shop.stock]
     match.reroll_shop(bob)
-    after = [offer.card_id for offer in match.shop.stock]
+    after = [offer.card_id for offer in bob.shop.stock]
     assert bob.chips == 500 - SHOP_REROLL_COST
     assert before != after
+
+
+def test_reroll_shop_is_per_player():
+    random.seed(1)
+    match = Match(["Alice", "Bob"])
+    _begin_active_turn(match)
+    match.roll()
+    match.score(Category.CHANCE)
+    alice, bob = match.players
+    alice.chips = 500
+    bob.chips = 500
+    bob_before = [offer.card_id for offer in bob.shop.stock]
+    alice_before = [offer.card_id for offer in alice.shop.stock]
+    match.reroll_shop(alice)
+    assert [offer.card_id for offer in bob.shop.stock] == bob_before
+    assert [offer.card_id for offer in alice.shop.stock] != alice_before

@@ -14,7 +14,7 @@
 ## 2. Currency & Economy
 
 - Currency: **chips**, given in multiple ways (open system — see below).
-- Shop: a slot-machine-style shop, available to a player during *other* players' turns (i.e. browsing/spending isn't limited to your own turn).
+- Shop: a slot-machine-style shop, available to a player during *other* players' turns (i.e. browsing/spending isn't limited to your own turn). Each player has an **independent** shop — stock and rerolls are personal. Playtest may show the full catalog; shipping target is a **random 3-card** offering unique per player.
 - **Compensation** (passive income mechanic). The two components **stack** — a player who attacked no one and was attacked by N people gets **200 + 100×N** chips on their turn.
   - **100** chips per person who attacked you in the previous rotation
   - **200** chips if you did not attack anyone in the previous rotation
@@ -87,11 +87,12 @@ Permanent boosts with drawbacks, picked at the start of a run/match.
 |---|---|
 | Positive punishment | If the target attacked **anyone** last rotation, arm −5 that applies on their **next scored hand** (survives Write Off). If the attack condition is not met at Start Turn, the card stays queued. |
 | Negative punishment | If the target attacked **anyone** last rotation, they lose **200** chips at Start Turn. If not, the card stays queued until a later Start Turn where the condition is true. |
-| Blue shell | Queued on the highest-standing player **other than you** at cast time; that player loses 10 points on their next Start Turn (does not retarget if standings change). |
+| Blue shell | Queued on the highest-standing player **other than you** at cast time; that player loses **10** points and **200** chips on their next Start Turn (does not retarget if standings change). |
 | Already in jail | Stays queued until the target’s **first lock** on a turn (or blocked). That die cannot be unlocked for the rest of the turn, and its face value cannot change under any effect (Icarus, Super Serum, Space Die, Toddler, Psychic, Twins, etc.). Each lock consumes one queued copy. |
 | Smoke bomb | At Start Turn: after the target’s **first roll**, **2** random unlocked dice are force-locked (blockable beforehand). Those dice cannot be unlocked and their faces cannot change (Icarus, Super Serum, Space Die, Toddler, Psychic, Twins, etc.) — only Parry / Guardian clears them. |
 | Tax audit | At Start Turn: take up to **150** chips from the target (paid to the caster). |
 | Bounty notice | Marks the target; the **next** hindrance cast on them pays that caster **300** chips, then the notice clears (placing Bounty itself does not pay out). |
+| Provoke | At Start Turn: steal **100** chips from the target (paid to the caster), or **350** if the target was a **pacifist** last rotation (did not attack anyone). |
 | Glass half empty | At Start Turn: any lower-section hand scored this turn is 0 (resolves for the turn regardless of which half they score). |
 | Glass half full | At Start Turn: any upper-section hand scored this turn is 0 (resolves for the turn regardless of which half they score). |
 
@@ -144,7 +145,7 @@ Reference mock: [`docs/ui-refs/hud.jpg`](ui-refs/hud.jpg). The play surface is a
 ### Cards & shop
 - Hovering a **power card**, **trading card**, or **debuff** shows its description (copy TBD).
 - The **shop sign** is visible and usable when it is **not** your turn; it is **hidden during your turn**.
-
+- Shop stock is **per player** — your reroll never changes anyone else’s offers.
 ### Dice
 - Dice always show the **active player’s** live rolls and locks (spectators see the same).
 - After a roll, dice **sort into ascending face order** in the tray above the power cards, where they can be locked.

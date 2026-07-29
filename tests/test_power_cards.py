@@ -330,6 +330,7 @@ def test_blue_shell_queues_on_leader():
     match = Match(["Alice", "Bob"])
     alice, bob = match.players
     bob.game_total = 50
+    bob.chips = 500
     alice.inventory.add_power(card_for_id(CardId.BLUE_SHELL))
     _begin_active_turn(match)
     match.roll()
@@ -339,6 +340,8 @@ def test_blue_shell_queues_on_leader():
     match.start_turn()
     match.begin_rolling()
     assert bob.game_total == 40
+    # Interest on 500 = 100; then Blue Shell −200 chips.
+    assert bob.chips == 500 + 100 - 200
 
 
 def test_blue_shell_skips_caster_when_they_lead():
@@ -347,6 +350,7 @@ def test_blue_shell_skips_caster_when_they_lead():
     alice.game_total = 100
     bob.game_total = 40
     carol.game_total = 70
+    carol.chips = 0
     alice.inventory.add_power(card_for_id(CardId.BLUE_SHELL))
     _begin_active_turn(match)
     match.roll()
@@ -361,6 +365,7 @@ def test_blue_shell_skips_caster_when_they_lead():
     match.end_turn_without_scoring()
     match.start_turn()  # Carol
     assert carol.game_total == 60
+    assert carol.chips == 0  # chip loss floors at 0
 
 
 def test_already_in_jail_locks_first_die():

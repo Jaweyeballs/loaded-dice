@@ -195,6 +195,7 @@ const HINDRANCE_IDS = new Set([
   "smoke_bomb",
   "tax_audit",
   "bounty_notice",
+  "provoke",
 ]);
 
 const UNTARGETED_HINDRANCES = new Set(["blue_shell"]);

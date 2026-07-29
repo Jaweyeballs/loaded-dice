@@ -35,7 +35,7 @@ export const CARD_BLURBS: Record<string, string> = {
   negative_punishment:
     "If the target attacked anyone last rotation, they lose 200 chips at their Start Turn (else keeps waiting).",
   blue_shell:
-    "Queued on the highest other player at cast; they lose 10 points on their Start Turn.",
+    "Queued on the highest other player at cast; they lose 10 points and 200 chips on their Start Turn.",
   already_in_jail:
     "Stays until the target’s first lock; that die cannot be unlocked or have its face changed (blockable until then).",
   smoke_bomb:
@@ -44,6 +44,8 @@ export const CARD_BLURBS: Record<string, string> = {
     "At Start Turn: take up to 150 chips from the target (paid to you).",
   bounty_notice:
     "Mark a player; the next hindrance cast on them pays that caster 300 chips (then clears).",
+  provoke:
+    "At Start Turn: steal 100 chips from the target (350 if they were pacifist last rotation).",
   mixup:
     "Hindrances you cast cannot be blocked by Parry (Guardian still works).",
 };
@@ -56,7 +58,7 @@ export const CARD_BLURBS_ON_YOU: Record<string, string> = {
     "If you attacked anyone last rotation, −5 on your next scored hand (stays until you score).",
   negative_punishment:
     "If you attacked anyone last rotation, you lose 200 chips at Start Turn (else it keeps waiting).",
-  blue_shell: "You lose 10 points at your Start Turn.",
+  blue_shell: "You lose 10 points and 200 chips at your Start Turn.",
   already_in_jail:
     "On your first lock this turn, that die stays locked and its face cannot change (blockable until then).",
   smoke_bomb:
@@ -64,6 +66,8 @@ export const CARD_BLURBS_ON_YOU: Record<string, string> = {
   tax_audit: "At Start Turn you lose up to 150 chips (paid to the caster).",
   bounty_notice:
     "You are marked: the next hindrance cast on you pays that caster 300 chips (then clears).",
+  provoke:
+    "At Start Turn the caster steals 100 chips from you (350 if you were pacifist last rotation).",
 };
 
 export function cardBlurb(cardId: string): string {

@@ -97,9 +97,9 @@ def _print_status(match: Match) -> None:
 
 def _print_shop(match: Match, player: Player) -> None:
     print("\nShop:")
-    for index, offer in enumerate(match.shop.stock):
+    for index, offer in enumerate(player.shop.stock):
         print(f"  [{index}] {offer.card_id.value} — {offer.price} chips")
-    print(f"  reroll stock costs {match.shop.reroll_cost} chips")
+    print(f"  reroll stock costs {player.shop.reroll_cost} chips")
 
 
 def _print_help() -> None:

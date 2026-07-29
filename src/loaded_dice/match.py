@@ -28,6 +28,7 @@ from loaded_dice.cards import (
     UNTARGETED_HINDRANCE_IDS,
 )
 from loaded_dice.card_effects.negative_power import (
+    BLUE_SHELL_CHIP_LOSS,
     BLUE_SHELL_POINT_LOSS,
     BOUNTY_NOTICE_REWARD,
     HindranceConflictError,
@@ -37,6 +38,7 @@ from loaded_dice.card_effects.negative_power import (
     clears_active_on_end_turn,
     clears_active_on_score,
     persists_after_resolve,
+    provoke_steal_amount,
     resolve_hindrance,
     try_resolve_hindrance_at_start_turn,
     validate_hindrance_queue,
@@ -170,6 +172,8 @@ class Player:
     turn_brief_version: int = 0
     # Snapshot of other players' hindrances — refreshed only on Start Turn with Forecaster.
     forecaster_reveals: dict[str, list[str]] | None = None
+    # Personal shop — stock and rerolls are independent per player.
+    shop: Shop = field(default_factory=Shop)
 
     def total_score(self) -> int:
         return self.game_total + self.current_sheet.grand_total()
@@ -219,7 +223,6 @@ class Match:
         self._rotation_count = 0
         self._current_rotation_attacks = RotationAttackRecord()
         self._previous_rotation_attacks = RotationAttackRecord()
-        self.shop = Shop()
         # Leaderboard HUD: freeze placement + score baselines until rotation ends.
         self._score_at_rotation_start = {p.name: p.total_score() for p in self.players}
         self._leaderboard_order = self._ranked_player_names()
@@ -392,6 +395,12 @@ class Match:
                             f"Blue shell ({hindrance.caster_name})",
                         )
                     )
+                    other_chip_lines.append(
+                        BriefAmountLine(
+                            -BLUE_SHELL_CHIP_LOSS,
+                            f"Blue shell ({hindrance.caster_name})",
+                        )
+                    )
                 elif hindrance.card_id == CardId.NEGATIVE_PUNISHMENT:
                     other_chip_lines.append(
                         BriefAmountLine(
@@ -404,6 +413,13 @@ class Match:
                         BriefAmountLine(
                             -TAX_AUDIT_CHIP_LOSS,
                             f"Tax audit ({hindrance.caster_name})",
+                        )
+                    )
+                elif hindrance.card_id == CardId.PROVOKE:
+                    other_chip_lines.append(
+                        BriefAmountLine(
+                            -provoke_steal_amount(player, self),
+                            f"Provoke ({hindrance.caster_name})",
                         )
                     )
                 elif hindrance.card_id == CardId.SMOKE_BOMB:
@@ -1179,22 +1195,22 @@ class Match:
         return self.phase in (TurnPhase.BETWEEN_TURNS, TurnPhase.TURN_START, TurnPhase.TURN_ACTIVE)
 
     def buy_from_shop(self, player: Player, stock_index: int):
-        """Buy a card from the shop for *player*."""
+        """Buy a card from *player*'s personal shop."""
         self._ensure_not_over()
         if not self.can_use_shop(player):
             raise WrongPhaseError(f"{player.name} cannot use the shop right now")
         try:
-            return self.shop.buy(player, stock_index)
+            return player.shop.buy(player, stock_index)
         except ShopError as exc:
             raise WrongPhaseError(str(exc)) from exc
 
     def reroll_shop(self, player: Player) -> None:
-        """Pay to refresh shop stock."""
+        """Pay to refresh *player*'s personal shop stock only."""
         self._ensure_not_over()
         if not self.can_use_shop(player):
             raise WrongPhaseError(f"{player.name} cannot use the shop right now")
         try:
-            self.shop.reroll_stock(player)
+            player.shop.reroll_stock(player)
         except InsufficientChipsError as exc:
             raise WrongPhaseError(str(exc)) from exc
 

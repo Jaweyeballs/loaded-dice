@@ -4,11 +4,17 @@ import pytest
 
 from loaded_dice.card_effects.negative_power import (
     BOUNTY_NOTICE_REWARD,
+    PROVOKE_CHIP_STEAL,
+    PROVOKE_PACIFIST_CHIP_STEAL,
     SMOKE_BOMB_LOCK_COUNT,
     TAX_AUDIT_CHIP_LOSS,
 )
 from loaded_dice.cards import CardId, card_for_id
-from loaded_dice.economy import COMPENSATION_CHIPS_PER_ATTACKER
+from loaded_dice.economy import (
+    COMPENSATION_CHIPS_PER_ATTACKER,
+    COMPENSATION_PACIFIST_CHIPS,
+    calculate_interest,
+)
 from loaded_dice.match import Match, WrongPhaseError
 
 
@@ -152,3 +158,88 @@ def test_mixup_blocks_parry_but_allows_guardian():
         match.block_hindrance(0, CardId.PARRY, player=bob)
     match.block_hindrance(0, CardId.GUARDIAN, player=bob)
     assert bob.queued_hindrances == []
+
+
+def test_provoke_steals_base_amount_before_pacifist_history():
+    match = Match(["Alice", "Bob"])
+    alice, bob = match.players
+    alice.inventory.add_power(card_for_id(CardId.PROVOKE))
+    bob.chips = 400
+    alice.chips = 50
+    _begin(match)
+    match.roll()
+    match.cast_hindrance(CardId.PROVOKE, bob)
+    match.end_turn_without_scoring()
+    _begin(match)
+    # Rotation 0: base steal (no prior rotation for pacifist check).
+    interest = calculate_interest(400)
+    assert bob.chips == 400 + interest - PROVOKE_CHIP_STEAL
+    assert alice.chips == 50 + PROVOKE_CHIP_STEAL
+
+
+def test_provoke_steals_pacifist_amount_after_peaceful_rotation():
+    match = Match(["Alice", "Bob"])
+    alice, bob = match.players
+    # Finish rotation 0 with no attacks so Bob qualifies as pacifist.
+    _begin(match)
+    match.end_turn_without_scoring()
+    _begin(match)
+    match.end_turn_without_scoring()
+    assert match.rotation_count == 1
+    assert match.player_qualifies_as_pacifist(bob)
+
+    alice.inventory.add_power(card_for_id(CardId.PROVOKE))
+    bob.chips = 500
+    alice.chips = 100
+    _begin(match)
+    alice_after_start = alice.chips
+    match.roll()
+    match.cast_hindrance(CardId.PROVOKE, bob)
+    match.end_turn_without_scoring()
+    _begin(match)
+    interest = calculate_interest(500)
+    # Pacifist compensation from peaceful rotation 0 (Alice's provoke is this rotation).
+    expected_bob = (
+        500
+        + interest
+        + COMPENSATION_PACIFIST_CHIPS
+        - PROVOKE_PACIFIST_CHIP_STEAL
+    )
+    assert bob.chips == expected_bob
+    assert alice.chips == alice_after_start + PROVOKE_PACIFIST_CHIP_STEAL
+
+
+def test_provoke_steals_base_amount_if_target_attacked_last_rotation():
+    match = Match(["Alice", "Bob"])
+    alice, bob = match.players
+    alice.inventory.add_power(card_for_id(CardId.GLASS_HALF_FULL))
+    bob.inventory.add_power(card_for_id(CardId.GLASS_HALF_EMPTY))
+    _begin(match)
+    match.roll()
+    match.cast_hindrance(CardId.GLASS_HALF_FULL, bob)
+    match.end_turn_without_scoring()
+    _begin(match)
+    match.roll()
+    match.cast_hindrance(CardId.GLASS_HALF_EMPTY, alice)
+    match.end_turn_without_scoring()
+    assert match.player_attacked_last_rotation(bob)
+
+    alice.inventory.add_power(card_for_id(CardId.PROVOKE))
+    bob.chips = 500
+    alice.chips = 100
+    _begin(match)
+    # Alice earns compensation for Bob attacking her last rotation.
+    alice_after_start = alice.chips
+    match.roll()
+    match.cast_hindrance(CardId.PROVOKE, bob)
+    match.end_turn_without_scoring()
+    _begin(match)
+    interest = calculate_interest(500)
+    expected_bob = (
+        500
+        + interest
+        + COMPENSATION_CHIPS_PER_ATTACKER
+        - PROVOKE_CHIP_STEAL
+    )
+    assert bob.chips == expected_bob
+    assert alice.chips == alice_after_start + PROVOKE_CHIP_STEAL

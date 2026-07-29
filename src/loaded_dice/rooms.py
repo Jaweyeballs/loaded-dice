@@ -88,14 +88,14 @@ class Room:
             "match": None,
         }
         if self.match is not None:
-            match_state = serialize_match(self.match)
+            viewer = next(
+                (p for p in self.match.players if p.name == viewer_name),
+                None,
+            ) if viewer_name else None
+            match_state = serialize_match(self.match, viewer=viewer)
             if viewer_name:
                 match_state["you_are_active"] = (
                     self.match.active_player.name == viewer_name
-                )
-                viewer = next(
-                    (p for p in self.match.players if p.name == viewer_name),
-                    None,
                 )
                 match_state["you_can_use_shop"] = (
                     self.match.can_use_shop(viewer) if viewer else False

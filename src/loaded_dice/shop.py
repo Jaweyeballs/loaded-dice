@@ -42,6 +42,7 @@ CARD_PRICES: dict[CardId, int] = {
     CardId.SMOKE_BOMB: 350,
     CardId.TAX_AUDIT: 100,
     CardId.BOUNTY_NOTICE: 250,
+    CardId.PROVOKE: 350,
     CardId.MIXUP: 450,
 }
 
@@ -84,15 +85,33 @@ def _offers_for_ids(card_ids: list[CardId] | tuple[CardId, ...]) -> list[ShopOff
     return [ShopOffer(card_id, CARD_PRICES[card_id]) for card_id in card_ids]
 
 
-def default_stock() -> list[ShopOffer]:
-    """Initial shop stock. Full catalog while SHOP_STOCK_SIZE is None (testing)."""
+def draw_stock(*, shuffle_full_catalog: bool = False) -> list[ShopOffer]:
+    """Build shop stock for one player.
+
+    While ``SHOP_STOCK_SIZE`` is None (playtest), stock is the full catalog.
+    Otherwise each player gets a random unique draw of that many cards.
+    """
+    from loaded_dice.cards import CARD_DEFS
+
     if SHOP_STOCK_SIZE is None:
-        return _offers_for_ids(tuple(CARD_PRICES.keys()))
-    return _offers_for_ids(DEFAULT_STOCK_IDS[:SHOP_STOCK_SIZE])
+        pool = list(CARD_PRICES.keys())
+        if shuffle_full_catalog:
+            random.shuffle(pool)
+        return _offers_for_ids(pool)
+    pool = list(CARD_DEFS.keys())
+    random.shuffle(pool)
+    return _offers_for_ids(pool[:SHOP_STOCK_SIZE])
+
+
+def default_stock() -> list[ShopOffer]:
+    """Initial per-player shop stock."""
+    return draw_stock(shuffle_full_catalog=False)
 
 
 @dataclass
 class Shop:
+    """One player's personal shop — stock and rerolls are never shared."""
+
     stock: list[ShopOffer] = field(default_factory=default_stock)
     reroll_cost: int = SHOP_REROLL_COST
 
@@ -121,14 +140,7 @@ class Shop:
         return card
 
     def reroll_stock(self, player) -> list[ShopOffer]:
-        """Pay to replace shop stock with a fresh random draw from the catalog."""
-        from loaded_dice.cards import CARD_DEFS
-
+        """Pay to replace *this* player's shop stock with a fresh draw."""
         player.spend_chips(self.reroll_cost)
-        pool = list(CARD_DEFS.keys())
-        random.shuffle(pool)
-        if SHOP_STOCK_SIZE is None:
-            self.stock = _offers_for_ids(pool)
-        else:
-            self.stock = _offers_for_ids(pool[:SHOP_STOCK_SIZE])
+        self.stock = draw_stock(shuffle_full_catalog=True)
         return self.stock

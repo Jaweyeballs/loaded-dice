@@ -14,7 +14,7 @@ from loaded_dice.match import Match, Player, TurnPhase
 from loaded_dice.preview import SCORING_HAND_SIZE, preview_scores
 from loaded_dice.scoring import Category, YAHTZEE_BONUS_POINTS, is_yahtzee
 from loaded_dice.effects import TurnEffects
-from loaded_dice.shop import sell_price_for_card
+from loaded_dice.shop import Shop, sell_price_for_card
 from itertools import combinations
 from dataclasses import replace
 
@@ -194,13 +194,13 @@ def serialize_dice(match: Match) -> dict[str, Any] | None:
     }
 
 
-def serialize_shop(match: Match) -> dict[str, Any]:
+def serialize_shop(shop: Shop) -> dict[str, Any]:
     return {
         "stock": [
             {"index": i, "card_id": offer.card_id.value, "price": offer.price}
-            for i, offer in enumerate(match.shop.stock)
+            for i, offer in enumerate(shop.stock)
         ],
-        "reroll_cost": match.shop.reroll_cost,
+        "reroll_cost": shop.reroll_cost,
     }
 
 
@@ -254,8 +254,9 @@ def serialize_do_over_preview(match: Match) -> dict[str, Any] | None:
     return {"category": category.value, "points": points}
 
 
-def serialize_match(match: Match) -> dict[str, Any]:
+def serialize_match(match: Match, *, viewer: Player | None = None) -> dict[str, Any]:
     winner = match.winner()
+    shop_owner = viewer if viewer is not None else match.players[0]
     return {
         "phase": match.phase.value,
         "rotation_count": match.rotation_count,
@@ -265,7 +266,7 @@ def serialize_match(match: Match) -> dict[str, Any]:
         "leaderboard_order": match.leaderboard_order,
         "players": [serialize_player(p, match) for p in match.players],
         "dice": serialize_dice(match),
-        "shop": serialize_shop(match),
+        "shop": serialize_shop(shop_owner.shop),
         "previews": serialize_previews(match),
         "do_over_preview": serialize_do_over_preview(match),
         "psychic_previews": {
