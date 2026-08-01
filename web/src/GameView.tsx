@@ -251,6 +251,20 @@ function placementArrow(
   return null;
 }
 
+function playerHasBounty(player: PlayerState): boolean {
+  return (player.queued_hindrances ?? []).some((h) => h.card_id === "bounty_notice");
+}
+
+/** Last-rotation stance for leaderboard badges (none on rotation 0). */
+function playerStance(
+  player: PlayerState,
+  rotationCount: number,
+): "P" | "A" | null {
+  if (rotationCount <= 0) return null;
+  if (player.attacked_last_rotation) return "A";
+  return "P";
+}
+
 function label(id: string): string {
   return id.replace(/_/g, " ");
 }
@@ -1207,6 +1221,11 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
               >
                 <div className="opponent-meta">
                   <span className="opponent-name">{opp.name}</span>
+                  {playerHasBounty(opp) && (
+                    <Tip text="This player has a bounty." className="tip-below">
+                      <span className="bounty-badge">B</span>
+                    </Tip>
+                  )}
                   <span className="opponent-count" title="Cards in hand">
                     {cardCount}
                   </span>
@@ -1292,6 +1311,8 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
               {rankedPlayers.map((p, place) => {
                 const arrow = placementArrow(p.name, place, predictedOrder);
                 const delta = p.score_delta ?? 0;
+                const stance = playerStance(p, match.rotation_count);
+                const bounty = playerHasBounty(p);
                 return (
                   <li
                     key={p.name}
@@ -1307,6 +1328,37 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
                       disabled={Boolean(playerTarget && p.name === playerName)}
                       onClick={() => selectLeaderboardPlayer(p.name)}
                     >
+                      {(stance || bounty) && (
+                        <span className="lb-badges" aria-hidden={!stance && !bounty}>
+                          {stance === "P" && (
+                            <Tip
+                              text="This player was a pacifist last turn."
+                              className="tip-below"
+                              tipAlign="end"
+                            >
+                              <span className="stance-badge stance-p">P</span>
+                            </Tip>
+                          )}
+                          {stance === "A" && (
+                            <Tip
+                              text="This player attacked someone last turn."
+                              className="tip-below"
+                              tipAlign="end"
+                            >
+                              <span className="stance-badge stance-a">A</span>
+                            </Tip>
+                          )}
+                          {bounty && (
+                            <Tip
+                              text="This player has a bounty."
+                              className="tip-below"
+                              tipAlign="end"
+                            >
+                              <span className="bounty-badge">B</span>
+                            </Tip>
+                          )}
+                        </span>
+                      )}
                       <span className="name-link">
                         <span className="place">#{place + 1}</span>
                         <span className="name">{p.name}</span>
