@@ -70,7 +70,7 @@ export type PlayerState = {
   pacifist_qualified?: boolean;
   /** Players who cast a hindrance on this player last rotation. */
   attacked_by_last_rotation?: string[];
-  /** Latest "your turn in preview" brief (null until first Start Turn). */
+  /** Latest "your turn in preview" brief (ready before Start Turn). */
   last_turn_preview?: TurnBrief | null;
 };
 

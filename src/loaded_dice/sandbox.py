@@ -253,6 +253,7 @@ def run_sandbox(player_names: list[str], starting_chips: int = SANDBOX_STARTING_
     match = Match(player_names, config=MatchConfig(max_rotations=5))
     for player in match.players:
         player.chips = starting_chips
+    match._publish_turn_preview(match.active_player)
 
     print("Loaded Dice — CLI sandbox")
     print(f"Players: {', '.join(player_names)}")

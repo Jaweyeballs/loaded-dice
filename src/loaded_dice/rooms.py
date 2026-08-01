@@ -76,6 +76,7 @@ class Room:
         for player in match.players:
             player.chips = self.starting_chips
         self.match = match
+        match._publish_turn_preview(match.active_player)
         return match
 
     def public_state(self, viewer_name: str | None = None) -> dict[str, Any]:

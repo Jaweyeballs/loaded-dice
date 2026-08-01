@@ -5,6 +5,30 @@ from loaded_dice.match import Match
 from loaded_dice.state import serialize_player
 
 
+def test_turn_preview_ready_before_start_turn():
+    match = Match(["Alice", "Bob"])
+    alice, bob = match.players
+    alice.chips = 400
+    alice.inventory.add_trading(card_for_id(CardId.MERCHANT))
+    match._publish_turn_preview(alice)
+    # Alice is waiting to Start Turn with a preview already published.
+    assert match.phase.value == "between_turns"
+    preview = alice.last_turn_preview
+    assert preview is not None
+    labels = [line.label for line in preview.chips]
+    assert labels[0] == "Merchant"
+    assert labels[-1].startswith("Interest:")
+    assert alice.chips == 400  # preview must not apply payouts yet
+
+    match.start_turn()
+    match.end_turn_without_scoring()
+    # Bob's turn is pending — preview appears before he starts.
+    assert match.active_player is bob
+    assert match.phase.value == "between_turns"
+    assert bob.last_turn_preview is not None
+    assert bob.last_turn_preview.version >= 1
+
+
 def test_turn_preview_lists_interest_and_merchant():
     match = Match(["Alice"])
     alice = match.players[0]

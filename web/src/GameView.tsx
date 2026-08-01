@@ -714,12 +714,12 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
     if (!canShop) setShopOpen(false);
   }, [canShop]);
 
-  // Auto-open turn preview when this player's Start Turn refreshes it.
+  // Auto-open turn preview when it is your turn and you still need to Start Turn.
   useEffect(() => {
     const version = me?.last_turn_preview?.version ?? 0;
     if (
       active &&
-      match.phase === "turn_active" &&
+      match.phase === "between_turns" &&
       version > seenPreviewVersionRef.current
     ) {
       seenPreviewVersionRef.current = version;
@@ -727,6 +727,14 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
       setBriefOverlay(true);
     }
   }, [active, match.phase, me?.last_turn_preview?.version]);
+
+  // Close the preview once Start Turn begins.
+  useEffect(() => {
+    if (match.phase !== "between_turns") {
+      setBriefOverlay(false);
+      setBriefEmpty(false);
+    }
+  }, [match.phase]);
 
   function openTurnPreview() {
     setBriefEmpty(!me?.last_turn_preview);

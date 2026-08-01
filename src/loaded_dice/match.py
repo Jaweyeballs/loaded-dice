@@ -34,11 +34,13 @@ from loaded_dice.card_effects.negative_power import (
     HindranceConflictError,
     NEGATIVE_PUNISHMENT_CHIP_LOSS,
     POSITIVE_PUNISHMENT_POINT_LOSS,
+    START_TURN_HINDRANCES,
     TAX_AUDIT_CHIP_LOSS,
     clears_active_on_end_turn,
     clears_active_on_score,
     persists_after_resolve,
     provoke_steal_amount,
+    punishment_condition_met,
     resolve_hindrance,
     try_resolve_hindrance_at_start_turn,
     validate_hindrance_queue,
@@ -232,6 +234,228 @@ class Match:
         self._psychic_used_this_turn = False
         # Cast/block history for the left-panel killfeed (newest last).
         self.hindrance_feed: list[HindranceFeedEntry] = []
+
+    def build_turn_preview(self, player: Player, *, version: int | None = None) -> TurnBrief:
+        """Predict Start Turn outcomes for *player* without mutating state."""
+        own_chip_lines: list[BriefAmountLine] = []
+        other_chip_lines: list[BriefAmountLine] = list(player.offturn_chip_events)
+        compensation_chip_lines: list[BriefAmountLine] = []
+        interest_chip_lines: list[BriefAmountLine] = []
+        score_lines: list[BriefAmountLine] = []
+        debuff_lines: list[str] = []
+        buff_lines: list[str] = []
+
+        interest = calculate_interest(player.chips)
+
+        if self._rotation_count > 0:
+            attackers = sorted(
+                self._previous_rotation_attacks.attacks_on.get(player.name, set())
+            )
+            for attacker_name in attackers:
+                compensation_chip_lines.append(
+                    BriefAmountLine(
+                        COMPENSATION_CHIPS_PER_ATTACKER,
+                        f"Compensation: {attacker_name}",
+                    )
+                )
+            if self.player_qualifies_as_pacifist(player):
+                compensation_chip_lines.append(
+                    BriefAmountLine(
+                        COMPENSATION_PACIFIST_CHIPS,
+                        "Compensation: Pacifist",
+                    )
+                )
+            gecko = gecko_compensation_bonus(player)
+            if gecko and compensation_chip_lines:
+                compensation_chip_lines.append(
+                    BriefAmountLine(gecko, "Compensation: Gecko")
+                )
+
+        if interest:
+            interest_chip_lines.append(
+                BriefAmountLine(
+                    interest,
+                    f"Interest: {INTEREST_CHIPS_PER_BLOCK} chips per "
+                    f"{INTEREST_BLOCK_SIZE} (Max {MAX_INTEREST_CHIPS})",
+                )
+            )
+
+        preserved_hh = player.turn_effects.helping_hand_bonus
+
+        if player.inventory.has_trading(CardId.MERCHANT):
+            own_chip_lines.append(
+                BriefAmountLine(MERCHANT_CHIPS_PER_TURN, "Merchant")
+            )
+
+        caster_by_name = {candidate.name: candidate for candidate in self.players}
+        pending_after: list[QueuedHindrance] = []
+        for hindrance in player.queued_hindrances:
+            if hindrance.active:
+                pending_after.append(hindrance)
+                name = card_display_name(hindrance.card_id.value)
+                debuff_lines.append(
+                    f"{name} casted on you by {hindrance.caster_name}!"
+                )
+                continue
+            caster = caster_by_name.get(hindrance.caster_name, player)
+            name = card_display_name(hindrance.card_id.value)
+            if self._hindrance_resolves_at_start_turn(hindrance.card_id, player, caster):
+                if persists_after_resolve(hindrance.card_id):
+                    pending_after.append(hindrance)
+                if hindrance.card_id in (
+                    CardId.GLASS_HALF_FULL,
+                    CardId.GLASS_HALF_EMPTY,
+                ):
+                    debuff_lines.append(
+                        f"{name} casted on you by {hindrance.caster_name}!"
+                    )
+                elif hindrance.card_id == CardId.BLUE_SHELL:
+                    score_lines.append(
+                        BriefAmountLine(
+                            -BLUE_SHELL_POINT_LOSS,
+                            f"Blue shell ({hindrance.caster_name})",
+                        )
+                    )
+                    other_chip_lines.append(
+                        BriefAmountLine(
+                            -BLUE_SHELL_CHIP_LOSS,
+                            f"Blue shell ({hindrance.caster_name})",
+                        )
+                    )
+                elif hindrance.card_id == CardId.NEGATIVE_PUNISHMENT:
+                    other_chip_lines.append(
+                        BriefAmountLine(
+                            -NEGATIVE_PUNISHMENT_CHIP_LOSS,
+                            f"Negative punishment ({hindrance.caster_name})",
+                        )
+                    )
+                elif hindrance.card_id == CardId.TAX_AUDIT:
+                    other_chip_lines.append(
+                        BriefAmountLine(
+                            -TAX_AUDIT_CHIP_LOSS,
+                            f"Tax audit ({hindrance.caster_name})",
+                        )
+                    )
+                elif hindrance.card_id == CardId.PROVOKE:
+                    other_chip_lines.append(
+                        BriefAmountLine(
+                            -provoke_steal_amount(player, self),
+                            f"Provoke ({hindrance.caster_name})",
+                        )
+                    )
+                elif hindrance.card_id == CardId.SMOKE_BOMB:
+                    debuff_lines.append(
+                        f"{name} casted on you by {hindrance.caster_name}!"
+                    )
+                elif hindrance.card_id == CardId.POSITIVE_PUNISHMENT:
+                    score_lines.append(
+                        BriefAmountLine(
+                            -POSITIVE_PUNISHMENT_POINT_LOSS,
+                            f"Positive punishment armed ({hindrance.caster_name})",
+                        )
+                    )
+            else:
+                pending_after.append(hindrance)
+
+        for hindrance in pending_after:
+            if hindrance.active:
+                continue
+            if self._hindrance_resolves_at_start_turn(
+                hindrance.card_id,
+                player,
+                caster_by_name.get(hindrance.caster_name, player),
+            ) and persists_after_resolve(hindrance.card_id):
+                # Already listed above when predicted to resolve into an active linger.
+                continue
+            name = card_display_name(hindrance.card_id.value)
+            debuff_lines.append(
+                f"{name} casted on you by {hindrance.caster_name}!"
+            )
+
+        if preserved_hh:
+            buff_lines.append(
+                f"+{preserved_hh} points on next scored hand (Helping hand)"
+            )
+
+        if (
+            player.inventory.has_power(CardId.POSITIVE_REINFORCEMENT)
+            and self.rotation_count > 0
+            and self.player_qualifies_as_pacifist(player)
+        ):
+            buff_lines.append(
+                f"+{POSITIVE_REINFORCEMENT_BONUS} points on next scored hand "
+                "(Positive reinforcement)"
+            )
+
+        if player.inventory.has_trading(CardId.GUARDIAN):
+            if player.guardian_cooldown_turns == 0:
+                buff_lines.append("Guardian is ready")
+            else:
+                buff_lines.append(
+                    f"Guardian cooldown: {player.guardian_cooldown_turns}"
+                )
+
+        if player.inventory.has_trading(CardId.LAWYER):
+            if player.lawyer_cooldown_turns == 0:
+                buff_lines.append("Lawyer is ready")
+            else:
+                buff_lines.append(
+                    f"Lawyer cooldown: {player.lawyer_cooldown_turns}"
+                )
+
+        if player.inventory.has_trading(CardId.PERSUADER):
+            buff_lines.append(
+                f"+{PERSUADER_SCORE_BONUS} points on next scored hand (Persuader)"
+            )
+
+        chip_lines = (
+            own_chip_lines
+            + other_chip_lines
+            + compensation_chip_lines
+            + interest_chip_lines
+        )
+        net_chips = sum(line.amount for line in chip_lines)
+        net_score = sum(line.amount for line in score_lines)
+        if preserved_hh:
+            net_score += preserved_hh
+        if (
+            player.inventory.has_power(CardId.POSITIVE_REINFORCEMENT)
+            and self.rotation_count > 0
+            and self.player_qualifies_as_pacifist(player)
+        ):
+            net_score += POSITIVE_REINFORCEMENT_BONUS
+        if player.inventory.has_trading(CardId.PERSUADER):
+            net_score += PERSUADER_SCORE_BONUS
+
+        return TurnBrief(
+            kind="preview",
+            version=player.turn_brief_version if version is None else version,
+            debuffs=debuff_lines,
+            chips=chip_lines,
+            buffs=buff_lines,
+            scores=score_lines,
+            net_chips=net_chips,
+            net_score=net_score,
+        )
+
+    def _hindrance_resolves_at_start_turn(
+        self,
+        card_id: CardId,
+        target: Player,
+        caster: Player,
+    ) -> bool:
+        if card_id not in START_TURN_HINDRANCES:
+            return False
+        if card_id in (CardId.POSITIVE_PUNISHMENT, CardId.NEGATIVE_PUNISHMENT):
+            return punishment_condition_met(target, caster, self)
+        return True
+
+    def _publish_turn_preview(self, player: Player) -> None:
+        """Store a fresh pre-Start-Turn preview and bump its version for the HUD."""
+        player.turn_brief_version += 1
+        player.last_turn_preview = self.build_turn_preview(
+            player, version=player.turn_brief_version
+        )
 
     @property
     def psychic_previews(self) -> dict[int, int]:
@@ -572,6 +796,11 @@ class Match:
             blocked=True,
             blocker_card_id=used,
         )
+        if (
+            self.phase == TurnPhase.BETWEEN_TURNS
+            and target is self.active_player
+        ):
+            self._publish_turn_preview(target)
 
     def _undo_active_hindrance(self, player: Player, card_id: CardId) -> None:
         """Reverse a lingering active debuff when blocked after it resolved."""
@@ -1410,6 +1639,8 @@ class Match:
                 p.name: p.total_score() for p in self.players
             }
             self._leaderboard_order = self._ranked_player_names()
+        self._publish_turn_preview(self.active_player)
+
     def _ranked_player_names(self) -> list[str]:
         return [
             player.name
