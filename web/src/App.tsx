@@ -91,6 +91,9 @@ export default function App() {
           playerName={playerName}
           onStart={() => socketRef.current?.start()}
           onLeave={leave}
+          onUpdateSettings={(settings) =>
+            socketRef.current?.updateSettings(settings)
+          }
         />
       ) : (
         <GameView

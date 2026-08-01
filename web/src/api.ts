@@ -60,6 +60,10 @@ export class RoomSocket {
     this.send({ type: "start" });
   }
 
+  updateSettings(settings: { max_rotations?: number }): void {
+    this.send({ type: "update_settings", ...settings });
+  }
+
   action(action: Record<string, unknown>): void {
     this.send({ type: "action", action });
   }

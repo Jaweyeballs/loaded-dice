@@ -90,6 +90,74 @@ select {
   color: var(--cream);
 }
 
+.waiting-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.waiting-head h1 {
+  margin: 0 0 0.35rem;
+}
+
+.waiting-head p {
+  margin: 0;
+}
+
+.settings-toggle.open {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--cream) 35%, transparent);
+}
+
+.settings-panel h2 {
+  margin-top: 0;
+}
+
+.settings-mode-hint {
+  margin: 0 0 0.85rem;
+}
+
+.settings-field {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.settings-label {
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  opacity: 0.85;
+}
+
+.settings-help {
+  font-size: 0.88rem;
+  color: color-mix(in srgb, var(--cream) 70%, transparent);
+}
+
+.settings-stepper {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin-top: 0.25rem;
+}
+
+.settings-stepper input[type="number"] {
+  width: 4.5rem;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.settings-stepper button {
+  min-width: 2.4rem;
+  padding-left: 0.55rem;
+  padding-right: 0.55rem;
+}
+
+.settings-summary {
+  margin: 0.65rem 0 0;
+}
+
 .lobby-brand h1 {
   font-family: "Fraunces", Georgia, serif;
   font-size: clamp(2.6rem, 7vw, 3.6rem);

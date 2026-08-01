@@ -131,6 +131,16 @@ async def room_socket(websocket: WebSocket, room_code: str) -> None:
                     room.start_match(player_name)
                     await _broadcast(room)
 
+                elif msg_type == "update_settings":
+                    if player_name is None:
+                        raise RoomError("Join the room first")
+                    max_rotations = message.get("max_rotations")
+                    room.update_settings(
+                        player_name,
+                        max_rotations=max_rotations if max_rotations is not None else None,
+                    )
+                    await _broadcast(room)
+
                 elif msg_type == "action":
                     if player_name is None:
                         raise RoomError("Join the room first")

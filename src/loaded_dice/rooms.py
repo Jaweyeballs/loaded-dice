@@ -13,6 +13,9 @@ from loaded_dice.state import serialize_match
 
 ROOM_CODE_LENGTH = 4
 MAX_PLAYERS = 6
+DEFAULT_MAX_ROTATIONS = 10
+MIN_MAX_ROTATIONS = 5
+MAX_MAX_ROTATIONS = 25
 
 
 class RoomError(Exception):
@@ -35,7 +38,7 @@ class Room:
     seated: list[str] = field(default_factory=list)
     match: Match | None = None
     starting_chips: int = SANDBOX_STARTING_CHIPS
-    max_rotations: int = 5
+    max_rotations: int = DEFAULT_MAX_ROTATIONS
 
     @property
     def started(self) -> bool:
@@ -79,6 +82,25 @@ class Room:
         match._publish_turn_preview(match.active_player)
         return match
 
+    def update_settings(self, requester: str, *, max_rotations: int | None = None) -> None:
+        """Host-only lobby settings. Locked once the match starts."""
+        if self.started:
+            raise RoomError("Cannot change settings after the match has started")
+        if requester != self.host_name:
+            raise RoomError("Only the host can change settings")
+        if max_rotations is not None:
+            if (
+                not isinstance(max_rotations, int)
+                or isinstance(max_rotations, bool)
+                or max_rotations < MIN_MAX_ROTATIONS
+                or max_rotations > MAX_MAX_ROTATIONS
+            ):
+                raise RoomError(
+                    f"Max rotations must be between {MIN_MAX_ROTATIONS} and "
+                    f"{MAX_MAX_ROTATIONS}"
+                )
+            self.max_rotations = max_rotations
+
     def public_state(self, viewer_name: str | None = None) -> dict[str, Any]:
         payload: dict[str, Any] = {
             "room_code": self.code,
@@ -86,6 +108,11 @@ class Room:
             "seated": list(self.seated),
             "started": self.started,
             "viewer": viewer_name,
+            "settings": {
+                "max_rotations": self.max_rotations,
+                "min_max_rotations": MIN_MAX_ROTATIONS,
+                "max_max_rotations": MAX_MAX_ROTATIONS,
+            },
             "match": None,
         }
         if self.match is not None:

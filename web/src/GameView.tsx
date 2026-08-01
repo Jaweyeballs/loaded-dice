@@ -1185,7 +1185,11 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
         </div>
         <div className="hud-status">
           <span>
-            Rotation {match.rotation_count} · {label(match.phase)}
+            Rotation{" "}
+            {match.max_rotations != null
+              ? `${match.rotation_count}/${match.max_rotations}`
+              : match.rotation_count}{" "}
+            · {label(match.phase)}
           </span>
           <span className={active ? "you-active" : "spectating"}>
             {match.is_over

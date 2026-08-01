@@ -88,6 +88,8 @@ export type TurnBrief = {
 export type MatchState = {
   phase: string;
   rotation_count: number;
+  /** Match ends when rotation_count reaches this (null = unlimited). */
+  max_rotations?: number | null;
   active_player: string;
   is_over: boolean;
   winner: string | null;
@@ -134,12 +136,19 @@ export type MatchState = {
   you_can_use_shop?: boolean;
 };
 
+export type RoomSettings = {
+  max_rotations: number;
+  min_max_rotations: number;
+  max_max_rotations: number;
+};
+
 export type RoomState = {
   room_code: string;
   host_name: string | null;
   seated: string[];
   started: boolean;
   viewer: string | null;
+  settings?: RoomSettings;
   match: MatchState | null;
 };
 

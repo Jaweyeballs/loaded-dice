@@ -260,6 +260,7 @@ def serialize_match(match: Match, *, viewer: Player | None = None) -> dict[str, 
     return {
         "phase": match.phase.value,
         "rotation_count": match.rotation_count,
+        "max_rotations": match.config.max_rotations,
         "active_player": match.active_player.name,
         "is_over": match.is_over(),
         "winner": winner.name if winner else None,
