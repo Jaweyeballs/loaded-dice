@@ -71,6 +71,8 @@ def test_lawyer_ends_turn_and_enters_cooldown():
     match.activate_trading_card(CardId.LAWYER)
     assert match.active_player.name == "Bob"
     assert alice.lawyer_cooldown_turns == 2
+    assert match.hindrance_feed[-1].kind == "power_use"
+    assert match.hindrance_feed[-1].card_id == CardId.LAWYER
 
     # Cooldown ticks on Alice's own turn ends (2 intervening turns).
     _begin_active_turn(match)  # Bob

@@ -123,14 +123,18 @@ export type MatchState = {
   toddler_used_this_turn?: boolean;
   psychic_used_this_turn?: boolean;
   forecaster_reveals?: Record<string, string[]> | null;
-  /** Newest last — hindrance cast/block killfeed for the History tab. */
+  /** Newest last — hindrance cast/block, power uses, and scores for History. */
   hindrance_feed?: {
-    card_id: string;
+    card_id?: string | null;
     caster_name: string;
     target_name: string;
     rotation: number;
     blocked: boolean;
     blocker_card_id?: string | null;
+    /** "hindrance" | "power_use" | "score". */
+    kind?: string;
+    points?: number | null;
+    category?: string | null;
   }[];
   you_are_active?: boolean;
   you_can_use_shop?: boolean;

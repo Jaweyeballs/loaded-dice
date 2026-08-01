@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { cardBlurb, cardBlurbOnYou, cardTipLabel } from "./cardCopy";
 import { Tip } from "./Tip";
 import type {
@@ -283,19 +283,49 @@ function debuffOnYouTip(cardId: string, casterName: string, mixup = false): stri
 }
 
 function killfeedLine(entry: {
-  card_id: string;
+  card_id?: string | null;
   caster_name: string;
   target_name: string;
   blocked: boolean;
   blocker_card_id?: string | null;
+  kind?: string;
+  points?: number | null;
+  category?: string | null;
 }): string {
+  if (entry.kind === "score") {
+    const cat = entry.category ? label(entry.category) : "a category";
+    const pts = entry.points ?? 0;
+    return `${entry.caster_name} scored ${cat} for ${pts} points!`;
+  }
+  if (entry.kind === "power_use") {
+    const card = entry.card_id ?? "";
+    if (card === "do_over" || card === "lawyer") {
+      return `${entry.caster_name} ended their turn with ${label(card)}`;
+    }
+    return `${entry.caster_name} used ${label(card)}!`;
+  }
   if (entry.blocked) {
     const withCard = entry.blocker_card_id
       ? ` with ${label(entry.blocker_card_id)}`
       : "";
-    return `${entry.target_name} has blocked ${entry.caster_name}'s ${label(entry.card_id)}${withCard}`;
+    return `${entry.target_name} has blocked ${entry.caster_name}'s ${label(entry.card_id ?? "")}${withCard}`;
   }
-  return `${entry.caster_name} → ${entry.target_name}: ${label(entry.card_id)}`;
+  return `${entry.caster_name} → ${entry.target_name}: ${label(entry.card_id ?? "")}`;
+}
+
+/** Shrink seat face-up cards as more appear in front of a player. */
+function seatFaceUpScale(count: number): number {
+  if (count <= 2) return 1;
+  if (count <= 4) return 0.88;
+  if (count <= 6) return 0.76;
+  return 0.64;
+}
+
+function debuffOnThemTip(cardId: string, casterName: string, mixup = false): string {
+  const head = cardTipLabel(cardId);
+  const body = cardBlurb(cardId);
+  const base = `${head} — ${body}\nCast by ${casterName}`;
+  return mixup ? `${base}\nThe Mixup: Parry cannot block this.` : base;
 }
 
 function conditionStatus(
@@ -1212,6 +1242,13 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
               opp.card_count ??
               (opp.power_count ?? 0) + (opp.trading_count ?? 0);
             const revealed = match.forecaster_reveals?.[opp.name] ?? [];
+            // After Start Turn, show the active opponent's debuffs in front of their seat.
+            const seatDebuffs =
+              opp.name === match.active_player && match.phase === "turn_active"
+                ? (opp.queued_hindrances ?? [])
+                : [];
+            const faceUpCount = revealed.length + seatDebuffs.length;
+            const seatScale = seatFaceUpScale(faceUpCount);
             // Revealed hindrances are "flipped out" of the blank hand.
             const hiddenCount = Math.max(0, cardCount - revealed.length);
             const blanks = Math.min(hiddenCount, 6);
@@ -1248,11 +1285,18 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
                     </span>
                   )}
                 </div>
-                {revealed.length > 0 && (
-                  <div className="opponent-reveals">
+                {faceUpCount > 0 && (
+                  <div
+                    className="opponent-reveals"
+                    style={
+                      {
+                        ["--seat-scale" as string]: String(seatScale),
+                      } as CSSProperties
+                    }
+                  >
                     {revealed.map((cardId, ri) => (
                       <Tip
-                        key={`${cardId}-${ri}`}
+                        key={`peek-${cardId}-${ri}`}
                         text={tipText(cardId)}
                         className="tip-below"
                       >
@@ -1264,6 +1308,42 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
                         </span>
                       </Tip>
                     ))}
+                    {seatDebuffs.map((h, di) => {
+                      const punishmentStatus =
+                        PUNISHMENT_IDS.has(h.card_id) && !h.active
+                          ? targetPunishmentStatus(opp, match.rotation_count)
+                          : null;
+                      const statusLabel = h.active ? "ACTIVE" : punishmentStatus;
+                      return (
+                        <Tip
+                          key={`debuff-${h.card_id}-${di}`}
+                          text={debuffOnThemTip(
+                            h.card_id,
+                            h.caster_name,
+                            h.mixup,
+                          )}
+                          className="tip-below"
+                        >
+                          <span
+                            className={`opponent-reveal-card fan-card debuff ${
+                              h.mixup ? "mixup" : ""
+                            } ${h.active ? "is-active" : ""}`}
+                            style={{ zIndex: revealed.length + di + 1 }}
+                          >
+                            <span className="card-title">{label(h.card_id)}</span>
+                            {statusLabel && (
+                              <span
+                                className={`card-status ${
+                                  statusLabel === "ACTIVE" ? "active" : "dormant"
+                                }`}
+                              >
+                                {statusLabel}
+                              </span>
+                            )}
+                          </span>
+                        </Tip>
+                      );
+                    })}
                   </div>
                 )}
               </div>
@@ -1294,19 +1374,28 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
           {leftTab === "history" ? (
             <div className="dock-content">
               {(match.hindrance_feed?.length ?? 0) === 0 ? (
-                <p className="hint">No hindrances cast yet.</p>
+                <p className="hint">No plays logged yet.</p>
               ) : (
                 <ul className="killfeed">
-                  {[...(match.hindrance_feed ?? [])].reverse().map((entry, index) => (
+                  {[...(match.hindrance_feed ?? [])].reverse().map((entry, index) => {
+                    const line = (
+                      <span className="killfeed-line">{killfeedLine(entry)}</span>
+                    );
+                    return (
                     <li
-                      key={`${entry.rotation}-${entry.card_id}-${entry.caster_name}-${entry.target_name}-${index}`}
+                      key={`${entry.kind ?? "hindrance"}-${entry.rotation}-${entry.card_id ?? entry.category}-${entry.points ?? ""}-${entry.caster_name}-${entry.target_name}-${index}`}
                       className={entry.blocked ? "blocked" : ""}
                     >
-                      <Tip text={tipText(entry.card_id)} className="tip-below">
-                        <span className="killfeed-line">{killfeedLine(entry)}</span>
-                      </Tip>
+                      {entry.card_id ? (
+                        <Tip text={tipText(entry.card_id)} className="tip-below">
+                          {line}
+                        </Tip>
+                      ) : (
+                        line
+                      )}
                     </li>
-                  ))}
+                    );
+                  })}
                 </ul>
               )}
             </div>
@@ -1752,9 +1841,7 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
                   PUNISHMENT_IDS.has(h.card_id) && !h.active
                     ? targetPunishmentStatus(me, match.rotation_count)
                     : null;
-                const statusLabel = h.active
-                  ? "ACTIVE"
-                  : punishmentStatus;
+                const statusLabel = h.active ? "ACTIVE" : punishmentStatus;
                 return (
                 <Tip
                   key={`d-${h.card_id}-${i}`}

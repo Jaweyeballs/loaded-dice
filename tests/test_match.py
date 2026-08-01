@@ -184,6 +184,21 @@ def test_refresh_sheet_adds_to_game_total():
     assert all(player.current_sheet.is_available(c) for c in Category)
 
 
+def test_score_appends_history_feed():
+    match = Match(["Alice"])
+    _begin_active_turn(match)
+    match.roll()
+    for die in match.dice.dice:
+        die.value = 3
+    points = match.score(Category.THREES)
+    entry = match.hindrance_feed[-1]
+    assert entry.kind == "score"
+    assert entry.caster_name == "Alice"
+    assert entry.category == Category.THREES.value
+    assert entry.points == points
+    assert entry.card_id is None
+
+
 def test_cannot_act_after_match_over():
     match = Match(["Alice"], config=MatchConfig(max_rotations=1))
     _begin_active_turn(match)
@@ -203,6 +218,9 @@ def test_cast_icarus_bumps_die_and_consumes_card():
     match.cast_power_card(CardId.ICARUS, die_index=2)
     assert match.dice.dice[2].value == 6
     assert not match.active_player.inventory.has_power(CardId.ICARUS)
+    assert match.hindrance_feed[-1].kind == "power_use"
+    assert match.hindrance_feed[-1].card_id == CardId.ICARUS
+    assert match.hindrance_feed[-1].caster_name == "Alice"
 
 
 def test_cast_icarus_wraps_six_to_one():

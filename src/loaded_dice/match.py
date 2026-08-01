@@ -106,14 +106,18 @@ class QueuedHindrance:
 
 @dataclass(frozen=True)
 class HindranceFeedEntry:
-    """Killfeed row: a hindrance cast (or blocked) during the match."""
+    """History row: hindrance cast/block, power use, or scored hand."""
 
-    card_id: CardId
     caster_name: str
     target_name: str
     rotation: int
+    card_id: CardId | None = None
     blocked: bool = False
     blocker_card_id: CardId | None = None
+    # "hindrance" | "power_use" | "score"
+    kind: str = "hindrance"
+    points: int | None = None
+    category: str | None = None
 
 
 @dataclass
@@ -889,25 +893,52 @@ class Match:
     def _append_hindrance_feed(
         self,
         *,
-        card_id: CardId,
         caster_name: str,
         target_name: str,
+        card_id: CardId | None = None,
         blocked: bool = False,
         blocker_card_id: CardId | None = None,
+        kind: str = "hindrance",
+        points: int | None = None,
+        category: str | None = None,
     ) -> None:
         self.hindrance_feed.append(
             HindranceFeedEntry(
-                card_id=card_id,
                 caster_name=caster_name,
                 target_name=target_name,
                 rotation=self._rotation_count,
+                card_id=card_id,
                 blocked=blocked,
                 blocker_card_id=blocker_card_id,
+                kind=kind,
+                points=points,
+                category=category,
             )
         )
         # Keep the killfeed bounded for long matches.
-        if len(self.hindrance_feed) > 40:
-            self.hindrance_feed = self.hindrance_feed[-40:]
+        if len(self.hindrance_feed) > 50:
+            self.hindrance_feed = self.hindrance_feed[-50:]
+
+    def _append_power_use_feed(self, card_id: CardId, actor: Player) -> None:
+        """Log a positive power card play for the History tab."""
+        self._append_hindrance_feed(
+            card_id=card_id,
+            caster_name=actor.name,
+            target_name=actor.name,
+            kind="power_use",
+        )
+
+    def _append_score_feed(
+        self, actor: Player, category: Category, points: int
+    ) -> None:
+        """Log a scored hand for the History tab."""
+        self._append_hindrance_feed(
+            caster_name=actor.name,
+            target_name=actor.name,
+            kind="score",
+            points=points,
+            category=category.value,
+        )
 
     def roll(self) -> list[int]:
         self._ensure_not_over()
@@ -1039,6 +1070,7 @@ class Match:
             self.end_turn_without_scoring()
             # Set after end so this turn's cooldown tick does not consume the fresh CD.
             player.lawyer_cooldown_turns = LAWYER_COOLDOWN_TURNS
+            self._append_power_use_feed(CardId.LAWYER, player)
             return
 
         if card_id == CardId.TODDLER:
@@ -1191,6 +1223,7 @@ class Match:
             if not player.inventory.has_power(CardId.TWINS):
                 raise WrongPhaseError("No twins in your inventory")
             cast_positive_power(card_id, player, self, **kwargs)
+            self._append_power_use_feed(card_id, player)
             return
 
         try:
@@ -1199,6 +1232,7 @@ class Match:
             raise WrongPhaseError(str(exc)) from exc
 
         cast_positive_power(card_id, player, self, **kwargs)
+        self._append_power_use_feed(card_id, player)
 
     def cast_hindrance(self, card_id: CardId, target: Player | None = None) -> None:
         """Queue a negative power card (Blue Shell auto-targets top other player)."""
@@ -1341,6 +1375,7 @@ class Match:
             player.inventory.consume_power_by_id(CardId.DO_OVER)
         except CardNotInInventoryError as exc:
             raise WrongPhaseError(str(exc)) from exc
+        self._append_power_use_feed(CardId.DO_OVER, player)
         return self.apply_do_over(player, values, category)
 
     def score(
@@ -1371,6 +1406,7 @@ class Match:
         )
         self.active_player.last_scored_values = list(values)
         self.active_player.last_scored_category = category
+        self._append_score_feed(self.active_player, category, points)
         self._clear_scored_turn_modifiers(self.active_player)
         self._clear_active_debuffs_on_score(self.active_player)
         self._award_scoring_income(self.active_player)

@@ -109,6 +109,9 @@ def test_serialize_inventory_and_hindrances():
             "rotation": 0,
             "blocked": False,
             "blocker_card_id": None,
+            "kind": "hindrance",
+            "points": None,
+            "category": None,
         }
     ]
     alice = next(p for p in state["players"] if p["name"] == "Alice")

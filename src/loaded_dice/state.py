@@ -281,7 +281,7 @@ def serialize_match(match: Match, *, viewer: Player | None = None) -> dict[str, 
         "psychic_used_this_turn": match.psychic_used_this_turn,
         "hindrance_feed": [
             {
-                "card_id": entry.card_id.value,
+                "card_id": entry.card_id.value if entry.card_id else None,
                 "caster_name": entry.caster_name,
                 "target_name": entry.target_name,
                 "rotation": entry.rotation,
@@ -289,6 +289,9 @@ def serialize_match(match: Match, *, viewer: Player | None = None) -> dict[str, 
                 "blocker_card_id": (
                     entry.blocker_card_id.value if entry.blocker_card_id else None
                 ),
+                "kind": entry.kind,
+                "points": entry.points,
+                "category": entry.category,
             }
             for entry in match.hindrance_feed
         ],

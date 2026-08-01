@@ -216,6 +216,12 @@ def test_do_over_overwrites_last_category_without_matching_hand():
     match.do_over()
     assert alice.current_sheet.get_score(Category.CHANCE) == 21
     assert not alice.inventory.has_power(CardId.DO_OVER)
+    assert match.hindrance_feed[-1].kind == "power_use"
+    assert match.hindrance_feed[-1].card_id == CardId.DO_OVER
+    assert not any(
+        e.kind == "score" and e.category == Category.CHANCE.value and e.points == 21
+        for e in match.hindrance_feed
+    )
 
 
 def test_do_over_plus_five_on_full_house_category():
