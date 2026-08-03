@@ -22,7 +22,6 @@ from loaded_dice.shop import ShopError
 TURN_ACTIONS = frozenset(
     {
         "start_turn",
-        "begin_rolling",
         "roll",
         "lock",
         "unlock",
@@ -72,10 +71,6 @@ def _require(action: dict[str, Any], key: str) -> Any:
 
 def _start_turn(match: Match, _actor: Player, _action: dict[str, Any]) -> None:
     match.start_turn()
-
-
-def _begin_rolling(match: Match, _actor: Player, _action: dict[str, Any]) -> None:
-    match.begin_rolling()
 
 
 def _block_hindrance(match: Match, actor: Player, action: dict[str, Any]) -> None:
@@ -170,7 +165,6 @@ def _sell_card(match: Match, actor: Player, action: dict[str, Any]) -> None:
 
 HANDLERS: dict[str, Callable[[Match, Player, dict[str, Any]], None]] = {
     "start_turn": _start_turn,
-    "begin_rolling": _begin_rolling,
     "block_hindrance": _block_hindrance,
     "roll": _roll,
     "lock": _lock,

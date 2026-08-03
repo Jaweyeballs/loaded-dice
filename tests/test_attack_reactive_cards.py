@@ -17,8 +17,6 @@ def _begin_active_turn(match: Match) -> None:
 def _end_turn_quickly(match: Match) -> None:
     if match.phase == TurnPhase.BETWEEN_TURNS:
         _begin_active_turn(match)
-    if match.phase == TurnPhase.TURN_START:
-        match.begin_rolling()
     if match.phase == TurnPhase.TURN_ACTIVE:
         if match.dice is not None and match.dice.rolls_this_turn < 1:
             match.roll()
@@ -122,7 +120,6 @@ def test_positive_punishment_penalizes_scoring_when_target_attacked_anyone():
     _end_turn_quickly(match)
 
     match.start_turn()
-    match.begin_rolling()
     match.roll()
     for die, value in zip(match.dice.dice, [3, 3, 3, 1, 2]):
         die.value = value
@@ -171,7 +168,6 @@ def test_positive_punishment_no_effect_if_target_did_not_attack_anyone():
     _end_turn_quickly(match)
 
     match.start_turn()
-    match.begin_rolling()
     match.roll()
     for die, value in zip(match.dice.dice, [3, 3, 3, 1, 2]):
         die.value = value

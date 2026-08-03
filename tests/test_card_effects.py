@@ -37,6 +37,5 @@ def test_parry_cast_sets_parry_ready():
     player = match.players[0]
     player.inventory.add_power(Card(CardId.PARRY, CardKind.POWER))
     match.start_turn()
-    match.begin_rolling()
     cast_positive_power(CardId.PARRY, player, match)
     assert player.parry_ready is True

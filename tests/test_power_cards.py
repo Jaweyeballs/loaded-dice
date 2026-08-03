@@ -344,7 +344,6 @@ def test_blue_shell_queues_on_leader():
     assert bob.queued_hindrances[0].card_id == CardId.BLUE_SHELL
     match.end_turn_without_scoring()
     match.start_turn()
-    match.begin_rolling()
     assert bob.game_total == 40
     # Interest on 500 = 100; then Blue Shell −200 chips.
     assert bob.chips == 500 + 100 - 200

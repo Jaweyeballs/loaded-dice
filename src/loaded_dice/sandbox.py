@@ -111,13 +111,13 @@ Commands:
   shop                         List shop stock (when open)
   buy <index>                  Buy from shop
   reroll                       Pay to refresh shop stock
-  start                        Start turn / begin rolling
+  start                        Start turn (enter rolling phase)
   roll                         Roll unlocked dice
   lock <index> | unlock <index>
   preview                      Best score per open category
   cast <card> [die_index=N]    Play a positive power card
   hindrance <card> <target>    Queue a negative power card
-  block <index>                Parry a queued hindrance (turn start)
+  block <index>                Block a queued hindrance on yourself
   score <category>             Score and end turn (name or 1-13)
   end                          End without scoring (requires Lawyer or Write off)
   quit                         Exit sandbox
@@ -158,9 +158,6 @@ def _handle_command(match: Match, line: str) -> bool:
             if match.phase == TurnPhase.BETWEEN_TURNS:
                 match.start_turn()
                 print(f"{match.active_player.name}'s turn — you can roll.")
-            elif match.phase == TurnPhase.TURN_START:
-                match.begin_rolling()
-                print("Rolling phase started.")
             else:
                 print("Already in the rolling phase.")
         elif command == "roll":
@@ -264,8 +261,6 @@ def run_sandbox(player_names: list[str], starting_chips: int = SANDBOX_STARTING_
         if match.phase == TurnPhase.BETWEEN_TURNS and not match.is_over():
             print("\nType `start` to begin the next turn, or `shop` / `buy` / `reroll`.")
             print("Block queued hindrances anytime with `block <index>` before they resolve.")
-        elif match.phase == TurnPhase.TURN_START:
-            print("\nHindrances queued — `block <index>` then `start` to roll.")
         elif match.phase == TurnPhase.TURN_ACTIVE:
             print("\n`roll`, `lock`, `cast`, `hindrance`, `preview`, `score`, or `end`.")
 

@@ -63,11 +63,9 @@ def test_score_delta_and_leaderboard_freeze_mid_rotation():
 
     # Advance through both turns so the rotation rolls over.
     match.start_turn()
-    match.begin_rolling()
     match.roll()
     match.end_turn_without_scoring()
     match.start_turn()
-    match.begin_rolling()
     match.roll()
     match.end_turn_without_scoring()
 
@@ -82,7 +80,6 @@ def test_score_delta_and_leaderboard_freeze_mid_rotation():
 def test_serialize_includes_dice_after_start():
     match = Match(["Alice", "Bob"])
     match.start_turn()
-    match.begin_rolling()
     match.roll()
     state = serialize_match(match)
     assert state["dice"] is not None
@@ -93,7 +90,6 @@ def test_serialize_includes_dice_after_start():
 def test_serialize_inventory_and_hindrances():
     match = Match(["Alice", "Bob"])
     match.start_turn()
-    match.begin_rolling()
     match.roll()
     match.players[0].inventory.add_power(Card(CardId.GLASS_HALF_FULL, CardKind.POWER))
     match.cast_hindrance(CardId.GLASS_HALF_FULL, match.players[1])

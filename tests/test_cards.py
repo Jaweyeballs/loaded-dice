@@ -88,7 +88,6 @@ def test_preview_applies_turn_effects():
 def test_match_score_applies_turn_effects():
     match = Match(["Alice"])
     match.start_turn()
-    match.begin_rolling()
     match.roll()
     for die, value in zip(match.dice.dice, [1, 2, 3, 4, 5]):
         die.value = value

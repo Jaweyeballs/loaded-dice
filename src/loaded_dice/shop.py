@@ -46,13 +46,6 @@ CARD_PRICES: dict[CardId, int] = {
     CardId.MIXUP: 450,
 }
 
-# Playtest-friendly mix: power, trading activate, trading passive.
-DEFAULT_STOCK_IDS: tuple[CardId, ...] = (
-    CardId.ICARUS,
-    CardId.GAMBLER,
-    CardId.MERCHANT,
-)
-
 # Temporary testing override: None = entire catalog in stock. Set back to 3 later.
 SHOP_STOCK_SIZE: int | None = None
 

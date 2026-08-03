@@ -79,7 +79,6 @@ def test_player_cannot_overspend():
 def test_scoring_awards_hand_and_unused_roll_chips():
     match = Match(["Alice"])
     match.start_turn()
-    match.begin_rolling()
     match.roll()
     match.score(Category.CHANCE)
     # 300 for scoring + 150 * 2 unused standard rolls
@@ -105,7 +104,6 @@ def test_interest_paid_at_turn_start():
 def test_extra_rolls_do_not_increase_unused_roll_income():
     match = Match(["Alice"])
     match.start_turn()
-    match.begin_rolling()
     match.grant_extra_rolls(2)
     match.roll()
     match.score(Category.CHANCE)
@@ -116,7 +114,6 @@ def test_extra_rolls_do_not_increase_unused_roll_income():
 def test_end_turn_without_scoring_awards_no_income():
     match = Match(["Alice"])
     match.start_turn()
-    match.begin_rolling()
     match.roll()
     match.end_turn_without_scoring()
     assert match.players[0].chips == 0

@@ -60,12 +60,6 @@ button.secondary {
   border: 1px solid color-mix(in srgb, var(--cream) 35%, transparent);
 }
 
-button.inline {
-  margin-left: 0.4rem;
-  padding: 0.15rem 0.45rem;
-  font-size: 0.8rem;
-}
-
 input,
 select {
   background: #fff;
@@ -648,25 +642,10 @@ select {
   color: var(--ink);
 }
 
-.plain-list,
 .leaderboard {
   list-style: none;
   padding: 0;
   margin: 0;
-}
-
-.plain-list li,
-.debuff-row {
-  padding: 0.4rem 0;
-  border-bottom: 1px solid var(--line);
-  font-size: 0.92rem;
-}
-
-.debuff-row {
-  display: flex;
-  justify-content: space-between;
-  gap: 0.5rem;
-  align-items: center;
 }
 
 .leaderboard li {

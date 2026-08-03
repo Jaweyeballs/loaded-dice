@@ -74,7 +74,6 @@ from loaded_dice.turn_effects import apply_turn_start_passives, resolve_turn_eff
 
 class TurnPhase(Enum):
     BETWEEN_TURNS = "between_turns"
-    TURN_START = "turn_start"  # legacy; start_turn now goes straight to TURN_ACTIVE
     TURN_ACTIVE = "turn_active"
 
 
@@ -162,7 +161,6 @@ class Player:
     gambler_next_cost: int = GAMBLER_BASE_COST
     lawyer_cooldown_turns: int = 0
     guardian_cooldown_turns: int = 0
-    last_scored_values: list[int] | None = None
     last_scored_category: Category | None = None
     # Chips earned from the most recent scored hand (base + unused-roll income).
     last_score_chip_gain: int | None = None
@@ -762,17 +760,6 @@ class Match:
             ]
         player.forecaster_reveals = reveals
 
-    def begin_rolling(self) -> None:
-        """No-op compatibility: Start turn already enters TURN_ACTIVE."""
-        self._ensure_not_over()
-        if self.phase == TurnPhase.TURN_ACTIVE:
-            return
-        if self.phase != TurnPhase.TURN_START:
-            raise WrongPhaseError(f"Cannot begin rolling during {self.phase.value}")
-        self._resolve_queued_hindrances(self.active_player)
-        self.active_player.parry_ready = False
-        self.phase = TurnPhase.TURN_ACTIVE
-
     def block_hindrance(
         self,
         hindrance_index: int,
@@ -1346,7 +1333,6 @@ class Match:
             effects=player.turn_effects,
             points=points,
         )
-        player.last_scored_values = list(values)
         player.last_scored_category = category
         self._clear_scored_turn_modifiers(player)
         self._clear_active_debuffs_on_score(player)
@@ -1406,7 +1392,6 @@ class Match:
             category,
             effects=self.active_player.turn_effects,
         )
-        self.active_player.last_scored_values = list(values)
         self.active_player.last_scored_category = category
         self._append_score_feed(self.active_player, category, points)
         self._clear_scored_turn_modifiers(self.active_player)
@@ -1459,7 +1444,7 @@ class Match:
             return False
         if player is self.active_player:
             return self.phase == TurnPhase.BETWEEN_TURNS
-        return self.phase in (TurnPhase.BETWEEN_TURNS, TurnPhase.TURN_START, TurnPhase.TURN_ACTIVE)
+        return self.phase in (TurnPhase.BETWEEN_TURNS, TurnPhase.TURN_ACTIVE)
 
     def buy_from_shop(self, player: Player, stock_index: int):
         """Buy a card from *player*'s personal shop."""
@@ -1588,26 +1573,6 @@ class Match:
         player.game_total += player.current_sheet.grand_total()
         player.sheets_completed += 1
         player.current_sheet = ScoreSheet()
-
-    def _resolve_queued_hindrances(self, player: Player) -> None:
-        """Resolve start-turn hindrances that are ready; leave the rest queued."""
-        caster_by_name = {candidate.name: candidate for candidate in self.players}
-        remaining: list[QueuedHindrance] = []
-        for hindrance in player.queued_hindrances:
-            if hindrance.active:
-                remaining.append(hindrance)
-                continue
-            caster = caster_by_name.get(hindrance.caster_name)
-            if caster is None:
-                raise ValueError(f"Unknown caster: {hindrance.caster_name}")
-            if try_resolve_hindrance_at_start_turn(
-                hindrance.card_id, player, caster, self
-            ):
-                if persists_after_resolve(hindrance.card_id):
-                    remaining.append(replace(hindrance, active=True))
-                continue
-            remaining.append(hindrance)
-        player.queued_hindrances = remaining
 
     def _consume_queued_hindrance(self, player: Player, card_id: CardId) -> bool:
         """Resolve the first pending *card_id*. Returns True if one was resolved."""

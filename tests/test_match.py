@@ -27,8 +27,6 @@ def _begin_active_turn(match: Match) -> None:
 def _end_turn_quickly(match: Match) -> None:
     if match.phase == TurnPhase.BETWEEN_TURNS:
         _begin_active_turn(match)
-    if match.phase == TurnPhase.TURN_START:
-        match.begin_rolling()
     if match.phase == TurnPhase.TURN_ACTIVE:
         if match.dice is not None and match.dice.rolls_this_turn < 1:
             match.roll()
