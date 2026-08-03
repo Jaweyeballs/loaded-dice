@@ -1,6 +1,7 @@
 import pytest
 
 from loaded_dice.rooms import RoomError, RoomManager
+from loaded_dice.shop import DEV_STARTING_CHIPS
 
 
 def test_create_and_join_room():
@@ -22,7 +23,10 @@ def test_only_host_can_start():
         room.start_match("Bob")
     match = room.start_match("Alice")
     assert match.active_player.name == "Alice"
-    assert match.players[0].chips == room.starting_chips
+    assert room.dev_mode is True
+    assert match.players[0].chips == DEV_STARTING_CHIPS
+    assert match.config.dev_mode is True
+    assert match.players[0].shop.full_catalog is True
 
 
 def test_need_two_players_to_start():

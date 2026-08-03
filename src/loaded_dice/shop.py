@@ -9,6 +9,8 @@ from loaded_dice.cards import Card, CardId, CardKind, InventoryFullError, card_f
 from loaded_dice.economy import InsufficientChipsError
 
 SHOP_REROLL_COST = 100
+NORMAL_STOCK_SIZE = 3
+DEV_STARTING_CHIPS = 9999
 
 # Stub prices until rarity tiers are designed.
 CARD_PRICES: dict[CardId, int] = {
@@ -46,9 +48,6 @@ CARD_PRICES: dict[CardId, int] = {
     CardId.MIXUP: 450,
 }
 
-# Temporary testing override: None = entire catalog in stock. Set back to 3 later.
-SHOP_STOCK_SIZE: int | None = None
-
 SELL_PRICE_DISCOUNT = 100
 
 
@@ -74,46 +73,47 @@ class ShopOffer:
     price: int
 
 
-def _offers_for_ids(card_ids: list[CardId] | tuple[CardId, ...]) -> list[ShopOffer]:
+def _offers_for_ids(card_ids: list[CardId]) -> list[ShopOffer | None]:
     return [ShopOffer(card_id, CARD_PRICES[card_id]) for card_id in card_ids]
 
 
-def draw_stock(*, shuffle_full_catalog: bool = False) -> list[ShopOffer]:
+def draw_stock(*, full_catalog: bool) -> list[ShopOffer | None]:
     """Build shop stock for one player.
 
-    While ``SHOP_STOCK_SIZE`` is None (playtest), stock is the full catalog.
-    Otherwise each player gets a random unique draw of that many cards.
+    *full_catalog* (dev mode): every priced card once.
+    Otherwise: a random draw of ``NORMAL_STOCK_SIZE`` unique cards.
     """
-    from loaded_dice.cards import CARD_DEFS
-
-    if SHOP_STOCK_SIZE is None:
-        pool = list(CARD_PRICES.keys())
-        if shuffle_full_catalog:
-            random.shuffle(pool)
-        return _offers_for_ids(pool)
-    pool = list(CARD_DEFS.keys())
+    pool = list(CARD_PRICES.keys())
     random.shuffle(pool)
-    return _offers_for_ids(pool[:SHOP_STOCK_SIZE])
-
-
-def default_stock() -> list[ShopOffer]:
-    """Initial per-player shop stock."""
-    return draw_stock(shuffle_full_catalog=False)
+    if full_catalog:
+        return _offers_for_ids(pool)
+    return _offers_for_ids(pool[:NORMAL_STOCK_SIZE])
 
 
 @dataclass
 class Shop:
     """One player's personal shop — stock and rerolls are never shared."""
 
-    stock: list[ShopOffer] = field(default_factory=default_stock)
+    stock: list[ShopOffer | None] = field(default_factory=list)
     reroll_cost: int = SHOP_REROLL_COST
+    full_catalog: bool = False
+
+    @classmethod
+    def create(cls, *, full_catalog: bool = False) -> Shop:
+        return cls(
+            stock=draw_stock(full_catalog=full_catalog),
+            full_catalog=full_catalog,
+        )
 
     def buy(self, player, index: int) -> Card:
-        """Spend chips and add the offered card to *player*'s inventory."""
+        """Spend chips, add the card, and mark the slot sold out."""
         if index < 0 or index >= len(self.stock):
             raise ShopError(f"No shop offer at index {index}")
 
         offer = self.stock[index]
+        if offer is None:
+            raise ShopError("Sold out")
+
         card = card_for_id(offer.card_id)
 
         try:
@@ -130,10 +130,11 @@ class Shop:
             player.earn_chips(offer.price)
             raise ShopError(str(exc)) from exc
 
+        self.stock[index] = None
         return card
 
-    def reroll_stock(self, player) -> list[ShopOffer]:
-        """Pay to replace *this* player's shop stock with a fresh draw."""
+    def reroll_stock(self, player) -> list[ShopOffer | None]:
+        """Pay to restock empty slots and replace any unbought offers."""
         player.spend_chips(self.reroll_cost)
-        self.stock = draw_stock(shuffle_full_catalog=True)
+        self.stock = draw_stock(full_catalog=self.full_catalog)
         return self.stock

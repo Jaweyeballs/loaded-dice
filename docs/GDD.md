@@ -159,6 +159,7 @@ Ideas only — not in the shop or engine yet. Numbers and wording may change.
 | Kind | Name | Concept |
 |---|---|---|
 | Trading | The mercenary | Pay **300** chips per blocked power card (reward for successfully blocking). Exact trigger timing TBD (per block vs. end of turn). |
+| Trading | The cheerleader | Reset another card's cooldown (then The Cheerleader itself enters a **3**-turn cooldown). Eligible targets TBD (Lawyer, Guardian, other cooldown trading cards, etc.). |
 | Power (negative) | Smoke bomb *(rework)* | Every roll, **1–2** random unlocked dice get force-locked (instead of only after the first roll). Same unlock/face immutability as the current card; only Parry / Guardian clears them. |
 | Power (negative) | Chud | Swap one of the target’s regular dice for a die that can only roll **0–2**. Duration / blockability TBD. |
 

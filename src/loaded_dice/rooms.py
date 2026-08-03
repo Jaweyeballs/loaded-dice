@@ -9,6 +9,7 @@ from typing import Any
 
 from loaded_dice.match import Match, MatchConfig
 from loaded_dice.sandbox import SANDBOX_STARTING_CHIPS
+from loaded_dice.shop import DEV_STARTING_CHIPS
 from loaded_dice.state import serialize_match
 
 ROOM_CODE_LENGTH = 4
@@ -39,6 +40,8 @@ class Room:
     match: Match | None = None
     starting_chips: int = SANDBOX_STARTING_CHIPS
     max_rotations: int = DEFAULT_MAX_ROTATIONS
+    # Playtest affordances (full shop catalog, 9999 starting chips). Default on until ship.
+    dev_mode: bool = True
 
     @property
     def started(self) -> bool:
@@ -74,15 +77,25 @@ class Room:
             raise RoomError("Need at least 2 players to start")
         match = Match(
             list(self.seated),
-            config=MatchConfig(max_rotations=self.max_rotations),
+            config=MatchConfig(
+                max_rotations=self.max_rotations,
+                dev_mode=self.dev_mode,
+            ),
         )
+        chips = DEV_STARTING_CHIPS if self.dev_mode else self.starting_chips
         for player in match.players:
-            player.chips = self.starting_chips
+            player.chips = chips
         self.match = match
         match._publish_turn_preview(match.active_player)
         return match
 
-    def update_settings(self, requester: str, *, max_rotations: int | None = None) -> None:
+    def update_settings(
+        self,
+        requester: str,
+        *,
+        max_rotations: int | None = None,
+        dev_mode: bool | None = None,
+    ) -> None:
         """Host-only lobby settings. Locked once the match starts."""
         if self.started:
             raise RoomError("Cannot change settings after the match has started")
@@ -100,6 +113,10 @@ class Room:
                     f"{MAX_MAX_ROTATIONS}"
                 )
             self.max_rotations = max_rotations
+        if dev_mode is not None:
+            if not isinstance(dev_mode, bool):
+                raise RoomError("Dev mode must be a boolean")
+            self.dev_mode = dev_mode
 
     def public_state(self, viewer_name: str | None = None) -> dict[str, Any]:
         payload: dict[str, Any] = {
@@ -112,6 +129,7 @@ class Room:
                 "max_rotations": self.max_rotations,
                 "min_max_rotations": MIN_MAX_ROTATIONS,
                 "max_max_rotations": MAX_MAX_ROTATIONS,
+                "dev_mode": self.dev_mode,
             },
             "match": None,
         }

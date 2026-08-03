@@ -145,6 +145,8 @@ class MatchConfig:
     refresh_sheet_on_complete: bool = False
     dice_size: int = 5
     max_rolls_per_turn: int = DEFAULT_MAX_ROLLS_PER_TURN
+    # Dev mode: full-catalog shop + other playtest affordances (set from room settings).
+    dev_mode: bool = True
 
 
 @dataclass
@@ -167,6 +169,9 @@ class Player:
     last_score_chip_gain_version: int = 0
     # Breakdown lines for the HUD flash (+300 scored hand, +150 unused roll, …).
     last_score_chip_lines: list[BriefAmountLine] = field(default_factory=list)
+    # Latest voluntary chip spend (shop / gambler / etc.) for the red HUD flash.
+    last_chip_spend: int | None = None
+    last_chip_spend_version: int = 0
     # Positive punishment armed at start turn; applied on the next scored hand.
     pending_score_penalty: int = 0
     jail_locked_index: int | None = None
@@ -179,7 +184,7 @@ class Player:
     # Snapshot of other players' hindrances — refreshed only on Start Turn with Forecaster.
     forecaster_reveals: dict[str, list[str]] | None = None
     # Personal shop — stock and rerolls are independent per player.
-    shop: Shop = field(default_factory=Shop)
+    shop: Shop = field(default_factory=lambda: Shop.create(full_catalog=True))
 
     def total_score(self) -> int:
         return self.game_total + self.current_sheet.grand_total()
@@ -202,6 +207,9 @@ class Player:
                 f"Need {amount} chips but only have {self.chips}"
             )
         self.chips -= amount
+        if amount > 0:
+            self.last_chip_spend = amount
+            self.last_chip_spend_version += 1
 
     def lose_chips(self, amount: int) -> None:
         if amount < 0:
@@ -223,6 +231,8 @@ class Match:
             raise ValueError("At least one player is required")
         self.config = config or MatchConfig()
         self.players = [Player(name=name) for name in player_names]
+        for player in self.players:
+            player.shop = Shop.create(full_catalog=self.config.dev_mode)
         self.phase = TurnPhase.BETWEEN_TURNS
         self._current_index = 0
         self._dice: DiceSet | None = None

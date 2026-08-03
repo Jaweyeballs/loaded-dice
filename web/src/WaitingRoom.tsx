@@ -6,7 +6,10 @@ type Props = {
   playerName: string;
   onStart: () => void;
   onLeave: () => void;
-  onUpdateSettings: (settings: { max_rotations: number }) => void;
+  onUpdateSettings: (settings: {
+    max_rotations?: number;
+    dev_mode?: boolean;
+  }) => void;
 };
 
 export function WaitingRoom({
@@ -22,6 +25,7 @@ export function WaitingRoom({
   const maxRotations = settings?.max_rotations ?? 10;
   const minRot = settings?.min_max_rotations ?? 5;
   const maxRot = settings?.max_max_rotations ?? 25;
+  const devMode = settings?.dev_mode ?? true;
 
   function bumpMaxRotations(delta: number) {
     if (!isHost) return;
@@ -96,6 +100,26 @@ export function WaitingRoom({
               </button>
             </div>
           </label>
+          <label className="settings-field settings-toggle-field">
+            <span className="settings-label">Dev mode</span>
+            <span className="settings-help">
+              Full shop catalog, scrollable shop UI, and 9999 starting chips for
+              all players.
+            </span>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={devMode}
+              className={`settings-switch ${devMode ? "on" : ""}`}
+              disabled={!isHost}
+              onClick={() => onUpdateSettings({ dev_mode: !devMode })}
+            >
+              <span className="settings-switch-knob" />
+              <span className="settings-switch-label">
+                {devMode ? "On" : "Off"}
+              </span>
+            </button>
+          </label>
           {!isHost && (
             <p className="hint">Only the host can change settings.</p>
           )}
@@ -118,6 +142,8 @@ export function WaitingRoom({
         )}
         <p className="hint settings-summary">
           Max rotations: {maxRotations}
+          {" · "}
+          Dev mode: {devMode ? "on" : "off"}
         </p>
       </div>
 

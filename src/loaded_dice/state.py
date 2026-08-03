@@ -123,6 +123,8 @@ def serialize_player(player: Player, match: Match) -> dict[str, Any]:
             {"amount": line.amount, "label": line.label}
             for line in player.last_score_chip_lines
         ],
+        "last_chip_spend": player.last_chip_spend,
+        "last_chip_spend_version": player.last_chip_spend_version,
         "upper_subtotal": player.current_sheet.upper_subtotal(),
         "upper_bonus": player.current_sheet.upper_bonus(),
         "lower_subtotal": player.current_sheet.lower_subtotal(),
@@ -199,12 +201,35 @@ def serialize_dice(match: Match) -> dict[str, Any] | None:
 
 
 def serialize_shop(shop: Shop) -> dict[str, Any]:
+    from loaded_dice.cards import CARD_DEFS
+
+    stock = []
+    for i, offer in enumerate(shop.stock):
+        if offer is None:
+            stock.append(
+                {
+                    "index": i,
+                    "card_id": None,
+                    "price": None,
+                    "kind": None,
+                    "sold_out": True,
+                }
+            )
+            continue
+        kind = CARD_DEFS[offer.card_id].kind.value
+        stock.append(
+            {
+                "index": i,
+                "card_id": offer.card_id.value,
+                "price": offer.price,
+                "kind": kind,
+                "sold_out": False,
+            }
+        )
     return {
-        "stock": [
-            {"index": i, "card_id": offer.card_id.value, "price": offer.price}
-            for i, offer in enumerate(shop.stock)
-        ],
+        "stock": stock,
         "reroll_cost": shop.reroll_cost,
+        "full_catalog": shop.full_catalog,
     }
 
 
@@ -265,6 +290,7 @@ def serialize_match(match: Match, *, viewer: Player | None = None) -> dict[str, 
         "phase": match.phase.value,
         "rotation_count": match.rotation_count,
         "max_rotations": match.config.max_rotations,
+        "dev_mode": match.config.dev_mode,
         "active_player": match.active_player.name,
         "is_over": match.is_over(),
         "winner": winner.name if winner else None,

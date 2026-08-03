@@ -410,7 +410,17 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
   const [sheetMode, setSheetMode] = useState<SheetMode>("mine");
   const [mineSelection, setMineSelection] = useState(playerName);
   const [cardsOpen, setCardsOpen] = useState(true);
-  const [shopOpen, setShopOpen] = useState(false);
+  const [shopPhase, setShopPhase] = useState<
+    "closed" | "opening" | "open" | "closing"
+  >("closed");
+  const [shopArmIndex, setShopArmIndex] = useState<number | null>(null);
+  const [shopFlyOut, setShopFlyOut] = useState<{
+    index: number;
+    cardId: string;
+    kind: string;
+    key: number;
+  } | null>(null);
+  const [flyInKeys, setFlyInKeys] = useState<Set<string>>(() => new Set());
   const [icarusArming, setIcarusArming] = useState(false);
   /** Space Die: null = idle; dieIndex null = pick die; number = pick face for that die. */
   const [spacePick, setSpacePick] = useState<{ dieIndex: number | null } | null>(
@@ -429,8 +439,14 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
     lines: { amount: number; label: string }[];
     key: number;
   } | null>(null);
+  const [chipSpendFlash, setChipSpendFlash] = useState<{
+    amount: number;
+    key: number;
+  } | null>(null);
   const seenPreviewVersionRef = useRef(0);
   const seenScoreChipVersionRef = useRef(0);
+  const seenChipSpendVersionRef = useRef(0);
+  const invSigRef = useRef<string>("");
   const prevDiceRef = useRef<{
     rolls: number;
     order: number[];
@@ -729,6 +745,45 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
     setChipFlash({ lines, key: version });
   }, [me?.last_score_chip_lines, me?.last_score_chip_gain_version]);
 
+  useEffect(() => {
+    const version = me?.last_chip_spend_version ?? 0;
+    const amount = me?.last_chip_spend;
+    if (
+      amount == null ||
+      amount <= 0 ||
+      version <= seenChipSpendVersionRef.current
+    ) {
+      return;
+    }
+    seenChipSpendVersionRef.current = version;
+    setChipSpendFlash({ amount, key: version });
+  }, [me?.last_chip_spend, me?.last_chip_spend_version]);
+
+  // Cards acquired (shop / cast leftovers) fly in from the bottom of the tray.
+  useEffect(() => {
+    const power = me?.power_cards ?? [];
+    const trading = me?.trading_cards ?? [];
+    const sig = [
+      ...power.map((c, i) => `p:${c.id}:${i}`),
+      ...trading.map((c, i) => `t:${c.id}:${i}`),
+    ].join("|");
+    if (!invSigRef.current) {
+      invSigRef.current = sig;
+      return;
+    }
+    if (sig === invSigRef.current) return;
+    const prev = new Set(invSigRef.current.split("|").filter(Boolean));
+    const nextKeys = sig.split("|").filter(Boolean);
+    const gained = nextKeys.filter((k) => !prev.has(k));
+    invSigRef.current = sig;
+    if (gained.length === 0) return;
+    setFlyInKeys((cur) => {
+      const next = new Set(cur);
+      for (const k of gained) next.add(k);
+      return next;
+    });
+  }, [me?.power_cards, me?.trading_cards]);
+
   // Where everyone would sit if the leaderboard re-sorted on current totals right now.
   const predictedOrder = useMemo(
     () =>
@@ -763,10 +818,62 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
     }
   }, [active, match.phase, match.dice, me?.queued_hindrances.length]);
 
-  // Shop sign is off-turn only — close the panel when shopping becomes unavailable.
+  // Shop sign is off-turn only — close the overlay when shopping becomes unavailable.
   useEffect(() => {
-    if (!canShop) setShopOpen(false);
+    if (!canShop) {
+      setShopPhase((phase) =>
+        phase === "closed" || phase === "closing" ? phase : "closing",
+      );
+      setShopArmIndex(null);
+    }
   }, [canShop]);
+
+  useEffect(() => {
+    if (shopPhase !== "opening" && shopPhase !== "closing") return;
+    if (typeof window === "undefined") return;
+    if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    if (shopPhase === "opening") {
+      setShopPhase("open");
+      return;
+    }
+    setShopPhase("closed");
+    setShopArmIndex(null);
+  }, [shopPhase]);
+
+  function openShop() {
+    setShopPhase((phase) =>
+      phase === "open" || phase === "opening" ? phase : "opening",
+    );
+  }
+
+  function closeShop() {
+    setShopPhase((phase) =>
+      phase === "closed" || phase === "closing" ? phase : "closing",
+    );
+    setShopArmIndex(null);
+  }
+
+  function onShopPanelAnimationEnd(event: AnimationEvent<HTMLDivElement>) {
+    if (event.target !== event.currentTarget) return;
+    if (shopPhase === "opening") {
+      setShopPhase("open");
+      return;
+    }
+    if (shopPhase === "closing") {
+      setShopPhase("closed");
+      setShopArmIndex(null);
+    }
+  }
+
+  function toggleShopArm(index: number) {
+    setShopArmIndex((cur) => (cur === index ? null : index));
+  }
+
+  function confirmShopBuy(index: number, cardId: string, kind: string) {
+    setShopFlyOut({ index, cardId, kind, key: Date.now() });
+    setShopArmIndex(null);
+    onAction({ type: "buy", stock_index: index });
+  }
 
   // Auto-open turn preview when it is your turn and you still need to Start Turn.
   useEffect(() => {
@@ -1238,7 +1345,7 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
             <em>Chips</em> {me?.chips ?? 0}
             {chipFlash && (
               <span
-                key={chipFlash.key}
+                key={`gain-${chipFlash.key}`}
                 className="hud-chip-flash"
                 onAnimationEnd={() => setChipFlash(null)}
               >
@@ -1247,6 +1354,17 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
                     +{line.amount} {line.label}
                   </span>
                 ))}
+              </span>
+            )}
+            {chipSpendFlash && (
+              <span
+                key={`spend-${chipSpendFlash.key}`}
+                className="hud-chip-flash spend"
+                onAnimationEnd={() => setChipSpendFlash(null)}
+              >
+                <span className="hud-chip-flash-line">
+                  −{chipSpendFlash.amount}
+                </span>
               </span>
             )}
           </span>
@@ -1431,7 +1549,11 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
                       className={entry.blocked ? "blocked" : ""}
                     >
                       {entry.card_id ? (
-                        <Tip text={tipText(entry.card_id)} className="tip-below">
+                        <Tip
+                          text={tipText(entry.card_id)}
+                          className="tip-below"
+                          tipAlign="start"
+                        >
                           {line}
                         </Tip>
                       ) : (
@@ -1973,8 +2095,19 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
                 return (
                   <div
                     key={`p-${card.id}-${i}`}
-                    className={`fan-card-slot ${expanded ? "expanded" : ""}`}
+                    className={`fan-card-slot ${expanded ? "expanded" : ""} ${
+                      flyInKeys.has(`p:${card.id}:${i}`) ? "fly-in" : ""
+                    }`}
                     style={{ zIndex: expanded ? 40 : i + 1 }}
+                    onAnimationEnd={(e) => {
+                      if (!e.currentTarget.classList.contains("fly-in")) return;
+                      if (e.target !== e.currentTarget) return;
+                      setFlyInKeys((cur) => {
+                        const next = new Set(cur);
+                        next.delete(`p:${card.id}:${i}`);
+                        return next;
+                      });
+                    }}
                   >
                     <Tip text={tipText(card.id, card.transparent)} tipAlign="start">
                       <button
@@ -2071,8 +2204,19 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
                 return (
                   <div
                     key={`t-${card.id}-${i}`}
-                    className={`fan-card-slot ${expanded ? "expanded" : ""}`}
+                    className={`fan-card-slot ${expanded ? "expanded" : ""} ${
+                      flyInKeys.has(`t:${card.id}:${i}`) ? "fly-in" : ""
+                    }`}
                     style={{ zIndex: expanded ? 40 : i + 1 }}
+                    onAnimationEnd={(e) => {
+                      if (!e.currentTarget.classList.contains("fly-in")) return;
+                      if (e.target !== e.currentTarget) return;
+                      setFlyInKeys((cur) => {
+                        const next = new Set(cur);
+                        next.delete(`t:${card.id}:${i}`);
+                        return next;
+                      });
+                    }}
                   >
                     <Tip
                       tipAlign="end"
@@ -2148,48 +2292,152 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
         </div>
       </section>
 
-      {canShop && (        <button
+      {canShop && (
+        <button
           type="button"
-          className={`shop-sign ${shopOpen ? "open" : ""}`}
-          onClick={() => setShopOpen((v) => !v)}
+          className={`shop-sign ${shopPhase !== "closed" ? "open" : ""}`}
+          onClick={() => {
+            if (shopPhase === "open" || shopPhase === "opening") closeShop();
+            else openShop();
+          }}
+          aria-label="Open shop"
         >
-          Shop
+          <span className="shop-sign-label">Shop</span>
         </button>
       )}
 
-      {canShop && shopOpen && (
-        <div className="shop-panel">
-          <div className="shop-panel-head">
-            <h2>Shop</h2>
-            <span className="hint">{me?.chips ?? 0} chips</span>
-            <button type="button" className="secondary" onClick={() => setShopOpen(false)}>
-              Close
-            </button>
-          </div>
-          <ul className="shop-list">
-            {match.shop.stock.map((offer) => (
-              <li key={offer.index}>
-                <Tip text={tipText(offer.card_id)} className="tip-below">
-                  <span>
-                    {label(offer.card_id)} — {offer.price}
-                  </span>
-                </Tip>
+      {shopPhase !== "closed" && (
+        <div
+          className={`shop-scrim is-${shopPhase}`}
+          role="presentation"
+          onClick={closeShop}
+        >
+          <div
+            className={`shop-panel is-${shopPhase}`}
+            role="dialog"
+            aria-label="Shop"
+            onClick={(e) => e.stopPropagation()}
+            onAnimationEnd={onShopPanelAnimationEnd}
+          >
+            <header className="shop-panel-head">
+              <h2>Shop</h2>
+              <span className="hint">{me?.chips ?? 0} chips</span>
+              <button type="button" className="secondary" onClick={closeShop}>
+                Close
+              </button>
+            </header>
+            <div className="shop-body">
+              <div
+                className={`shop-grid ${
+                  match.dev_mode || match.shop.full_catalog ? "scrollable" : ""
+                }`}
+              >
+                {match.shop.stock.map((offer) => {
+                  const soldOut = Boolean(offer.sold_out) || !offer.card_id;
+                  const armed = shopArmIndex === offer.index;
+                  const canAfford =
+                    !soldOut &&
+                    offer.price != null &&
+                    (me?.chips ?? 0) >= offer.price;
+                  const kind =
+                    offer.kind ??
+                    (offer.card_id && HINDRANCE_IDS.has(offer.card_id)
+                      ? "hindrance"
+                      : "power");
+                  const fanKind =
+                    kind === "trading"
+                      ? "trading"
+                      : offer.card_id && HINDRANCE_IDS.has(offer.card_id)
+                        ? "hindrance"
+                        : "power";
+                  const flying =
+                    shopFlyOut?.index === offer.index
+                      ? shopFlyOut
+                      : null;
+                  return (
+                    <div key={offer.index} className="shop-slot">
+                      <span className="shop-slot-price">
+                        {soldOut ? "—" : `${offer.price}`}
+                      </span>
+                      <div className="shop-slot-card-wrap">
+                        {soldOut ? (
+                          <div className="shop-sold-out" aria-label="Sold out">
+                            Sold out
+                          </div>
+                        ) : flying ? (
+                          <div className="shop-slot-placeholder" aria-hidden />
+                        ) : (
+                          <Tip
+                            text={tipText(offer.card_id!)}
+                            className="tip-below"
+                          >
+                            <button
+                              type="button"
+                              className={`fan-card shop-card ${fanKind} ${
+                                armed ? "armed" : ""
+                              }`}
+                              onClick={() => toggleShopArm(offer.index)}
+                            >
+                              <span className="card-title">
+                                {label(offer.card_id!)}
+                              </span>
+                            </button>
+                          </Tip>
+                        )}
+                        {flying && (
+                          <span
+                            key={flying.key}
+                            className={`fan-card shop-card shop-fly-out ${
+                              flying.kind === "trading"
+                                ? "trading"
+                                : HINDRANCE_IDS.has(flying.cardId)
+                                  ? "hindrance"
+                                  : "power"
+                            }`}
+                            onAnimationEnd={() => setShopFlyOut(null)}
+                          >
+                            <span className="card-title">
+                              {label(flying.cardId)}
+                            </span>
+                          </span>
+                        )}
+                      </div>
+                      {armed && !soldOut && offer.card_id && (
+                        <button
+                          type="button"
+                          className="shop-buy-btn"
+                          disabled={!canAfford}
+                          onClick={() =>
+                            confirmShopBuy(
+                              offer.index,
+                              offer.card_id!,
+                              fanKind,
+                            )
+                          }
+                        >
+                          Buy
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="shop-reroll-col">
                 <button
                   type="button"
-                  onClick={() => onAction({ type: "buy", stock_index: offer.index })}
+                  className="shop-reroll-btn"
+                  disabled={(me?.chips ?? 0) < match.shop.reroll_cost}
+                  onClick={() => onAction({ type: "reroll_shop" })}
+                  aria-label="Reroll shop"
                 >
-                  Buy
+                  ↻
                 </button>
-              </li>
-            ))}
-          </ul>
-          <button
-            type="button"
-            className="secondary"
-            onClick={() => onAction({ type: "reroll_shop" })}
-          >
-            Reroll ({match.shop.reroll_cost})
-          </button>
+                <span className="shop-reroll-cost">
+                  {match.shop.reroll_cost}
+                </span>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 

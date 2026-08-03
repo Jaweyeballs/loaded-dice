@@ -22,6 +22,9 @@ export type PlayerState = {
   last_score_chip_gain_version?: number;
   /** Per-line HUD flash: scored hand first, then each unused roll. */
   last_score_chip_lines?: { amount: number; label: string }[];
+  /** Latest chip spend amount for the red HUD flash. */
+  last_chip_spend?: number | null;
+  last_chip_spend_version?: number;
   upper_subtotal?: number;
   upper_bonus?: number;
   lower_subtotal?: number;
@@ -113,9 +116,18 @@ export type MatchState = {
     smoke_bomb_locked_indices?: number[];
   } | null;
   shop: {
-    stock: { index: number; card_id: string; price: number }[];
+    stock: {
+      index: number;
+      card_id: string | null;
+      price: number | null;
+      kind?: string | null;
+      sold_out?: boolean;
+    }[];
     reroll_cost: number;
+    full_catalog?: boolean;
   };
+  /** Room playtest mode — full catalog shop, etc. */
+  dev_mode?: boolean;
   previews: Record<string, number> | null;
   /** Live overwrite preview when Do over is usable this turn. */
   do_over_preview?: { category: string; points: number } | null;
@@ -146,6 +158,8 @@ export type RoomSettings = {
   max_rotations: number;
   min_max_rotations: number;
   max_max_rotations: number;
+  /** Full shop catalog + 9999 starting chips while testing. */
+  dev_mode: boolean;
 };
 
 export type RoomState = {
