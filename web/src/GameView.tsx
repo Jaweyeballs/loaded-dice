@@ -1,4 +1,12 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type AnimationEvent,
+  type CSSProperties,
+} from "react";
 import { cardBlurb, cardBlurbOnYou, cardTipLabel } from "./cardCopy";
 import { Tip } from "./Tip";
 import type {
@@ -413,11 +421,14 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
   const [playerTarget, setPlayerTarget] = useState<PlayerTargetMode | null>(null);
   const [cardExpand, setCardExpand] = useState<CardExpand | null>(null);
   const [rollAnim, setRollAnim] = useState<RollAnim | null>(null);
-  const [briefOverlay, setBriefOverlay] = useState(false);
+  const [briefPhase, setBriefPhase] = useState<
+    "closed" | "opening" | "open" | "closing"
+  >("closed");
   const [briefEmpty, setBriefEmpty] = useState(false);
-  const [chipFlash, setChipFlash] = useState<{ amount: number; key: number } | null>(
-    null,
-  );
+  const [chipFlash, setChipFlash] = useState<{
+    lines: { amount: number; label: string }[];
+    key: number;
+  } | null>(null);
   const seenPreviewVersionRef = useRef(0);
   const seenScoreChipVersionRef = useRef(0);
   const prevDiceRef = useRef<{
@@ -707,17 +718,16 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
 
   useEffect(() => {
     const version = me?.last_score_chip_gain_version ?? 0;
-    const amount = me?.last_score_chip_gain;
+    const lines = me?.last_score_chip_lines ?? [];
     if (
-      amount == null ||
-      amount <= 0 ||
+      lines.length === 0 ||
       version <= seenScoreChipVersionRef.current
     ) {
       return;
     }
     seenScoreChipVersionRef.current = version;
-    setChipFlash({ amount, key: version });
-  }, [me?.last_score_chip_gain, me?.last_score_chip_gain_version]);
+    setChipFlash({ lines, key: version });
+  }, [me?.last_score_chip_lines, me?.last_score_chip_gain_version]);
 
   // Where everyone would sit if the leaderboard re-sorted on current totals right now.
   const predictedOrder = useMemo(
@@ -768,26 +778,55 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
     ) {
       seenPreviewVersionRef.current = version;
       setBriefEmpty(false);
-      setBriefOverlay(true);
+      setBriefPhase("opening");
     }
   }, [active, match.phase, me?.last_turn_preview?.version]);
 
   // Close the preview once Start Turn begins.
   useEffect(() => {
     if (match.phase !== "between_turns") {
-      setBriefOverlay(false);
-      setBriefEmpty(false);
+      setBriefPhase((phase) =>
+        phase === "closed" || phase === "closing" ? phase : "closing",
+      );
     }
   }, [match.phase]);
 
+  // Reduced motion: skip waiting for CSS animationend.
+  useEffect(() => {
+    if (briefPhase !== "opening" && briefPhase !== "closing") return;
+    if (typeof window === "undefined") return;
+    if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    if (briefPhase === "opening") {
+      setBriefPhase("open");
+      return;
+    }
+    setBriefPhase("closed");
+    setBriefEmpty(false);
+  }, [briefPhase]);
+
   function openTurnPreview() {
     setBriefEmpty(!me?.last_turn_preview);
-    setBriefOverlay(true);
+    setBriefPhase((phase) =>
+      phase === "open" || phase === "opening" ? phase : "opening",
+    );
   }
 
   function closeTurnBrief() {
-    setBriefOverlay(false);
-    setBriefEmpty(false);
+    setBriefPhase((phase) =>
+      phase === "closed" || phase === "closing" ? phase : "closing",
+    );
+  }
+
+  function onBriefPanelAnimationEnd(event: AnimationEvent<HTMLDivElement>) {
+    if (event.target !== event.currentTarget) return;
+    if (briefPhase === "opening") {
+      setBriefPhase("open");
+      return;
+    }
+    if (briefPhase === "closing") {
+      setBriefPhase("closed");
+      setBriefEmpty(false);
+    }
   }
 
   // Jump scoresheet to a player (used by leaderboard name clicks).
@@ -1163,7 +1202,8 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
       ].filter(Boolean)
     : [];
 
-  const displayedBrief: TurnBrief | null = briefOverlay
+  const briefVisible = briefPhase !== "closed";
+  const displayedBrief: TurnBrief | null = briefVisible
     ? briefEmpty
       ? emptyTurnBrief()
       : (me?.last_turn_preview ?? emptyTurnBrief())
@@ -1202,7 +1242,11 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
                 className="hud-chip-flash"
                 onAnimationEnd={() => setChipFlash(null)}
               >
-                +{chipFlash.amount}
+                {chipFlash.lines.map((line, i) => (
+                  <span key={`${line.label}-${i}`} className="hud-chip-flash-line">
+                    +{line.amount} {line.label}
+                  </span>
+                ))}
               </span>
             )}
           </span>
@@ -2155,12 +2199,16 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
         </button>
       </div>
 
-      {briefOverlay && displayedBrief && (
-        <div className="turn-brief-scrim" role="presentation">
+      {briefVisible && displayedBrief && (
+        <div
+          className={`turn-brief-scrim is-${briefPhase}`}
+          role="presentation"
+        >
           <div
-            className="turn-brief-panel"
+            className={`turn-brief-panel is-${briefPhase}`}
             role="dialog"
             aria-label="Your turn in preview"
+            onAnimationEnd={onBriefPanelAnimationEnd}
           >
             <header className="turn-brief-head">
               <h2>Your turn in preview</h2>

@@ -87,6 +87,13 @@ def test_scoring_awards_hand_and_unused_roll_chips():
     assert match.players[0].chips == expected
     assert match.players[0].last_score_chip_gain == expected
     assert match.players[0].last_score_chip_gain_version == 1
+    assert [
+        (line.amount, line.label) for line in match.players[0].last_score_chip_lines
+    ] == [
+        (CHIPS_PER_SCORED_HAND, "scored hand"),
+        (CHIPS_PER_UNUSED_STANDARD_ROLL, "unused roll"),
+        (CHIPS_PER_UNUSED_STANDARD_ROLL, "unused roll"),
+    ]
 
 def test_interest_paid_at_turn_start():
     match = Match(["Alice"])

@@ -20,6 +20,8 @@ export type PlayerState = {
   last_score_chip_gain?: number | null;
   /** Increments each score so the HUD can replay the same amount. */
   last_score_chip_gain_version?: number;
+  /** Per-line HUD flash: scored hand first, then each unused roll. */
+  last_score_chip_lines?: { amount: number; label: string }[];
   upper_subtotal?: number;
   upper_bonus?: number;
   lower_subtotal?: number;

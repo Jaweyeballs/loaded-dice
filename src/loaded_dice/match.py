@@ -10,13 +10,13 @@ import random
 from loaded_dice.dice import DEFAULT_MAX_ROLLS_PER_TURN, DiceSet, TooManyRollsError
 from loaded_dice.economy import (
     CHIPS_PER_SCORED_HAND,
+    CHIPS_PER_UNUSED_STANDARD_ROLL,
     COMPENSATION_CHIPS_PER_ATTACKER,
     COMPENSATION_PACIFIST_CHIPS,
     INTEREST_BLOCK_SIZE,
     INTEREST_CHIPS_PER_BLOCK,
     MAX_INTEREST_CHIPS,
     calculate_interest,
-    chips_for_unused_standard_rolls,
     InsufficientChipsError,
 )
 from loaded_dice.cards import (
@@ -167,6 +167,8 @@ class Player:
     # Chips earned from the most recent scored hand (base + unused-roll income).
     last_score_chip_gain: int | None = None
     last_score_chip_gain_version: int = 0
+    # Breakdown lines for the HUD flash (+300 scored hand, +150 unused roll, …).
+    last_score_chip_lines: list[BriefAmountLine] = field(default_factory=list)
     # Positive punishment armed at start turn; applied on the next scored hand.
     pending_score_penalty: int = 0
     jail_locked_index: int | None = None
@@ -1559,14 +1561,22 @@ class Match:
 
     def _award_scoring_income(self, player: Player) -> None:
         assert self._dice is not None
-        roll_income = chips_for_unused_standard_rolls(
-            self._dice.rolls_this_turn,
-            self._dice.standard_max_rolls,
-        )
-        total = CHIPS_PER_SCORED_HAND + roll_income
+        rolls_used = self._dice.rolls_this_turn
+        standard_max = self._dice.standard_max_rolls
+        standard_used = min(rolls_used, standard_max)
+        unused_rolls = max(0, standard_max - standard_used)
+        roll_income = unused_rolls * CHIPS_PER_UNUSED_STANDARD_ROLL
+        lines = [
+            BriefAmountLine(CHIPS_PER_SCORED_HAND, "scored hand"),
+            *[
+                BriefAmountLine(CHIPS_PER_UNUSED_STANDARD_ROLL, "unused roll")
+                for _ in range(unused_rolls)
+            ],
+        ]
         player.earn_chips(CHIPS_PER_SCORED_HAND)
         player.earn_chips(roll_income)
-        player.last_score_chip_gain = total
+        player.last_score_chip_gain = CHIPS_PER_SCORED_HAND + roll_income
+        player.last_score_chip_lines = lines
         player.last_score_chip_gain_version += 1
 
     def _on_sheet_completed(self, player: Player) -> None:
