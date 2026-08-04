@@ -1419,7 +1419,8 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
             const seatScale = seatFaceUpScale(faceUpCount);
             // Revealed hindrances are "flipped out" of the blank hand.
             const hiddenCount = Math.max(0, cardCount - revealed.length);
-            const blanks = Math.min(hiddenCount, 6);
+            // Face-down fan matches default hand cap (5 power + 3 trading); +N only beyond that.
+            const blanks = Math.min(hiddenCount, 8);
             return (
               <div
                 key={opp.name}
