@@ -1409,7 +1409,13 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
               opp.name === match.active_player && match.phase === "turn_active"
                 ? (opp.queued_hindrances ?? [])
                 : [];
-            const faceUpCount = revealed.length + seatDebuffs.length;
+            // Power cards (not trading) the active opponent has cast this turn.
+            const castPowers =
+              opp.name === match.active_player && match.phase === "turn_active"
+                ? (match.powers_played_this_turn ?? [])
+                : [];
+            const faceUpCount =
+              revealed.length + seatDebuffs.length + castPowers.length;
             const seatScale = seatFaceUpScale(faceUpCount);
             // Revealed hindrances are "flipped out" of the blank hand.
             const hiddenCount = Math.max(0, cardCount - revealed.length);
@@ -1502,6 +1508,28 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
                                 {statusLabel}
                               </span>
                             )}
+                          </span>
+                        </Tip>
+                      );
+                    })}
+                    {castPowers.map((cardId, ci) => {
+                      const isHindrance = HINDRANCE_IDS.has(cardId);
+                      return (
+                        <Tip
+                          key={`cast-${cardId}-${ci}`}
+                          text={tipText(cardId)}
+                          className="tip-below"
+                        >
+                          <span
+                            className={`opponent-reveal-card fan-card ${
+                              isHindrance ? "hindrance" : "power"
+                            }`}
+                            style={{
+                              zIndex:
+                                revealed.length + seatDebuffs.length + ci + 1,
+                            }}
+                          >
+                            {label(cardId)}
                           </span>
                         </Tip>
                       );
@@ -1819,7 +1847,9 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
             }`}
           >
             {trayDice.map(({ value, index, locked, kind }) => {
-              const psychicFace = match.psychic_previews?.[String(index)];
+              const psychicFace = active
+                ? match.psychic_previews?.[String(index)]
+                : undefined;
               const picked =
                 diePick?.picked.includes(index) ||
                 spacePick?.dieIndex === index;

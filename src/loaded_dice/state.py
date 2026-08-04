@@ -303,6 +303,9 @@ def serialize_match(match: Match, *, viewer: Player | None = None) -> dict[str, 
         "psychic_previews": {
             str(index): face for index, face in match.psychic_previews.items()
         },
+        "powers_played_this_turn": [
+            card_id.value for card_id in match.powers_played_this_turn
+        ],
         "twins_links": {
             str(follower): leader
             for follower, leader in match.twins_links.items()

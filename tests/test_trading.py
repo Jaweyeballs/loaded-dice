@@ -203,6 +203,27 @@ def test_toddler_immediately_rolls_selected_dice():
         match.activate_trading_card(CardId.TODDLER, die_indices=[1, 3])
 
 
+def test_psychic_previews_hidden_from_spectators():
+    from loaded_dice.rooms import RoomManager
+    from loaded_dice.cards import CardId, card_for_id
+
+    manager = RoomManager()
+    room = manager.create_room()
+    room.add_player("Alice")
+    room.add_player("Bob")
+    room.start_match("Alice")
+    match = room.match
+    assert match is not None
+    match.players[0].inventory.add_trading(card_for_id(CardId.PSYCHIC))
+    match.start_turn()
+    match.roll()
+    match.activate_trading_card(CardId.PSYCHIC, die_indices=[1, 4])
+    alice_view = room.public_state(viewer_name="Alice")
+    bob_view = room.public_state(viewer_name="Bob")
+    assert set(alice_view["match"]["psychic_previews"]) == {"1", "4"}
+    assert bob_view["match"]["psychic_previews"] == {}
+
+
 def test_psychic_queues_previews():
     match = Match(["Alice"])
     match.players[0].inventory.add_trading(card_for_id(CardId.PSYCHIC))

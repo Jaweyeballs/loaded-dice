@@ -219,6 +219,26 @@ def test_cast_icarus_bumps_die_and_consumes_card():
     assert match.hindrance_feed[-1].kind == "power_use"
     assert match.hindrance_feed[-1].card_id == CardId.ICARUS
     assert match.hindrance_feed[-1].caster_name == "Alice"
+    assert match.powers_played_this_turn == [CardId.ICARUS]
+
+
+def test_powers_played_this_turn_clears_on_end():
+    match = Match(["Alice", "Bob"])
+    match.players[0].inventory.add_power(Card(CardId.ICARUS, CardKind.POWER))
+    match.players[0].inventory.add_power(
+        Card(CardId.GLASS_HALF_FULL, CardKind.POWER)
+    )
+    _begin_active_turn(match)
+    match.roll()
+    match.dice.dice[0].value = 4
+    match.cast_power_card(CardId.ICARUS, die_index=0)
+    match.cast_hindrance(CardId.GLASS_HALF_FULL, match.players[1])
+    assert match.powers_played_this_turn == [
+        CardId.ICARUS,
+        CardId.GLASS_HALF_FULL,
+    ]
+    match.score(Category.CHANCE)
+    assert match.powers_played_this_turn == []
 
 
 def test_cast_icarus_wraps_six_to_one():

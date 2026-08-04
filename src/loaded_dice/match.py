@@ -248,6 +248,8 @@ class Match:
         self._psychic_used_this_turn = False
         # Cast/block history for the left-panel killfeed (newest last).
         self.hindrance_feed: list[HindranceFeedEntry] = []
+        # Power cards played this turn (positive + hindrances) — seat fan for spectators.
+        self._powers_played_this_turn: list[CardId] = []
 
     def build_turn_preview(self, player: Player, *, version: int | None = None) -> TurnBrief:
         """Predict Start Turn outcomes for *player* without mutating state."""
@@ -472,6 +474,14 @@ class Match:
         )
 
     @property
+    def powers_played_this_turn(self) -> list[CardId]:
+        return list(self._powers_played_this_turn)
+
+    def _record_power_played(self, card_id: CardId) -> None:
+        """Track a played power/hindrance for the active seat fan this turn."""
+        self._powers_played_this_turn.append(card_id)
+
+    @property
     def psychic_previews(self) -> dict[int, int]:
         """Psychic ghosts for the HUD, including Twins mirror from source → follower."""
         previews = dict(self._psychic_previews)
@@ -601,6 +611,7 @@ class Match:
         self._toddler_used_this_turn = False
         self._psychic_used_this_turn = False
         self._psychic_previews = {}
+        self._powers_played_this_turn = []
 
         caster_by_name = {candidate.name: candidate for candidate in self.players}
         remaining: list[QueuedHindrance] = []
@@ -1223,6 +1234,9 @@ class Match:
                 raise WrongPhaseError("No twins in your inventory")
             cast_positive_power(card_id, player, self, **kwargs)
             self._append_power_use_feed(card_id, player)
+            # Only show Twins on the seat fan when linking (not on cancel).
+            if kwargs.get("die_indices"):
+                self._record_power_played(card_id)
             return
 
         try:
@@ -1232,6 +1246,7 @@ class Match:
 
         cast_positive_power(card_id, player, self, **kwargs)
         self._append_power_use_feed(card_id, player)
+        self._record_power_played(card_id)
 
     def cast_hindrance(self, card_id: CardId, target: Player | None = None) -> None:
         """Queue a negative power card (Blue Shell auto-targets top other player)."""
@@ -1273,6 +1288,7 @@ class Match:
             caster_name=caster.name,
             target_name=target.name,
         )
+        self._record_power_played(card_id)
         if bounty_pending and card_id != CardId.BOUNTY_NOTICE:
             self._collect_bounty_notice(target, collector=caster)
 
@@ -1374,6 +1390,7 @@ class Match:
         except CardNotInInventoryError as exc:
             raise WrongPhaseError(str(exc)) from exc
         self._append_power_use_feed(CardId.DO_OVER, player)
+        self._record_power_played(CardId.DO_OVER)
         return self.apply_do_over(player, values, category)
 
     def score(
@@ -1646,6 +1663,7 @@ class Match:
 
         self._dice = None
         self._psychic_previews = {}
+        self._powers_played_this_turn = []
         self.phase = TurnPhase.BETWEEN_TURNS
 
         if self.is_over():

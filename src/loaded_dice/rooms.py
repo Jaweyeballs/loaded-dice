@@ -147,6 +147,9 @@ class Room:
                     self.match.can_use_shop(viewer) if viewer else False
                 )
                 match_state["forecaster_reveals"] = self._forecaster_view_for(viewer)
+                # Psychic ghosts are private to the active player.
+                if not match_state["you_are_active"]:
+                    match_state["psychic_previews"] = {}
                 # Never leak other players' exact card IDs — only counts + Forecaster snapshot.
                 for entry in match_state["players"]:
                     if entry["name"] != viewer_name:
