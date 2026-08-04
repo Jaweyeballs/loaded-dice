@@ -2350,6 +2350,14 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
                       : offer.card_id && HINDRANCE_IDS.has(offer.card_id)
                         ? "hindrance"
                         : "power";
+                  // Match inventory tray limits for this card's kind.
+                  const canCarry =
+                    fanKind === "trading"
+                      ? (me?.trading_slots_used ?? tradingCards.length) <
+                        (me?.trading_slot_capacity ?? 3)
+                      : (me?.power_slots_used ?? powerFanCards.length) <
+                        (me?.power_slot_capacity ?? 5);
+                  const canBuy = canAfford && canCarry;
                   const flying =
                     shopFlyOut?.index === offer.index
                       ? shopFlyOut
@@ -2406,7 +2414,7 @@ export function GameView({ room, playerName, onAction, onLeave }: Props) {
                         <button
                           type="button"
                           className="shop-buy-btn"
-                          disabled={!canAfford}
+                          disabled={!canBuy}
                           onClick={() =>
                             confirmShopBuy(
                               offer.index,

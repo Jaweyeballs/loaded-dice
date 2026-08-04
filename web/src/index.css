@@ -1300,24 +1300,6 @@ select {
   transform: rotate(-4deg);
 }
 
-.shop-sign::before {
-  content: "";
-  position: absolute;
-  inset: 0.28rem;
-  clip-path: polygon(
-    30% 0%,
-    70% 0%,
-    100% 30%,
-    100% 70%,
-    70% 100%,
-    30% 100%,
-    0% 70%,
-    0% 30%
-  );
-  border: 2px solid #fff;
-  pointer-events: none;
-}
-
 .shop-sign-label {
   position: relative;
   z-index: 1;
@@ -1603,7 +1585,7 @@ select {
   inset: 0;
   margin: 0 !important;
   pointer-events: none;
-  animation: shop-card-fly-out 0.55s ease-in forwards;
+  animation: shop-card-fly-out 0.35s ease-in forwards;
   z-index: 5;
 }
 
@@ -1619,7 +1601,7 @@ select {
 }
 
 .fan-card-slot.fly-in {
-  animation: inv-card-fly-in 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: inv-card-fly-in 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 @keyframes inv-card-fly-in {
