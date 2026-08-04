@@ -1184,11 +1184,11 @@ select {
   z-index: 20 !important;
 }
 
-/* Seat face-ups sit under card backs — keep the hover lift subtle. */
-.opponent-reveal-card:hover,
-.opponent-reveal-card.armed {
-  transform: translateY(-4px);
-  z-index: 8 !important;
+/* Must beat .fan-card:hover:not(:disabled) specificity or seat peeks still lift 14px. */
+.fan-card.opponent-reveal-card:hover:not(:disabled),
+.fan-card.opponent-reveal-card.armed {
+  transform: translateY(-2px);
+  z-index: 4 !important;
 }
 
 .fan-card.power {
